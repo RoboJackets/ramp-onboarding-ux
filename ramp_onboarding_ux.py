@@ -998,7 +998,7 @@ def order_physical_card() -> Dict[str, str]:
 
 
 @app.get("/order-physical-card/<task_id>")
-def get_physical_card_task(task_id: str) -> Dict[str, str]:
+def get_physical_card_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to order a physical card.
     """
