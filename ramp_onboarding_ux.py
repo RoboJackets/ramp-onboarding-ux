@@ -284,9 +284,7 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
     session["ramp_user_id"] = userinfo["rampUserId"] if "rampUserId" in userinfo else None
 
     if "googleWorkspaceAccount" in userinfo:
-        session["email_address"] = (
-            userinfo["googleWorkspaceAccount"] if "googleWorkspaceAccount" in userinfo else None
-        )
+        session["email_address"] = userinfo["googleWorkspaceAccount"]
         session["email_verified"] = False
     else:
         session["email_address"] = userinfo["email"] if "email" in userinfo else None
