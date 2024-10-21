@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block body %}
+    <p class="mt-4">Finish setting up your account within Ramp.</p>
+    <ol>
+        <li>Open <a href="https://{{ ramp_login_hostname }}">{{ ramp_login_hostname }}</a>.</li>
+        <li>Enter <a href="mailto:{{ ramp_login_email }}">{{ ramp_login_email }}</a> as your email address.</li>
+        <li>Click <strong>Continue</strong>.</li>
+    </ol>
+    <p>Please ask in <a href="slack://channel?team=T033JPZLT&id=C64F32R50">#treasury-helpdesk</a> if you have any questions or need assistance.</p>
+{% endblock %}
