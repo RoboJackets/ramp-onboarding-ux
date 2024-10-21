@@ -13,7 +13,7 @@ WORKDIR /app/
 
 RUN set -eux && \
     npm ci --no-progress && \
-    npm run build-debug
+    npm run build
 
 FROM python:3.13-slim-bullseye
 
