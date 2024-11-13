@@ -450,38 +450,45 @@ update msg model =
                           else
                             Cmd.none
                         , if model.orderPhysicalCard then
-                            Http.post
-                                { url =
-                                    Url.Builder.crossOrigin
-                                        "https://addressvalidation.googleapis.com/v1:validateAddress"
-                                        []
-                                        [ Url.Builder.string "key" model.googleMapsApiKey ]
-                                , body =
-                                    jsonBody
-                                        (Json.Encode.object
-                                            [ ( "enableUspsCass", Json.Encode.bool True )
-                                            , ( "address"
-                                              , Json.Encode.object
-                                                    [ ( "regionCode", Json.Encode.string "US" )
-                                                    , ( "postalCode", Json.Encode.string (String.trim model.zip) )
-                                                    , ( "administrativeArea", Json.Encode.string (Maybe.withDefault "" model.state) )
-                                                    , ( "locality", Json.Encode.string (String.trim model.city) )
-                                                    , ( "addressLines"
-                                                      , Json.Encode.list Json.Encode.string
-                                                            (List.filter nonBlankString
-                                                                (List.map String.trim
-                                                                    [ model.addressLineOne
-                                                                    , model.addressLineTwo
-                                                                    ]
+                            if checkCampusAddress model == NotCampusAddress then
+                                Http.post
+                                    { url =
+                                        Url.Builder.crossOrigin
+                                            "https://addressvalidation.googleapis.com/v1:validateAddress"
+                                            []
+                                            [ Url.Builder.string "key" model.googleMapsApiKey ]
+                                    , body =
+                                        jsonBody
+                                            (Json.Encode.object
+                                                [ ( "enableUspsCass", Json.Encode.bool True )
+                                                , ( "address"
+                                                  , Json.Encode.object
+                                                        [ ( "regionCode", Json.Encode.string "US" )
+                                                        , ( "postalCode", Json.Encode.string (String.trim model.zip) )
+                                                        , ( "administrativeArea", Json.Encode.string (Maybe.withDefault "" model.state) )
+                                                        , ( "locality", Json.Encode.string (String.trim model.city) )
+                                                        , ( "addressLines"
+                                                          , Json.Encode.list Json.Encode.string
+                                                                (List.filter nonBlankString
+                                                                    (List.map String.trim
+                                                                        [ model.addressLineOne
+                                                                        , model.addressLineTwo
+                                                                        ]
+                                                                    )
                                                                 )
-                                                            )
-                                                      )
-                                                    ]
-                                              )
-                                            ]
-                                        )
-                                , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
-                                }
+                                                          )
+                                                        ]
+                                                  )
+                                                ]
+                                            )
+                                    , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
+                                    }
+
+                            else if model.managerRampId /= Nothing then
+                                createRampAccountTask model
+
+                            else
+                                Cmd.none
 
                           else
                             Cmd.none
@@ -678,8 +685,15 @@ update msg model =
                                 else
                                     Cmd.none
 
-                            _ ->
+                            Just False ->
                                 Cmd.none
+
+                            Nothing ->
+                                if checkCampusAddress model /= NotCampusAddress then
+                                    createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+
+                                else
+                                    Cmd.none
 
                     else
                         createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
