@@ -1252,17 +1252,17 @@ renderForm model =
                 ]
             , div [ class "form-text", class "mb-3", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ text
-                    ("All cards ship via UPS 2nd Day Air with tracking. Your card should be delivered by "
+                    ("Your card should be delivered by "
                         ++ formatTime model.zone
-                            (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (6.5 * 1000 * 60 * 60 * 24 * 1))) of
+                            (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
                                 Sat ->
-                                    millisToPosix (posixToMillis model.time + ceiling (8.5 * 1000 * 60 * 60 * 24 * 1))
+                                    millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
 
                                 Sun ->
-                                    millisToPosix (posixToMillis model.time + ceiling (7.5 * 1000 * 60 * 60 * 24 * 1))
+                                    millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
 
                                 _ ->
-                                    millisToPosix (posixToMillis model.time + ceiling (6.5 * 1000 * 60 * 60 * 24 * 1))
+                                    millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
                             )
                         ++ "."
                     )
