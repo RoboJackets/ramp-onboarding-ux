@@ -767,10 +767,10 @@ def create_ramp_account() -> Dict[str, str]:
 
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users/"
-            + session["sub"],
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + session["sub"],
         headers={
             "Authorization": "Bearer " + keycloak_access_token,
         },
