@@ -765,16 +765,45 @@ def create_ramp_account() -> Dict[str, str]:
     if keycloak_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Keycloak")
 
+    get_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users/"
+            + session["sub"],
+        headers={
+            "Authorization": "Bearer " + keycloak_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if get_keycloak_user_response.status_code != 200:
+        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
+        print("Response body:", get_keycloak_user_response.text)
+        raise InternalServerError("Failed to retrieve user from Keycloak")
+
+    new_user = get_keycloak_user_response.json()
+    if "id" in new_user:
+        del new_user["id"]
+
+    if "username" in new_user:
+        del new_user["username"]
+
+    if "attributes" not in new_user:
+        new_user["attributes"] = {"googleWorkspaceAccount": [session["email_address"]]}
+    else:
+        new_user["attributes"]["googleWorkspaceAccount"] = [session["email_address"]]
+
+    new_user["firstName"] = request.json["firstName"]  # type: ignore
+    new_user["lastName"] = request.json["lastName"]  # type: ignore
+
     keycloak_user_response = put(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
         + "/users/"
         + session["sub"],
-        json={
-            "firstName": request.json["firstName"],  # type: ignore
-            "lastName": request.json["lastName"],  # type: ignore
-        },
+        json=new_user,
         headers={
             "Authorization": "Bearer " + keycloak_access_token,
         },
@@ -784,7 +813,7 @@ def create_ramp_account() -> Dict[str, str]:
     if keycloak_user_response.status_code != 204:
         print("Keycloak returned status code:", keycloak_user_response.status_code)
         print("Response body:", keycloak_user_response.text)
-        raise InternalServerError("Failed to update name in Keycloak")
+        raise InternalServerError("Failed to update name and email address in Keycloak")
 
     ramp_access_token = get_ramp_access_token("users:write")
 
