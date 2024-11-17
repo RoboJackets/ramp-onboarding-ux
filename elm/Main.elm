@@ -1252,7 +1252,7 @@ renderForm model =
                 ]
             , div [ class "form-text", class "mb-3", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ text
-                    ("Your card should be delivered by "
+                    ("Your physical card should be delivered by "
                         ++ formatTime model.zone
                             (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
                                 Sat ->
