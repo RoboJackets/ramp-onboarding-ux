@@ -2,6 +2,7 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
+from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
 from re import fullmatch
@@ -74,6 +75,12 @@ oauth.register(
     server_metadata_url=app.config["MICROSOFT_METADATA_URL"],
     client_kwargs={"scope": "openid email"},
 )
+
+BILL_PHYSICAL_CARD_ADDRESSES = {}
+
+for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
+    if row["Order Status"] == "Activated":
+        BILL_PHYSICAL_CARD_ADDRESSES[row["Card Holder"]] = row["Shipping Address"]
 
 
 def get_keycloak_access_token() -> Union[str, None]:
@@ -485,6 +492,14 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                 ):
                     home_address = entry["homePostalAddress"].value
 
+        if (
+            home_address is None
+            and session["first_name"] + " " + session["last_name"] in BILL_PHYSICAL_CARD_ADDRESSES
+        ):
+            home_address = BILL_PHYSICAL_CARD_ADDRESSES[
+                session["first_name"] + " " + session["last_name"]
+            ]
+
         if georgia_tech_mailbox is not None:
             session["address_line_one"] = "351 Ferst Dr NW"
             session["address_line_two"] = georgia_tech_mailbox.split(",")[0]
@@ -504,6 +519,9 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                 },
                 timeout=(5, 5),
             )
+
+            print(address_validation_response.status_code)
+            print(address_validation_response.text)
 
             if address_validation_response.status_code == 200:
                 address_validation_json = address_validation_response.json()
