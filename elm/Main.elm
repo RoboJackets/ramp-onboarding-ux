@@ -1148,7 +1148,7 @@ renderForm model =
                 , div [ class "form-text", class "mb-3" ]
                     [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
                 ]
-            , div [ class "col-6", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
+            , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
                 [ label [ for "department", class "form-label" ]
                     [ text "Department" ]
                 , select
@@ -1190,7 +1190,7 @@ renderForm model =
                     , text "."
                     ]
                 ]
-            , div [ class "col-6", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
+            , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
                 [ label [ for "location", class "form-label" ]
                     [ text "Location" ]
                 , select
