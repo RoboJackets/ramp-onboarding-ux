@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from email.headerregistry import Address
 from re import fullmatch
 from typing import Any, Dict, Union
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
@@ -861,14 +861,9 @@ def create_ramp_account() -> (
 
     direct_manager_id = request.json["directManagerId"]  # type: ignore
 
-    if not fullmatch(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", direct_manager_id
-    ):
-        raise BadRequest("Invalid manager")
-
     if request.json["role"] == "BUSINESS_ADMIN":  # type: ignore
         ramp_user_response = get(
-            url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + direct_manager_id,
+            url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + str(UUID(direct_manager_id)),
             headers={
                 "Authorization": "Bearer " + ramp_access_token,
             },
