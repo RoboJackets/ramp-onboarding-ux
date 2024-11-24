@@ -848,7 +848,7 @@ def create_ramp_account() -> (
     if not session["email_verified"]:
         raise BadRequest("Email address must be verified")
 
-    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "BUSINESS_ADMIN"]:  # type: ignore
+    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "BUSINESS_ADMIN"]:  # type: ignore  # noqa
         raise BadRequest("Invalid role")
 
     if request.json["role"] == "BUSINESS_ADMIN" and session["is_student"] is True:  # type: ignore
