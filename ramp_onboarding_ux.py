@@ -861,6 +861,9 @@ def create_ramp_account() -> (
 
     direct_manager_id = request.json["directManagerId"]  # type: ignore
 
+    if not fullmatch(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", direct_manager_id):
+        raise BadRequest("Invalid manager")
+
     if request.json["role"] == "BUSINESS_ADMIN":  # type: ignore
         ramp_user_response = get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + direct_manager_id,
