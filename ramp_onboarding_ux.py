@@ -827,7 +827,9 @@ def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branch
 
 
 @app.post("/create-ramp-account")
-def create_ramp_account() -> Dict[str, str]:  # pylint: disable=too-many-branches,too-many-statements
+def create_ramp_account() -> (
+    Dict[str, str]
+):  # pylint: disable=too-many-branches,too-many-statements
     """
     Creates a new Ramp account and returns the task status for the browser to poll.
     """
