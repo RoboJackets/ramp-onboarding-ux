@@ -126,7 +126,7 @@ def get_ramp_access_token(scope: str) -> Union[str, None]:
 
 
 @app.get("/")
-def index() -> Any:  # pylint: disable=too-many-branches
+def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     """
     Generates the main form or messaging if the user shouldn't fill it out
     """
@@ -238,6 +238,63 @@ def index() -> Any:  # pylint: disable=too-many-branches
         print("Response body:", apiary_managers_response.text)
         raise InternalServerError("Unable to load managers from Apiary")
 
+    ramp_access_token = get_ramp_access_token("departments:read locations:read")
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    ramp_departments_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/departments",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_departments_response.status_code != 200:
+        print("Ramp returned status code:", ramp_departments_response.status_code)
+        print("Response body:", ramp_departments_response.text)
+        raise InternalServerError("Failed to retrieve departments from Ramp")
+
+    departments = {}
+
+    for department in ramp_departments_response.json()["data"]:
+        departments[department["id"]] = {
+            "label": department["name"],
+            "enabled": department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+        }
+
+    ramp_locations_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if session["is_student"]:
+        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
+    else:
+        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
+
+    if ramp_locations_response.status_code != 200:
+        print("Ramp returned status code:", ramp_locations_response.status_code)
+        print("Response body:", ramp_locations_response.text)
+        raise InternalServerError("Failed to retrieve locations from Ramp")
+
+    locations = {}
+
+    for location in ramp_locations_response.json()["data"]:
+        locations[location["id"]] = {
+            "label": location["name"],
+            "enabled": True,
+        }
+
+    if session["is_student"] or session["zip_code"][:2] == "30":
+        default_location = app.config["RAMP_DEFAULT_LOCATION_STUDENTS"]
+    else:
+        default_location = app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"]
+
     return render_template(
         "form.html",
         elm_model={
@@ -256,6 +313,30 @@ def index() -> Any:  # pylint: disable=too-many-branches
             "googleMapsApiKey": app.config["GOOGLE_MAPS_FRONTEND_API_KEY"],
             "googleClientId": app.config["GOOGLE_CLIENT_ID"],
             "googleOneTapLoginUri": url_for("verify_google_onetap", _external=True),
+            "showAdvancedOptions": not session["is_student"],
+            "departmentOptions": departments,
+            "departmentId": default_department,
+            "locationOptions": locations,
+            "locationId": default_location,
+            "roleOptions": {
+                "BUSINESS_USER": {
+                    "label": "Employee",
+                    "enabled": True,
+                },
+                "BUSINESS_BOOKKEEPER": {
+                    "label": "Bookkeeper",
+                    "enabled": True,
+                },
+                "BUSINESS_ADMIN": {
+                    "label": "Admin",
+                    "enabled": False,  # TODO waiting on ramp developer support to clarify if this is supposed to work  # noqa  # pylint: disable=fixme
+                },
+            },
+            "roleId": "BUSINESS_USER",
+            "defaultDepartmentForStudents": app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"],
+            "defaultDepartmentForNonStudents": app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"],
+            "defaultLocationForStudents": app.config["RAMP_DEFAULT_LOCATION_STUDENTS"],
+            "defaultLocationForNonStudents": app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"],
         },
     )
 
@@ -282,6 +363,7 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
     session["manager_id"] = None
     session["sub"] = userinfo["sub"]
     session["ramp_user_id"] = userinfo["rampUserId"] if "rampUserId" in userinfo else None
+    session["is_student"] = True
 
     if "googleWorkspaceAccount" in userinfo:
         session["email_address"] = userinfo["googleWorkspaceAccount"]
@@ -360,6 +442,10 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                 session["manager_id"] = apiary_user["manager"]["id"]
             else:
                 session["manager_id"] = None
+
+            if "is_student" in apiary_user and apiary_user["is_student"] is False:
+                session["is_student"] = False
+
         else:
             print("Apiary returned status code:", apiary_user_response.status_code)
             print("Response body:", apiary_user_response.text)
@@ -741,7 +827,7 @@ def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branch
 
 
 @app.post("/create-ramp-account")
-def create_ramp_account() -> Dict[str, str]:
+def create_ramp_account() -> Dict[str, str]:  # pylint: disable=too-many-branches,too-many-statements
     """
     Creates a new Ramp account and returns the task status for the browser to poll.
     """
@@ -759,6 +845,41 @@ def create_ramp_account() -> Dict[str, str]:
 
     if not session["email_verified"]:
         raise BadRequest("Email address must be verified")
+
+    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "BUSINESS_ADMIN"]:  # type: ignore
+        raise BadRequest("Invalid role")
+
+    if request.json["role"] == "BUSINESS_ADMIN" and session["is_student"] is True:  # type: ignore
+        raise Unauthorized("Invalid role")
+
+    ramp_access_token = get_ramp_access_token("users:read users:write")
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    direct_manager_id = request.json["directManagerId"]  # type: ignore
+
+    if request.json["role"] == "BUSINESS_ADMIN":  # type: ignore
+        ramp_user_response = get(
+            url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + direct_manager_id,
+            headers={
+                "Authorization": "Bearer " + ramp_access_token,
+            },
+            timeout=(5, 5),
+        )
+
+        if ramp_user_response.status_code != 200:
+            print("Ramp returned status code:", ramp_user_response.status_code)
+            print("Response body:", ramp_user_response.text)
+            return {"error": "Failed to retrieve manager from Ramp"}
+
+        print(ramp_user_response.text)
+
+        if ramp_user_response.json()["role"] not in ("BUSINESS_ADMIN", "BUSINESS_OWNER"):
+            # Ramp doesn't allow an admin to have a non-admin as a manager
+            direct_manager_id = None
+
+    print(direct_manager_id)
 
     keycloak_access_token = get_keycloak_access_token()
 
@@ -815,26 +936,25 @@ def create_ramp_account() -> Dict[str, str]:
         print("Response body:", keycloak_user_response.text)
         raise InternalServerError("Failed to update name and email address in Keycloak")
 
-    ramp_access_token = get_ramp_access_token("users:write")
+    request_body = {
+        "department_id": request.json["departmentId"],  # type: ignore
+        "email": session["email_address"],
+        "first_name": request.json["firstName"],  # type: ignore
+        "idempotency_key": uuid4().hex,
+        "last_name": request.json["lastName"],  # type: ignore
+        "location_id": request.json["locationId"],  # type: ignore
+        "role": request.json["role"],  # type: ignore
+    }
 
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
+    if direct_manager_id is not None:
+        request_body["direct_manager_id"] = direct_manager_id
 
     ramp_invite_user_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
         headers={
             "Authorization": "Bearer " + ramp_access_token,
         },
-        json={
-            "department_id": app.config["RAMP_DEPARTMENT_ID"],
-            "direct_manager_id": request.json["directManagerId"],  # type: ignore
-            "email": session["email_address"],
-            "first_name": request.json["firstName"],  # type: ignore
-            "idempotency_key": uuid4().hex,
-            "last_name": request.json["lastName"],  # type: ignore
-            "location_id": app.config["RAMP_LOCATION_ID"],
-            "role": "BUSINESS_USER",
-        },
+        json=request_body,
         timeout=(5, 5),
     )
 
