@@ -79,7 +79,7 @@ oauth.register(
 BILL_PHYSICAL_CARD_ADDRESSES = {}
 
 for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
-    if row["Order Status"] == "Activated":
+    if row["Order Status"] in ["Activated", "Shipped"]:
         BILL_PHYSICAL_CARD_ADDRESSES[row["Card Holder"]] = row["Shipping Address"]
 
 
