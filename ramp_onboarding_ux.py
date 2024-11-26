@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from email.headerregistry import Address
 from re import fullmatch
 from typing import Any, Dict, Union
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
