@@ -1273,6 +1273,8 @@ renderForm model =
                     , strong [] [ text "Bookkeeper" ]
                     , text ". All other members should select "
                     , strong [] [ text "Employee" ]
+                    , text ". Read more about roles in the "
+                    , a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank" ] [ text "Ramp help center" ]
                     , text "."
                     ]
                 ]
