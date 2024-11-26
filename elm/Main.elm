@@ -1399,6 +1399,7 @@ renderForm model =
                                 Nothing ->
                                     True
                             )
+                        , style "display" "none"
                         ]
                         [ text "Select..." ]
                      ]
