@@ -336,7 +336,7 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
                 },
                 "BUSINESS_ADMIN": {
                     "label": "Admin",
-                    "enabled": False,  # TODO waiting on ramp developer support to clarify if this is supposed to work  # noqa  # pylint: disable=fixme
+                    "enabled": not session["is_student"],
                 },
             },
             "roleId": "BUSINESS_USER",
@@ -872,35 +872,6 @@ def create_ramp_account() -> (
     if request.json["role"] == "BUSINESS_ADMIN" and session["is_student"] is True:  # type: ignore
         raise Unauthorized("Invalid role")
 
-    ramp_access_token = get_ramp_access_token("users:read users:write")
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
-    direct_manager_id = request.json["directManagerId"]  # type: ignore
-
-    if request.json["role"] == "BUSINESS_ADMIN":  # type: ignore
-        ramp_user_response = get(
-            url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + str(UUID(direct_manager_id)),
-            headers={
-                "Authorization": "Bearer " + ramp_access_token,
-            },
-            timeout=(5, 5),
-        )
-
-        if ramp_user_response.status_code != 200:
-            print("Ramp returned status code:", ramp_user_response.status_code)
-            print("Response body:", ramp_user_response.text)
-            return {"error": "Failed to retrieve manager from Ramp"}
-
-        print(ramp_user_response.text)
-
-        if ramp_user_response.json()["role"] not in ("BUSINESS_ADMIN", "BUSINESS_OWNER"):
-            # Ramp doesn't allow an admin to have a non-admin as a manager
-            direct_manager_id = None
-
-    print(direct_manager_id)
-
     keycloak_access_token = get_keycloak_access_token()
 
     if keycloak_access_token is None:
@@ -966,8 +937,14 @@ def create_ramp_account() -> (
         "role": request.json["role"],  # type: ignore
     }
 
-    if direct_manager_id is not None:
-        request_body["direct_manager_id"] = direct_manager_id
+    # Ramp doesn't allow setting a manager for admins via API
+    if request.json["role"] != "BUSINESS_ADMIN":  # type: ignore
+        request_body["direct_manager_id"] = request.json["directManagerId"]
+
+    ramp_access_token = get_ramp_access_token("users:write")
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
 
     ramp_invite_user_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
