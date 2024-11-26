@@ -1435,9 +1435,26 @@ renderForm model =
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText (validateZipCode model.zip)) ]
                 ]
-            , div [ class "form-text", class "mb-3", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
+            , div [ class "form-text", class "d-none", class "mb-3", classList [ ( "d-sm-block", model.orderPhysicalCard ) ] ]
                 [ text
                     ("Your physical card should be delivered by "
+                        ++ formatTime model.zone
+                            (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
+                                Sat ->
+                                    millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
+
+                                Sun ->
+                                    millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
+
+                                _ ->
+                                    millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
+                            )
+                        ++ "."
+                    )
+                ]
+            , div [ class "form-text", class "d-sm-none", class "mb-3", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
+                [ text
+                    ("Your card should be delivered by "
                         ++ formatTime model.zone
                             (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
                                 Sat ->
