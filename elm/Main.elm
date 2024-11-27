@@ -2431,7 +2431,7 @@ buildInitialModel value =
         )
         (case decodeString (field managerRampIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok managerId ->
-                if Dict.member managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                     Just managerId
 
                 else
@@ -2440,7 +2440,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, managerRampIdFieldName ] string) value of
                     Ok managerId ->
-                        if Dict.member managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                             Just managerId
 
                         else
@@ -2518,7 +2518,7 @@ buildInitialModel value =
         (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value))
         (case decodeString (field departmentIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok departmentId ->
-                if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                     Just departmentId
 
                 else
@@ -2527,7 +2527,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, departmentIdFieldName ] string) value of
                     Ok departmentId ->
-                        if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                             Just departmentId
 
                         else
@@ -2558,7 +2558,7 @@ buildInitialModel value =
         )
         (case decodeString (field roleIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok roleId ->
-                if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                     Just roleId
 
                 else
@@ -2567,7 +2567,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, roleIdFieldName ] string) value of
                     Ok roleId ->
-                        if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
                             Just roleId
 
                         else
