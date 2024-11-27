@@ -2,6 +2,7 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
+from collections import defaultdict
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
@@ -245,7 +246,7 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
         print("Response body:", apiary_managers_response.text)
         raise InternalServerError("Unable to load managers from Apiary")
 
-    ramp_access_token = get_ramp_access_token("departments:read locations:read")
+    ramp_access_token = get_ramp_access_token("departments:read locations:read users:read")
 
     if ramp_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Ramp")
@@ -271,6 +272,11 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             "enabled": department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
         }
 
+    if session["is_student"]:
+        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
+    else:
+        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
+
     ramp_locations_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
         headers={
@@ -278,11 +284,6 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
         },
         timeout=(5, 5),
     )
-
-    if session["is_student"]:
-        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
-    else:
-        default_department = app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
 
     if ramp_locations_response.status_code != 200:
         print("Ramp returned status code:", ramp_locations_response.status_code)
@@ -302,6 +303,42 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
     else:
         default_location = app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"]
 
+    ramp_users_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_users_response.status_code != 200:
+        print("Ramp returned status code:", ramp_users_response.status_code)
+        print("Response body:", ramp_users_response.text)
+        raise InternalServerError("Failed to retrieve users from Ramp")
+
+    users = {}
+
+    name_map = defaultdict(list)
+
+    for user in ramp_users_response.json()["data"]:
+        users[user["id"]] = {
+            "label": user["first_name"] + " " + user["last_name"],
+            "enabled": user["status"] == "USER_ACTIVE"
+            and user["is_manager"] is True
+            and user["department_id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+        }
+
+        name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
+
+    ramp_manager_id = None
+
+    if (
+        not session["is_student"]
+        and session["manager_id"] is not None
+        and len(name_map[managers[session["manager_id"]]]) == 1
+    ):
+        ramp_manager_id = name_map[managers[session["manager_id"]]][0]
+
     return render_template(
         "form.html",
         elm_model={
@@ -309,8 +346,10 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             "lastName": session["last_name"],
             "emailAddress": session["email_address"],
             "emailVerified": session["email_verified"],
-            "managerId": session["manager_id"],
-            "managerOptions": managers,
+            "apiaryManagerId": session["manager_id"],
+            "apiaryManagerOptions": managers,
+            "rampManagerId": ramp_manager_id,
+            "rampManagerOptions": users,
             "selfId": session["user_id"],
             "addressLineOne": session["address_line_one"],
             "addressLineTwo": session["address_line_two"],

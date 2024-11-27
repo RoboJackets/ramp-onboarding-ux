@@ -66,6 +66,146 @@ managerFeedbackText =
     "Please select your manager"
 
 
+departmentFeedbackText : String
+departmentFeedbackText =
+    "Please select your department"
+
+
+locationFeedbackText : String
+locationFeedbackText =
+    "Please select your location"
+
+
+roleFeedbackText : String
+roleFeedbackText =
+    "Please select your role"
+
+
+firstNameFieldName : String
+firstNameFieldName =
+    "firstName"
+
+
+lastNameFieldName : String
+lastNameFieldName =
+    "lastName"
+
+
+emailAddressFieldName : String
+emailAddressFieldName =
+    "emailAddress"
+
+
+emailVerifiedFieldName : String
+emailVerifiedFieldName =
+    "emailVerified"
+
+
+managerApiaryIdFieldName : String
+managerApiaryIdFieldName =
+    "managerApiaryId"
+
+
+managerRampIdFieldName : String
+managerRampIdFieldName =
+    "managerRampId"
+
+
+departmentIdFieldName : String
+departmentIdFieldName =
+    "departmentId"
+
+
+locationIdFieldName : String
+locationIdFieldName =
+    "locationId"
+
+
+roleIdFieldName : String
+roleIdFieldName =
+    "roleId"
+
+
+orderPhysicalCardFieldName : String
+orderPhysicalCardFieldName =
+    "orderPhysicalCard"
+
+
+addressLineOneFieldName : String
+addressLineOneFieldName =
+    "addressLineOne"
+
+
+addressLineTwoFieldName : String
+addressLineTwoFieldName =
+    "addressLineTwo"
+
+
+cityFieldName : String
+cityFieldName =
+    "city"
+
+
+stateFieldName : String
+stateFieldName =
+    "state"
+
+
+zipCodeFieldName : String
+zipCodeFieldName =
+    "zip"
+
+
+showAdvancedOptionsFieldName : String
+showAdvancedOptionsFieldName =
+    "showAdvancedOptions"
+
+
+googleMapsApiKeyFieldName : String
+googleMapsApiKeyFieldName =
+    "googleMapsApiKey"
+
+
+serverDataFieldName : String
+serverDataFieldName =
+    "serverData"
+
+
+localDataFieldName : String
+localDataFieldName =
+    "localData"
+
+
+apiaryManagerOptionsFieldName : String
+apiaryManagerOptionsFieldName =
+    "apiaryManagerOptions"
+
+
+rampManagerOptionsFieldName : String
+rampManagerOptionsFieldName =
+    "rampManagerOptions"
+
+
+departmentOptionsFieldName : String
+departmentOptionsFieldName =
+    "departmentOptions"
+
+
+locationOptionsFieldName : String
+locationOptionsFieldName =
+    "locationOptions"
+
+
+roleOptionsFieldName : String
+roleOptionsFieldName =
+    "roleOptions"
+
+
+selfIdFieldName : String
+selfIdFieldName =
+    "selfId"
+
+
 
 -- ICONS
 
@@ -188,7 +328,7 @@ type alias Model =
     , lastName : String
     , emailAddress : String
     , emailVerified : Bool
-    , managerOptions : Dict Int String
+    , managerApiaryOptions : Dict Int String
     , managerApiaryId : Maybe Int
     , managerRampId : Maybe String
     , managerIsValid : Maybe Bool
@@ -223,6 +363,7 @@ type alias Model =
     , nonStudentDefaultDepartmentId : String
     , studentDefaultLocationId : String
     , nonStudentDefaultLocationId : String
+    , managerRampOptions : Dict String RampObject
     }
 
 
@@ -234,7 +375,8 @@ type Msg
     | FirstNameInput String
     | LastNameInput String
     | EmailAddressInput String
-    | ManagerInput Int
+    | ApiaryManagerInput Int
+    | RampManagerInput String
     | OrderPhysicalCardChecked Bool
     | AddressLineOneInput String
     | AddressLineTwoInput String
@@ -281,7 +423,7 @@ init flags url key =
     , Cmd.batch
         [ Task.perform SetTime Time.now
         , Task.perform SetZone Time.here
-        , initializeAutocomplete (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "googleMapsApiKey" ] string) flags)))
+        , initializeAutocomplete (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, googleMapsApiKeyFieldName ] string) flags)))
         , if showOneTap (buildInitialModel flags) then
             initializeOneTap True
 
@@ -380,14 +522,24 @@ update msg model =
             , saveToLocalStorage (stringifyModel model)
             )
 
-        ManagerInput managerApiaryId ->
+        ApiaryManagerInput managerApiaryId ->
             ( { model
                 | managerApiaryId = Just managerApiaryId
                 , managerRampId = Nothing
                 , managerIsValid = Nothing
                 , nextAction = NoOpNextAction
               }
-            , saveToLocalStorage (stringifyModel { model | managerApiaryId = Just managerApiaryId })
+            , saveToLocalStorage (stringifyModel { model | managerApiaryId = Just managerApiaryId, managerRampId = Nothing })
+            )
+
+        RampManagerInput managerRampId ->
+            ( { model
+                | managerApiaryId = Nothing
+                , managerRampId = Just managerRampId
+                , managerIsValid = Just True
+                , nextAction = NoOpNextAction
+              }
+            , saveToLocalStorage (stringifyModel { model | managerApiaryId = Nothing, managerRampId = Just managerRampId })
             )
 
         OrderPhysicalCardChecked orderPhysicalCard ->
@@ -454,7 +606,7 @@ update msg model =
                     Nav.load
                         (Url.Builder.absolute
                             [ "verify-email" ]
-                            [ Url.Builder.string "emailAddress" model.emailAddress ]
+                            [ Url.Builder.string emailAddressFieldName model.emailAddress ]
                         )
 
                 Validation ->
@@ -790,12 +942,12 @@ update msg model =
                                     , body =
                                         jsonBody
                                             (Json.Encode.object
-                                                [ ( "firstName", Json.Encode.string (String.trim model.firstName) )
-                                                , ( "lastName", Json.Encode.string (String.trim model.lastName) )
-                                                , ( "addressLineOne", Json.Encode.string (String.trim model.addressLineOne) )
-                                                , ( "addressLineTwo", Json.Encode.string (String.trim model.addressLineTwo) )
-                                                , ( "city", Json.Encode.string (String.trim model.city) )
-                                                , ( "state"
+                                                [ ( firstNameFieldName, Json.Encode.string (String.trim model.firstName) )
+                                                , ( lastNameFieldName, Json.Encode.string (String.trim model.lastName) )
+                                                , ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
+                                                , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
+                                                , ( cityFieldName, Json.Encode.string (String.trim model.city) )
+                                                , ( stateFieldName
                                                   , case model.state of
                                                         Just state ->
                                                             Json.Encode.string state
@@ -803,7 +955,7 @@ update msg model =
                                                         Nothing ->
                                                             Json.Encode.null
                                                   )
-                                                , ( "zip", Json.Encode.string (String.trim model.zip) )
+                                                , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
                                                 ]
                                             )
                                     , expect = expectJson OrderPhysicalCardTaskIdReceived createTaskResponseDecoder
@@ -895,9 +1047,12 @@ update msg model =
         ShowAdvancedOptionsButtonClicked ->
             ( { model
                 | showAdvancedOptions = True
+                , managerApiaryId = Nothing
+                , managerRampId = getManagerRampIdFromApiaryId model
+                , managerIsValid = Just True
                 , nextAction = NoOpNextAction
               }
-            , saveToLocalStorage (stringifyModel { model | showAdvancedOptions = True })
+            , saveToLocalStorage (stringifyModel { model | showAdvancedOptions = True, managerApiaryId = Nothing, managerRampId = getManagerRampIdFromApiaryId model })
             )
 
         DepartmentInput selectedDepartment ->
@@ -1120,31 +1275,51 @@ renderForm model =
                     , id "manager"
                     , required True
                     , readonly (model.formState /= Editing)
-                    , on "change" (Json.Decode.map ManagerInput targetValueIntParse)
+                    , on "change"
+                        (if model.showAdvancedOptions then
+                            Json.Decode.map RampManagerInput targetValue
+
+                         else
+                            Json.Decode.map ApiaryManagerInput targetValueIntParse
+                        )
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateManager model.managerIsValid model.managerFeedbackText model.managerApiaryId model.managerOptions model.selfApiaryId) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateManager model.managerIsValid model.managerFeedbackText model.managerApiaryId model.managerOptions model.selfApiaryId)) )
+                        [ ( "is-valid", model.showValidation && isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId) )
+                        , ( "is-invalid", model.showValidation && not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) )
                         ]
                     ]
                     ([ option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
-                            (case model.managerApiaryId of
-                                Just managerApiaryId ->
-                                    model.selfApiaryId == managerApiaryId
+                            (if model.showAdvancedOptions then
+                                case model.managerRampId of
+                                    Just _ ->
+                                        False
 
-                                Nothing ->
-                                    True
+                                    Nothing ->
+                                        True
+
+                             else
+                                case model.managerApiaryId of
+                                    Just managerApiaryId ->
+                                        model.selfApiaryId == managerApiaryId
+
+                                    Nothing ->
+                                        True
                             )
                         , style "display" "none"
                         ]
                         [ text "Select your manager..." ]
                      ]
-                        ++ List.map (managerTupleToHtmlOption model.managerApiaryId model.selfApiaryId) (sortBy second (toList model.managerOptions))
+                        ++ (if model.showAdvancedOptions then
+                                List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
+
+                            else
+                                List.map (managerTupleToHtmlOption model.managerApiaryId model.selfApiaryId) (sortBy second (toList model.managerApiaryOptions))
+                           )
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateManager model.managerIsValid model.managerFeedbackText model.managerApiaryId model.managerOptions model.selfApiaryId)) ]
+                    [ text (feedbackText (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) ]
                 , div [ class "form-text", class "mb-3" ]
                     [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
                 ]
@@ -1266,7 +1441,14 @@ renderForm model =
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText (validateRole model.rampRoleId model.rampRoleOptions)) ]
-                , div [ class "form-text", class "mb-3" ]
+                , div [ class "form-text", class "d-md-none", class "mb-3" ]
+                    [ text "Most members should select "
+                    , strong [] [ text "Employee" ]
+                    , text ", unless you have a specific need for additional access. Read more about roles in the "
+                    , a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank" ] [ text "Ramp help center" ]
+                    , text "."
+                    ]
+                , div [ class "form-text", class "d-none", class "mb-3", class "d-md-block" ]
                     [ text "Corporation staff that need to manage our Ramp account should select "
                     , strong [] [ text "Admin" ]
                     , text ". Members that need to view all activity within Ramp should select "
@@ -1604,29 +1786,42 @@ validateEmailAddress emailAddress verified =
             Invalid emailFeedbackText
 
 
-validateManager : Maybe Bool -> String -> Maybe Int -> Dict Int String -> Int -> ValidationResult
-validateManager selectedManagerHasRampAccount selectedManagerRampFeedbackText selectedManagerId managerOptions selfId =
-    case selectedManagerId of
-        Just managerId ->
-            if managerId == selfId then
+validateManager : Bool -> Maybe Bool -> String -> Maybe String -> Maybe Int -> Dict Int String -> Dict String RampObject -> Int -> ValidationResult
+validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedManagerRampFeedbackText selectedManagerRampId selectedManagerApiaryId managerApiaryOptions managerRampOptions selfId =
+    if usingRampManagerOptions then
+        case selectedManagerRampId of
+            Just managerId ->
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId managerRampOptions)).enabled == True then
+                    Valid
+
+                else
+                    Invalid managerFeedbackText
+
+            Nothing ->
                 Invalid managerFeedbackText
 
-            else if Dict.member managerId managerOptions then
-                case selectedManagerHasRampAccount of
-                    Just True ->
-                        Valid
+    else
+        case selectedManagerApiaryId of
+            Just managerId ->
+                if managerId == selfId then
+                    Invalid managerFeedbackText
 
-                    Just False ->
-                        Invalid selectedManagerRampFeedbackText
+                else if Dict.member managerId managerApiaryOptions then
+                    case selectedManagerHasRampAccount of
+                        Just True ->
+                            Valid
 
-                    Nothing ->
-                        Valid
+                        Just False ->
+                            Invalid selectedManagerRampFeedbackText
 
-            else
+                        Nothing ->
+                            Valid
+
+                else
+                    Invalid managerFeedbackText
+
+            Nothing ->
                 Invalid managerFeedbackText
-
-        Nothing ->
-            Invalid managerFeedbackText
 
 
 validateAddressLineOne : String -> ValidationResult
@@ -1737,10 +1932,10 @@ validateDepartment selectedDepartment departmentOptions =
                 Valid
 
             else
-                Invalid "Please select your department"
+                Invalid departmentFeedbackText
 
         Nothing ->
-            Invalid "Please select your department"
+            Invalid departmentFeedbackText
 
 
 validateLocation : Maybe String -> Dict String RampObject -> ValidationResult
@@ -1751,10 +1946,10 @@ validateLocation selectedLocation locationOptions =
                 Valid
 
             else
-                Invalid "Please select your location"
+                Invalid locationFeedbackText
 
         Nothing ->
-            Invalid "Please select your location"
+            Invalid locationFeedbackText
 
 
 validateRole : Maybe String -> Dict String RampObject -> ValidationResult
@@ -1765,10 +1960,10 @@ validateRole selectedRole roleOptions =
                 Valid
 
             else
-                Invalid "Please select your role"
+                Invalid roleFeedbackText
 
         Nothing ->
-            Invalid "Please select your role"
+            Invalid roleFeedbackText
 
 
 validateZipCode : String -> ValidationResult
@@ -1794,7 +1989,7 @@ validateModel model =
     else if not model.emailVerified then
         Invalid "email_verification_button"
 
-    else if not (isValid (validateManager model.managerIsValid model.managerFeedbackText model.managerApiaryId model.managerOptions model.selfApiaryId)) then
+    else if not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) then
         Invalid "manager"
 
     else if not (isValid (validateDepartment model.rampDepartmentId model.rampDepartmentOptions)) then
@@ -1950,10 +2145,10 @@ stringifyModel : Model -> String
 stringifyModel model =
     Json.Encode.encode 0
         (Json.Encode.object
-            [ ( "firstName", Json.Encode.string (String.trim model.firstName) )
-            , ( "lastName", Json.Encode.string (String.trim model.lastName) )
-            , ( "emailAddress", Json.Encode.string (String.trim model.emailAddress) )
-            , ( "managerId"
+            [ ( firstNameFieldName, Json.Encode.string (String.trim model.firstName) )
+            , ( lastNameFieldName, Json.Encode.string (String.trim model.lastName) )
+            , ( emailAddressFieldName, Json.Encode.string (String.trim model.emailAddress) )
+            , ( managerApiaryIdFieldName
               , case model.managerApiaryId of
                     Just managerApiaryId ->
                         Json.Encode.int managerApiaryId
@@ -1961,7 +2156,15 @@ stringifyModel model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( "departmentId"
+            , ( managerRampIdFieldName
+              , case model.managerRampId of
+                    Just managerRampId ->
+                        Json.Encode.string (String.trim managerRampId)
+
+                    Nothing ->
+                        Json.Encode.null
+              )
+            , ( departmentIdFieldName
               , case model.rampDepartmentId of
                     Just departmentId ->
                         Json.Encode.string (String.trim departmentId)
@@ -1969,7 +2172,7 @@ stringifyModel model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( "locationId"
+            , ( locationIdFieldName
               , case model.rampLocationId of
                     Just locationId ->
                         Json.Encode.string (String.trim locationId)
@@ -1977,7 +2180,7 @@ stringifyModel model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( "roleId"
+            , ( roleIdFieldName
               , case model.rampRoleId of
                     Just roleId ->
                         Json.Encode.string (String.trim roleId)
@@ -1985,12 +2188,12 @@ stringifyModel model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( "showAdvancedOptions", Json.Encode.bool model.showAdvancedOptions )
-            , ( "orderPhysicalCard", Json.Encode.bool model.orderPhysicalCard )
-            , ( "addressLineOne", Json.Encode.string (String.trim model.addressLineOne) )
-            , ( "addressLineTwo", Json.Encode.string (String.trim model.addressLineTwo) )
-            , ( "city", Json.Encode.string (String.trim model.city) )
-            , ( "state"
+            , ( showAdvancedOptionsFieldName, Json.Encode.bool model.showAdvancedOptions )
+            , ( orderPhysicalCardFieldName, Json.Encode.bool model.orderPhysicalCard )
+            , ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
+            , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
+            , ( cityFieldName, Json.Encode.string (String.trim model.city) )
+            , ( stateFieldName
               , case model.state of
                     Just state ->
                         Json.Encode.string state
@@ -1998,7 +2201,7 @@ stringifyModel model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( "zip", Json.Encode.string (String.trim model.zip) )
+            , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
             ]
         )
 
@@ -2184,40 +2387,40 @@ buildInitialModel value =
     Model
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "firstName" ] string) value))
-                (decodeString (field "firstName" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, firstNameFieldName ] string) value))
+                (decodeString (field firstNameFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "lastName" ] string) value))
-                (decodeString (field "lastName" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, lastNameFieldName ] string) value))
+                (decodeString (field lastNameFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
-        (if Result.withDefault False (decodeValue (at [ "serverData", "emailVerified" ] bool) value) then
+        (if Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value) then
             String.trim
                 (Result.withDefault
                     ""
-                    (decodeValue (at [ "serverData", "emailAddress" ] string) value)
+                    (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value)
                 )
 
          else
             String.trim
                 (Result.withDefault
-                    (Result.withDefault "" (decodeValue (at [ "serverData", "emailAddress" ] string) value))
-                    (decodeString (field "emailAddress" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                    (Result.withDefault "" (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value))
+                    (decodeString (field emailAddressFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
                 )
         )
-        (Result.withDefault False (decodeValue (at [ "serverData", "emailVerified" ] bool) value))
-        (Dict.fromList (List.filterMap stringStringTupleToMaybeIntStringTuple (Result.withDefault [] (decodeValue (at [ "serverData", "managerOptions" ] (keyValuePairs string)) value))))
-        (case decodeString (field "managerId" int) (Result.withDefault "{}" (decodeValue (field "localData" string) value)) of
+        (Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value))
+        (Dict.fromList (List.filterMap stringStringTupleToMaybeIntStringTuple (Result.withDefault [] (decodeValue (at [ serverDataFieldName, apiaryManagerOptionsFieldName ] (keyValuePairs string)) value))))
+        (case decodeString (field managerApiaryIdFieldName int) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok managerId ->
                 Just managerId
 
             Err _ ->
-                case decodeValue (at [ "serverData", "managerId" ] int) value of
+                case decodeValue (at [ serverDataFieldName, managerApiaryIdFieldName ] int) value of
                     Ok managerId ->
-                        if Result.withDefault -1 (decodeValue (at [ "serverData", "selfId" ] int) value) == managerId then
+                        if Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value) == managerId then
                             Nothing
 
                         else
@@ -2226,30 +2429,49 @@ buildInitialModel value =
                     Err _ ->
                         Nothing
         )
-        Nothing
+        (case decodeString (field managerRampIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
+            Ok managerId ->
+                if Dict.member managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                    Just managerId
+
+                else
+                    Nothing
+
+            Err _ ->
+                case decodeValue (at [ serverDataFieldName, managerRampIdFieldName ] string) value of
+                    Ok managerId ->
+                        if Dict.member managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                            Just managerId
+
+                        else
+                            Nothing
+
+                    Err _ ->
+                        Nothing
+        )
         Nothing
         ""
-        (Result.withDefault -1 (decodeValue (at [ "serverData", "selfId" ] int) value))
-        (Result.withDefault True (decodeString (field "orderPhysicalCard" bool) (Result.withDefault "{}" (decodeValue (field "localData" string) value))))
+        (Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value))
+        (Result.withDefault True (decodeString (field orderPhysicalCardFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value))))
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "addressLineOne" ] string) value))
-                (decodeString (field "addressLineOne" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, addressLineOneFieldName ] string) value))
+                (decodeString (field addressLineOneFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "addressLineTwo" ] string) value))
-                (decodeString (field "addressLineTwo" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, addressLineTwoFieldName ] string) value))
+                (decodeString (field addressLineTwoFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "city" ] string) value))
-                (decodeString (field "city" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, cityFieldName ] string) value))
+                (decodeString (field cityFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
-        (case decodeString (field "state" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)) of
+        (case decodeString (field stateFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok state ->
                 if Dict.member state statesMap then
                     Just state
@@ -2258,7 +2480,7 @@ buildInitialModel value =
                     Nothing
 
             Err _ ->
-                case decodeValue (at [ "serverData", "state" ] string) value of
+                case decodeValue (at [ serverDataFieldName, stateFieldName ] string) value of
                     Ok state ->
                         if Dict.member state statesMap then
                             Just state
@@ -2271,16 +2493,16 @@ buildInitialModel value =
         )
         (String.trim
             (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ "serverData", "zip" ] string) value))
-                (decodeString (field "zip" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, zipCodeFieldName ] string) value))
+                (decodeString (field zipCodeFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
         False
         Nothing
         False
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "googleMapsApiKey" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "googleClientId" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "googleOneTapLoginUri" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, googleMapsApiKeyFieldName ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "googleClientId" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "googleOneTapLoginUri" ] string) value)))
         (Time.millisToPosix 0)
         Time.utc
         Editing
@@ -2288,24 +2510,24 @@ buildInitialModel value =
         Nothing
         Nothing
         (Result.withDefault
-            (Result.withDefault False (decodeValue (at [ "serverData", "showAdvancedOptions" ] bool) value))
-            (decodeString (field "showAdvancedOptions" bool) (Result.withDefault "{}" (decodeValue (field "localData" string) value)))
+            (Result.withDefault False (decodeValue (at [ serverDataFieldName, showAdvancedOptionsFieldName ] bool) value))
+            (decodeString (field showAdvancedOptionsFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
         )
-        (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "departmentOptions" ] (dict rampObjectDecoder)) value))
-        (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "locationOptions" ] (dict rampObjectDecoder)) value))
-        (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "roleOptions" ] (dict rampObjectDecoder)) value))
-        (case decodeString (field "departmentId" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)) of
+        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value))
+        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value))
+        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value))
+        (case decodeString (field departmentIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok departmentId ->
-                if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "departmentOptions" ] (dict rampObjectDecoder)) value)) then
+                if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                     Just departmentId
 
                 else
                     Nothing
 
             Err _ ->
-                case decodeValue (at [ "serverData", "departmentId" ] string) value of
+                case decodeValue (at [ serverDataFieldName, departmentIdFieldName ] string) value of
                     Ok departmentId ->
-                        if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "departmentOptions" ] (dict rampObjectDecoder)) value)) then
+                        if Dict.member departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                             Just departmentId
 
                         else
@@ -2314,18 +2536,18 @@ buildInitialModel value =
                     Err _ ->
                         Nothing
         )
-        (case decodeString (field "locationId" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)) of
+        (case decodeString (field locationIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok locationId ->
-                if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "locationOptions" ] (dict rampObjectDecoder)) value)) then
+                if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                     Just locationId
 
                 else
                     Nothing
 
             Err _ ->
-                case decodeValue (at [ "serverData", "locationId" ] string) value of
+                case decodeValue (at [ serverDataFieldName, locationIdFieldName ] string) value of
                     Ok locationId ->
-                        if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "locationOptions" ] (dict rampObjectDecoder)) value)) then
+                        if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                             Just locationId
 
                         else
@@ -2334,18 +2556,18 @@ buildInitialModel value =
                     Err _ ->
                         Nothing
         )
-        (case decodeString (field "roleId" string) (Result.withDefault "{}" (decodeValue (field "localData" string) value)) of
+        (case decodeString (field roleIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok roleId ->
-                if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "roleOptions" ] (dict rampObjectDecoder)) value)) then
+                if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                     Just roleId
 
                 else
                     Nothing
 
             Err _ ->
-                case decodeValue (at [ "serverData", "roleId" ] string) value of
+                case decodeValue (at [ serverDataFieldName, roleIdFieldName ] string) value of
                     Ok roleId ->
-                        if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ "serverData", "roleOptions" ] (dict rampObjectDecoder)) value)) then
+                        if Dict.member roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)) then
                             Just roleId
 
                         else
@@ -2354,10 +2576,11 @@ buildInitialModel value =
                     Err _ ->
                         Nothing
         )
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "defaultDepartmentForStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "defaultDepartmentForNonStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "defaultLocationForStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ "serverData", "defaultLocationForNonStudents" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultDepartmentForStudents" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultDepartmentForNonStudents" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForStudents" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
+        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value))
 
 
 stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )
@@ -2468,6 +2691,25 @@ formatTime zone time =
 sortByRampObjectLabel : ( String, RampObject ) -> ( String, RampObject ) -> Order
 sortByRampObjectLabel first second =
     compare (Tuple.second first).label (Tuple.second second).label
+
+
+labelMatches : Maybe String -> String -> RampObject -> Bool
+labelMatches maybeGivenLabel rampId rampObject =
+    case maybeGivenLabel of
+        Just givenLabel ->
+            givenLabel == rampObject.label
+
+        Nothing ->
+            False
+
+
+getManagerRampIdFromApiaryId : Model -> Maybe String
+getManagerRampIdFromApiaryId model =
+    if Dict.size (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions) == 1 then
+        Just (Tuple.first (Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions)))))
+
+    else
+        Nothing
 
 
 
