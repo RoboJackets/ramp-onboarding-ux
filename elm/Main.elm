@@ -2337,7 +2337,7 @@ checkCampusAddress model =
             == "atlanta"
             && Maybe.withDefault "" model.state
             == "GA"
-            && String.trim String.left 3 model.zip
+            && String.trim (String.left 3 model.zip)
             == "303"
     then
         StudentCenter
@@ -2349,7 +2349,7 @@ checkCampusAddress model =
             == "atlanta"
             && Maybe.withDefault "" model.state
             == "GA"
-            && String.trim String.left 3 model.zip
+            && String.trim (String.left 3 model.zip)
             == "303"
     then
         GraduateLivingCenter
@@ -2361,7 +2361,7 @@ checkCampusAddress model =
             == "atlanta"
             && Maybe.withDefault "" model.state
             == "GA"
-            && String.trim String.left 3 model.zip
+            && String.trim (String.left 3 model.zip)
             == "303"
     then
         ManufacturingRelatedDisciplinesComplex
@@ -2373,7 +2373,7 @@ checkCampusAddress model =
             == "atlanta"
             && Maybe.withDefault "" model.state
             == "GA"
-            && String.trim String.left 3 model.zip
+            && String.trim (String.left 3 model.zip)
             == "303"
     then
         ManufacturingRelatedDisciplinesComplex
