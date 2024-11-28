@@ -2705,7 +2705,7 @@ labelMatches maybeGivenLabel rampId rampObject =
 
 getManagerRampIdFromApiaryId : Model -> Maybe String
 getManagerRampIdFromApiaryId model =
-    if Dict.size (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions) == 1 then
+    if Dict.size (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions) == 1 && (Tuple.second (Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions))))).enabled then
         Just (Tuple.first (Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions)))))
 
     else
