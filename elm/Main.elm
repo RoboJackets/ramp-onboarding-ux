@@ -203,7 +203,7 @@ roleOptionsFieldName =
 
 selfIdFieldName : String
 selfIdFieldName =
-    "selfId"
+    "selfApiaryId"
 
 
 
