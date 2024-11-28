@@ -64,9 +64,7 @@ job "ramp-onboarding-ux" {
   group "ramp-onboarding-ux" {
     network {
       port "http" {}
-    }
 
-    network {
       port "resp" {}
     }
 
