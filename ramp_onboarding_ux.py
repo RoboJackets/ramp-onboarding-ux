@@ -7,13 +7,15 @@ from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
 from re import fullmatch
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Tuple, Union
 from uuid import uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
 from flask import Flask, Response, redirect, render_template, request, session, url_for
 from flask.helpers import get_debug_flag
+
+from flask_caching import Cache
 
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -84,6 +86,25 @@ for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
         BILL_PHYSICAL_CARD_ADDRESSES[row["Card Holder"]] = row["Shipping Address"]
 
 
+cache = Cache(app)
+cache.clear()
+
+
+def dont_cache_none(response: Union[str, None]) -> bool:
+    """
+    Don't cache None results from access token functions
+    """
+    return response is not None
+
+
+def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
+    """
+    Don't cache Ramp user lookup calls if the user doesn't have an active Ramp account
+    """
+    return "rampUserId" not in response
+
+
+@cache.cached(timeout=55, key_prefix="keycloak_access_token", response_filter=dont_cache_none)
 def get_keycloak_access_token() -> Union[str, None]:
     """
     Get an access token for Keycloak.
@@ -107,7 +128,8 @@ def get_keycloak_access_token() -> Union[str, None]:
     return None
 
 
-def get_ramp_access_token(scope: str) -> Union[str, None]:
+@cache.cached(timeout=863995, key_prefix="ramp_access_token", response_filter=dont_cache_none)
+def get_ramp_access_token() -> Union[str, None]:
     """
     Get an access token for Ramp.
     """
@@ -115,7 +137,7 @@ def get_ramp_access_token(scope: str) -> Union[str, None]:
         url=app.config["RAMP_API_URL"] + "/developer/v1/token",
         data={
             "grant_type": "client_credentials",
-            "scope": scope,
+            "scope": "users:read users:write departments:read locations:read cards:write",
         },
         auth=(
             app.config["RAMP_CLIENT_ID"],
@@ -131,6 +153,143 @@ def get_ramp_access_token(scope: str) -> Union[str, None]:
     print("Response body:", ramp_access_token_response.text)
 
     return None
+
+
+@cache.cached(timeout=0, key_prefix="apiary_managers")
+def get_apiary_managers() -> Dict[int, str]:
+    """
+    Get the list of managers from Apiary
+    """
+    apiary_managers_response = get(
+        url=app.config["APIARY_URL"] + "/api/v1/users/managers",
+        headers={
+            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
+            "Accept": "application/json",
+        },
+        timeout=(5, 5),
+    )
+
+    managers = {}
+
+    if apiary_managers_response.status_code == 200:
+        apiary_managers_json = apiary_managers_response.json()
+
+        for manager in apiary_managers_json["users"]:
+            managers[manager["id"]] = manager["full_name"]
+    else:
+        print("Apiary returned status code:", apiary_managers_response.status_code)
+        print("Response body:", apiary_managers_response.text)
+        raise InternalServerError("Unable to load managers from Apiary")
+
+    return managers
+
+
+@cache.cached(timeout=0, key_prefix="ramp_departments")
+def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
+    """
+    Get the list of departments from Ramp
+    """
+    ramp_access_token = get_ramp_access_token()
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    ramp_departments_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/departments",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_departments_response.status_code != 200:
+        print("Ramp returned status code:", ramp_departments_response.status_code)
+        print("Response body:", ramp_departments_response.text)
+        raise InternalServerError("Failed to retrieve departments from Ramp")
+
+    departments = {}
+
+    for department in ramp_departments_response.json()["data"]:
+        departments[department["id"]] = {
+            "label": department["name"],
+            "enabled": department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+        }
+
+    return departments
+
+
+@cache.cached(timeout=0, key_prefix="ramp_locations")
+def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
+    """
+    Get the list of locations from Ramp
+    """
+    ramp_access_token = get_ramp_access_token()
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    ramp_locations_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_locations_response.status_code != 200:
+        print("Ramp returned status code:", ramp_locations_response.status_code)
+        print("Response body:", ramp_locations_response.text)
+        raise InternalServerError("Failed to retrieve locations from Ramp")
+
+    locations = {}
+
+    for location in ramp_locations_response.json()["data"]:
+        locations[location["id"]] = {
+            "label": location["name"],
+            "enabled": True,
+        }
+
+    return locations
+
+
+@cache.cached(timeout=0, key_prefix="ramp_users")
+def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[str, bool]]]]:
+    """
+    Get the list of users from Ramp
+    """
+    ramp_access_token = get_ramp_access_token()
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    ramp_users_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_users_response.status_code != 200:
+        print("Ramp returned status code:", ramp_users_response.status_code)
+        print("Response body:", ramp_users_response.text)
+        raise InternalServerError("Failed to retrieve users from Ramp")
+
+    users = {}
+
+    name_map = defaultdict(list)
+
+    for user in ramp_users_response.json()["data"]:
+        users[user["id"]] = {
+            "label": user["first_name"] + " " + user["last_name"],
+            "enabled": user["status"] == "USER_ACTIVE"
+            and user["is_manager"] is True
+            and user["department_id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+        }
+
+        name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
+
+    return name_map, users
 
 
 @app.get("/")
@@ -184,7 +343,7 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
         ramp_user_id = session["ramp_user_id"]
 
     if ramp_user_id is not None:
-        ramp_access_token = get_ramp_access_token("users:read")
+        ramp_access_token = get_ramp_access_token()
 
         if ramp_access_token is None:
             raise InternalServerError("Failed to retrieve access token for Ramp")
@@ -225,119 +384,28 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
         session.clear()
         return render_template("ineligible.html")
 
-    apiary_managers_response = get(
-        url=app.config["APIARY_URL"] + "/api/v1/users/managers",
-        headers={
-            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
-            "Accept": "application/json",
-        },
-        timeout=(5, 5),
-    )
-
-    managers = {}
-
-    if apiary_managers_response.status_code == 200:
-        apiary_managers_json = apiary_managers_response.json()
-
-        for manager in apiary_managers_json["users"]:
-            managers[manager["id"]] = manager["full_name"]
-    else:
-        print("Apiary returned status code:", apiary_managers_response.status_code)
-        print("Response body:", apiary_managers_response.text)
-        raise InternalServerError("Unable to load managers from Apiary")
-
-    ramp_access_token = get_ramp_access_token("departments:read locations:read users:read")
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
-    ramp_departments_response = get(
-        url=app.config["RAMP_API_URL"] + "/developer/v1/departments",
-        headers={
-            "Authorization": "Bearer " + ramp_access_token,
-        },
-        timeout=(5, 5),
-    )
-
-    if ramp_departments_response.status_code != 200:
-        print("Ramp returned status code:", ramp_departments_response.status_code)
-        print("Response body:", ramp_departments_response.text)
-        raise InternalServerError("Failed to retrieve departments from Ramp")
-
-    departments = {}
-
-    for department in ramp_departments_response.json()["data"]:
-        departments[department["id"]] = {
-            "label": department["name"],
-            "enabled": department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
-        }
-
     if session["is_student"]:
         default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
     else:
         default_department = app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
-
-    ramp_locations_response = get(
-        url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
-        headers={
-            "Authorization": "Bearer " + ramp_access_token,
-        },
-        timeout=(5, 5),
-    )
-
-    if ramp_locations_response.status_code != 200:
-        print("Ramp returned status code:", ramp_locations_response.status_code)
-        print("Response body:", ramp_locations_response.text)
-        raise InternalServerError("Failed to retrieve locations from Ramp")
-
-    locations = {}
-
-    for location in ramp_locations_response.json()["data"]:
-        locations[location["id"]] = {
-            "label": location["name"],
-            "enabled": True,
-        }
 
     if session["is_student"] or session["zip_code"][:2] == "30":
         default_location = app.config["RAMP_DEFAULT_LOCATION_STUDENTS"]
     else:
         default_location = app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"]
 
-    ramp_users_response = get(
-        url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-        headers={
-            "Authorization": "Bearer " + ramp_access_token,
-        },
-        timeout=(5, 5),
-    )
-
-    if ramp_users_response.status_code != 200:
-        print("Ramp returned status code:", ramp_users_response.status_code)
-        print("Response body:", ramp_users_response.text)
-        raise InternalServerError("Failed to retrieve users from Ramp")
-
-    users = {}
-
-    name_map = defaultdict(list)
-
-    for user in ramp_users_response.json()["data"]:
-        users[user["id"]] = {
-            "label": user["first_name"] + " " + user["last_name"],
-            "enabled": user["status"] == "USER_ACTIVE"
-            and user["is_manager"] is True
-            and user["department_id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
-        }
-
-        name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
-
     ramp_manager_id = None
+
+    apiary_managers = get_apiary_managers()
+
+    name_map, ramp_managers = get_ramp_users()
 
     if (
         not session["is_student"]
         and session["manager_id"] is not None
-        and len(name_map[managers[session["manager_id"]]]) == 1
+        and len(name_map[apiary_managers[session["manager_id"]]]) == 1
     ):
-        ramp_manager_id = name_map[managers[session["manager_id"]]][0]
+        ramp_manager_id = name_map[apiary_managers[session["manager_id"]]][0]
 
     return render_template(
         "form.html",
@@ -347,9 +415,9 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             "emailAddress": session["email_address"],
             "emailVerified": session["email_verified"],
             "managerApiaryId": session["manager_id"],
-            "apiaryManagerOptions": managers,
+            "apiaryManagerOptions": apiary_managers,
             "managerRampId": ramp_manager_id,
-            "rampManagerOptions": users,
+            "rampManagerOptions": ramp_managers,
             "selfApiaryId": session["user_id"],
             "addressLineOne": session["address_line_one"],
             "addressLineTwo": session["address_line_two"],
@@ -360,9 +428,9 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             "googleClientId": app.config["GOOGLE_CLIENT_ID"],
             "googleOneTapLoginUri": url_for("verify_google_onetap", _external=True),
             "showAdvancedOptions": not session["is_student"],
-            "departmentOptions": departments,
+            "departmentOptions": get_ramp_departments(),
             "departmentId": default_department,
-            "locationOptions": locations,
+            "locationOptions": get_ramp_locations(),
             "locationId": default_location,
             "roleOptions": {
                 "BUSINESS_USER": {
@@ -763,6 +831,7 @@ def verify_microsoft_complete() -> Response:
 
 
 @app.get("/get-ramp-user/<apiary_id>")
+@cache.cached(timeout=0, response_filter=only_cache_if_ramp_id_present)
 def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branches
     apiary_id: str,
 ) -> Dict[str, str]:
@@ -851,7 +920,7 @@ def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branch
     else:
         return {"error": "More than one result for manager search in Keycloak"}
 
-    ramp_access_token = get_ramp_access_token("users:read")
+    ramp_access_token = get_ramp_access_token()
 
     if ramp_access_token is None:
         return {"error": "Failed to retrieve access token for Ramp"}
@@ -978,7 +1047,7 @@ def create_ramp_account() -> Dict[str, str]:  # pylint: disable=too-many-branche
     if request.json["role"] != "BUSINESS_ADMIN":  # type: ignore
         request_body["direct_manager_id"] = request.json["directManagerId"]  # type: ignore
 
-    ramp_access_token = get_ramp_access_token("users:write")
+    ramp_access_token = get_ramp_access_token()
 
     if ramp_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Ramp")
@@ -1007,7 +1076,7 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to create a Ramp account.
     """
-    ramp_access_token = get_ramp_access_token("users:write")
+    ramp_access_token = get_ramp_access_token()
 
     if ramp_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Ramp")
@@ -1127,7 +1196,7 @@ def order_physical_card() -> Dict[str, str]:
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         raise InternalServerError("No Ramp user ID in session")
 
-    ramp_access_token = get_ramp_access_token("cards:write")
+    ramp_access_token = get_ramp_access_token()
 
     if ramp_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Ramp")
@@ -1183,7 +1252,7 @@ def get_physical_card_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to order a physical card.
     """
-    ramp_access_token = get_ramp_access_token("cards:write")
+    ramp_access_token = get_ramp_access_token()
 
     if ramp_access_token is None:
         raise InternalServerError("Failed to retrieve access token for Ramp")
