@@ -1108,7 +1108,15 @@ update msg model =
                     }
             in
             ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
+            , Cmd.batch
+                [ saveToLocalStorage (stringifyModel newModel)
+                , case getManagerRampIdFromApiaryId model of
+                    Just _ ->
+                        Task.attempt (\_ -> NoOpMsg) (focus "department")
+
+                    Nothing ->
+                        Task.attempt (\_ -> NoOpMsg) (focus "manager")
+                ]
             )
 
         DepartmentInput selectedDepartment ->
