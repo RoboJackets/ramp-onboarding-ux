@@ -265,7 +265,7 @@ statesMap =
 
 type NextAction
     = RedirectToEmailVerification
-    | Validation
+    | ValidateForm
     | CreateRampAccount
     | NoOpNextAction
 
@@ -471,10 +471,10 @@ update msg model =
 
                         Valid ->
                             if model.managerRampId == Nothing then
-                                Validation
+                                ValidateForm
 
                             else if model.orderPhysicalCard == True then
-                                Validation
+                                ValidateForm
 
                             else
                                 CreateRampAccount
@@ -601,7 +601,7 @@ update msg model =
             ( { model
                 | nextAction = NoOpNextAction
                 , formState =
-                    if model.nextAction == Validation then
+                    if model.nextAction == ValidateForm then
                         if model.managerRampId == Nothing then
                             Validating
 
@@ -622,7 +622,7 @@ update msg model =
                             [ Url.Builder.string emailAddressFieldName model.emailAddress ]
                         )
 
-                Validation ->
+                ValidateForm ->
                     Cmd.batch
                         [ if model.managerRampId == Nothing then
                             Http.get
