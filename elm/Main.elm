@@ -66,21 +66,6 @@ managerFeedbackText =
     "Please select your manager"
 
 
-departmentFeedbackText : String
-departmentFeedbackText =
-    "Please select your department"
-
-
-locationFeedbackText : String
-locationFeedbackText =
-    "Please select your location"
-
-
-roleFeedbackText : String
-roleFeedbackText =
-    "Please select your role"
-
-
 firstNameFieldName : String
 firstNameFieldName =
     "firstName"
@@ -523,31 +508,46 @@ update msg model =
             )
 
         ApiaryManagerInput managerApiaryId ->
-            ( { model
-                | managerApiaryId = Just managerApiaryId
-                , managerRampId = Nothing
-                , managerIsValid = Nothing
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | managerApiaryId = Just managerApiaryId, managerRampId = Nothing })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | managerApiaryId = Just managerApiaryId
+                        , managerRampId = Nothing
+                        , managerIsValid = Nothing
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         RampManagerInput managerRampId ->
-            ( { model
-                | managerApiaryId = Nothing
-                , managerRampId = Just managerRampId
-                , managerIsValid = Just True
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | managerApiaryId = Nothing, managerRampId = Just managerRampId })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | managerApiaryId = Nothing
+                        , managerRampId = Just managerRampId
+                        , managerIsValid = Just True
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         OrderPhysicalCardChecked orderPhysicalCard ->
-            ( { model
-                | orderPhysicalCard = orderPhysicalCard
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | orderPhysicalCard = orderPhysicalCard })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | orderPhysicalCard = orderPhysicalCard
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         AddressLineOneInput addressLineOne ->
@@ -577,12 +577,17 @@ update msg model =
             )
 
         StateInput state ->
-            ( { model
-                | state = Just state
-                , nextAction = NoOpNextAction
-                , addressLineTwoRequired = False
-              }
-            , saveToLocalStorage (stringifyModel { model | state = Just state })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | state = Just state
+                        , nextAction = NoOpNextAction
+                        , addressLineTwoRequired = False
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         ZipInput zip ->
@@ -598,6 +603,11 @@ update msg model =
             ( { model | nextAction = NoOpNextAction }, Cmd.none )
 
         LocalStorageSaved _ ->
+            let
+                needGoogleAddressValidation : Bool
+                needGoogleAddressValidation =
+                    model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
+            in
             ( { model
                 | nextAction = NoOpNextAction
                 , formState =
@@ -605,7 +615,7 @@ update msg model =
                         if model.managerRampId == Nothing then
                             Validating
 
-                        else if model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress then
+                        else if needGoogleAddressValidation then
                             Validating
 
                         else
@@ -635,7 +645,7 @@ update msg model =
 
                           else
                             Cmd.none
-                        , if model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress then
+                        , if needGoogleAddressValidation then
                             Http.post
                                 { url =
                                     Url.Builder.crossOrigin
@@ -684,15 +694,35 @@ update msg model =
             )
 
         PlaceChanged value ->
-            ( { model
-                | addressLineOne =
+            let
+                addressLineOne : String
+                addressLineOne =
                     String.trim (getAddressComponent (decodePlaceChanged value) "street_number")
                         ++ " "
                         ++ String.trim (getAddressComponent (decodePlaceChanged value) "route")
-                , addressLineTwo = String.trim (getAddressComponent (decodePlaceChanged value) "subpremise")
-                , city = String.trim (getAddressComponent (decodePlaceChanged value) "locality")
-                , state = Just (String.trim (getAddressComponent (decodePlaceChanged value) "administrative_area_level_1"))
-                , zip = String.trim (getAddressComponent (decodePlaceChanged value) "postal_code")
+
+                addressLineTwo : String
+                addressLineTwo =
+                    String.trim (getAddressComponent (decodePlaceChanged value) "subpremise")
+
+                city : String
+                city =
+                    String.trim (getAddressComponent (decodePlaceChanged value) "locality")
+
+                state : Maybe String
+                state =
+                    Just (String.trim (getAddressComponent (decodePlaceChanged value) "administrative_area_level_1"))
+
+                zip : String
+                zip =
+                    String.trim (getAddressComponent (decodePlaceChanged value) "postal_code")
+            in
+            ( { model
+                | addressLineOne = addressLineOne
+                , addressLineTwo = addressLineTwo
+                , city = city
+                , state = state
+                , zip = zip
                 , nextAction = NoOpNextAction
               }
             , Cmd.batch
@@ -700,26 +730,33 @@ update msg model =
                 , saveToLocalStorage
                     (stringifyModel
                         { model
-                            | addressLineOne =
-                                String.trim (getAddressComponent (decodePlaceChanged value) "street_number")
-                                    ++ " "
-                                    ++ String.trim (getAddressComponent (decodePlaceChanged value) "route")
-                            , addressLineTwo = String.trim (getAddressComponent (decodePlaceChanged value) "subpremise")
-                            , city = String.trim (getAddressComponent (decodePlaceChanged value) "locality")
-                            , state = Just (String.trim (getAddressComponent (decodePlaceChanged value) "administrative_area_level_1"))
-                            , zip = String.trim (getAddressComponent (decodePlaceChanged value) "postal_code")
+                            | addressLineOne = addressLineOne
+                            , addressLineTwo = addressLineTwo
+                            , city = city
+                            , state = state
+                            , zip = zip
                         }
                     )
                 ]
             )
 
         GoogleAddressValidationResultReceived result ->
+            let
+                missingAddressLineTwo : Bool
+                missingAddressLineTwo =
+                    case result of
+                        Ok verdict ->
+                            List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes)
+
+                        Err _ ->
+                            False
+            in
             ( { model
                 | nextAction = NoOpNextAction
                 , addressLineTwoRequired =
                     case result of
                         Ok verdict ->
-                            if List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes) then
+                            if missingAddressLineTwo then
                                 True
 
                             else
@@ -735,7 +772,7 @@ update msg model =
                                     Just addressComplete
 
                                 Nothing ->
-                                    if List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes) then
+                                    if missingAddressLineTwo then
                                         Just True
 
                                     else
@@ -756,7 +793,7 @@ update msg model =
                                             Validating
 
                                 Nothing ->
-                                    if List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes) then
+                                    if missingAddressLineTwo then
                                         Editing
 
                                     else
@@ -775,7 +812,7 @@ update msg model =
                             Nothing ->
                                 Cmd.none
 
-                    else if List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes) then
+                    else if missingAddressLineTwo then
                         Task.attempt (\_ -> NoOpMsg) (focus "address_line_two")
 
                     else
@@ -855,6 +892,11 @@ update msg model =
               }
             , case result of
                 Ok managerRampInfo ->
+                    let
+                        task : Cmd Msg
+                        task =
+                            createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+                    in
                     if managerRampInfo.managerRampId == Nothing then
                         Cmd.none
 
@@ -862,7 +904,7 @@ update msg model =
                         case model.addressIsValid of
                             Just True ->
                                 if validateModel model == Valid then
-                                    createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+                                    task
 
                                 else
                                     Cmd.none
@@ -872,13 +914,13 @@ update msg model =
 
                             Nothing ->
                                 if checkCampusAddress model /= NotCampusAddress then
-                                    createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+                                    task
 
                                 else
                                     Cmd.none
 
                     else
-                        createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+                        task
 
                 Err _ ->
                     Cmd.none
@@ -1054,38 +1096,58 @@ update msg model =
             )
 
         ShowAdvancedOptionsButtonClicked ->
-            ( { model
-                | showAdvancedOptions = True
-                , managerApiaryId = Nothing
-                , managerRampId = getManagerRampIdFromApiaryId model
-                , managerIsValid = Just True
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | showAdvancedOptions = True, managerApiaryId = Nothing, managerRampId = getManagerRampIdFromApiaryId model })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | showAdvancedOptions = True
+                        , managerApiaryId = Nothing
+                        , managerRampId = getManagerRampIdFromApiaryId model
+                        , managerIsValid = Just True
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         DepartmentInput selectedDepartment ->
-            ( { model
-                | rampDepartmentId = Just selectedDepartment
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | rampDepartmentId = Just selectedDepartment })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | rampDepartmentId = Just selectedDepartment
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         LocationInput selectedLocation ->
-            ( { model
-                | rampLocationId = Just selectedLocation
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | rampLocationId = Just selectedLocation })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | rampLocationId = Just selectedLocation
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
         RoleInput selectedRole ->
-            ( { model
-                | rampRoleId = Just selectedRole
-                , nextAction = NoOpNextAction
-              }
-            , saveToLocalStorage (stringifyModel { model | rampRoleId = Just selectedRole })
+            let
+                newModel : Model
+                newModel =
+                    { model
+                        | rampRoleId = Just selectedRole
+                        , nextAction = NoOpNextAction
+                    }
+            in
+            ( newModel
+            , saveToLocalStorage (stringifyModel newModel)
             )
 
 
@@ -1136,6 +1198,79 @@ view model =
 
 renderForm : Model -> List (Html Msg)
 renderForm model =
+    let
+        firstNameValidationResult : ValidationResult
+        firstNameValidationResult =
+            validateName "first" model.firstName
+
+        lastNameValidationResult : ValidationResult
+        lastNameValidationResult =
+            validateName "last" model.lastName
+
+        emailAddressValidationResult : ValidationResult
+        emailAddressValidationResult =
+            validateEmailAddress model.emailAddress model.emailVerified
+
+        emailAddressDomainString : String
+        emailAddressDomainString =
+            withDefault "unknown" (emailAddressDomain model.emailAddress)
+
+        managerValidationResult : ValidationResult
+        managerValidationResult =
+            validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId
+
+        departmentValidationResult : ValidationResult
+        departmentValidationResult =
+            validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions
+
+        locationValidationResult : ValidationResult
+        locationValidationResult =
+            validateRampObject "location" model.rampLocationId model.rampLocationOptions
+
+        roleValidationResult : ValidationResult
+        roleValidationResult =
+            validateRampObject "role" model.rampRoleId model.rampRoleOptions
+
+        userRolesRampHelpCenterLink : List (Html Msg)
+        userRolesRampHelpCenterLink =
+            [ a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank" ] [ text "Ramp help center" ]
+            , text "."
+            ]
+
+        addressLineOneValidationResult : ValidationResult
+        addressLineOneValidationResult =
+            validateAddressLineOne model.addressLineOne
+
+        addressLineTwoValidationResult : ValidationResult
+        addressLineTwoValidationResult =
+            validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model)
+
+        cityValidationResult : ValidationResult
+        cityValidationResult =
+            validateCity model.city
+
+        stateValidationResult : ValidationResult
+        stateValidationResult =
+            validateState model.state
+
+        zipValidationResult : ValidationResult
+        zipValidationResult =
+            validateZipCode model.zip
+
+        physicalCardEstimatedDeliveryDate : String
+        physicalCardEstimatedDeliveryDate =
+            formatTime model.zone
+                (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
+                    Sat ->
+                        millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
+
+                    Sun ->
+                        millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
+
+                    _ ->
+                        millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
+                )
+    in
     [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
         [ h1 []
             [ text "Ramp Onboarding"
@@ -1163,8 +1298,8 @@ renderForm model =
                     , type_ "text"
                     , classList
                         [ ( "form-control", True )
-                        , ( "is-valid", model.showValidation && isValid (validateName "first" model.firstName) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateName "first" model.firstName)) )
+                        , ( "is-valid", model.showValidation && isValid firstNameValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid firstNameValidationResult) )
                         ]
                     , name "first_name"
                     , minlength 1
@@ -1178,7 +1313,7 @@ renderForm model =
                     ]
                     []
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateName "first" model.firstName)) ]
+                    [ text (feedbackText firstNameValidationResult) ]
                 ]
             , div [ class "col-6" ]
                 [ label [ for "last_name", class "form-label" ]
@@ -1188,8 +1323,8 @@ renderForm model =
                     , type_ "text"
                     , classList
                         [ ( "form-control", True )
-                        , ( "is-valid", model.showValidation && isValid (validateName "last" model.lastName) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateName "last" model.lastName)) )
+                        , ( "is-valid", model.showValidation && isValid lastNameValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid lastNameValidationResult) )
                         ]
                     , name "last_name"
                     , minlength 1
@@ -1203,7 +1338,7 @@ renderForm model =
                     ]
                     []
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateName "last" model.lastName)) ]
+                    [ text (feedbackText lastNameValidationResult) ]
                 ]
             , div [ class "form-text", class "mb-3" ]
                 [ text "Your name must match your government-issued identification, only contain letters and spaces, and be a maximum of 80 characters." ]
@@ -1217,8 +1352,8 @@ renderForm model =
                         , type_ "email"
                         , classList
                             [ ( "form-control", True )
-                            , ( "is-valid", model.showValidation && isValid (validateEmailAddress model.emailAddress model.emailVerified) )
-                            , ( "is-invalid", model.showValidation && not (isValid (validateEmailAddress model.emailAddress model.emailVerified)) )
+                            , ( "is-valid", model.showValidation && isValid emailAddressValidationResult )
+                            , ( "is-invalid", model.showValidation && not (isValid emailAddressValidationResult) )
                             ]
                         , minlength 13
                         , required True
@@ -1239,7 +1374,7 @@ renderForm model =
                         , id "email_verification_button"
                         , disabled
                             (model.emailVerified
-                                || not (Dict.member (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName)
+                                || not (Dict.member emailAddressDomainString emailProviderName)
                                 || (model.nextAction /= NoOpNextAction)
                             )
                         , onClick EmailVerificationButtonClicked
@@ -1260,9 +1395,9 @@ renderForm model =
                                 ++ (if model.emailVerified then
                                         "Verified"
 
-                                    else if Dict.member (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName then
+                                    else if Dict.member emailAddressDomainString emailProviderName then
                                         "Verify with "
-                                            ++ withDefault "Unknown" (Dict.get (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName)
+                                            ++ withDefault "Unknown" (Dict.get emailAddressDomainString emailProviderName)
 
                                     else
                                         "Verify"
@@ -1270,7 +1405,7 @@ renderForm model =
                             )
                         ]
                     , div [ class "invalid-feedback" ]
-                        [ text (feedbackText (validateEmailAddress model.emailAddress model.emailVerified)) ]
+                        [ text (feedbackText emailAddressValidationResult) ]
                     ]
                 ]
             , div [ class "form-text", class "mb-3" ]
@@ -1292,8 +1427,8 @@ renderForm model =
                             Json.Decode.map ApiaryManagerInput targetValueIntParse
                         )
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) )
+                        [ ( "is-valid", model.showValidation && isValid managerValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid managerValidationResult) )
                         ]
                     ]
                     ([ option
@@ -1328,7 +1463,7 @@ renderForm model =
                            )
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) ]
+                    [ text (feedbackText managerValidationResult) ]
                 , div [ class "form-text", class "mb-3" ]
                     [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
                 ]
@@ -1343,8 +1478,8 @@ renderForm model =
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map DepartmentInput targetValue)
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateDepartment model.rampDepartmentId model.rampDepartmentOptions) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateDepartment model.rampDepartmentId model.rampDepartmentOptions)) )
+                        [ ( "is-valid", model.showValidation && isValid departmentValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid departmentValidationResult) )
                         ]
                     ]
                     ([ option
@@ -1365,7 +1500,7 @@ renderForm model =
                         ++ List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateDepartment model.rampDepartmentId model.rampDepartmentOptions)) ]
+                    [ text (feedbackText departmentValidationResult) ]
                 , div [ class "form-text", class "mb-3" ]
                     [ text "Students should generally select "
                     , strong [] [ text (Maybe.withDefault { label = "", enabled = True } (Dict.get model.studentDefaultDepartmentId model.rampDepartmentOptions)).label ]
@@ -1385,8 +1520,8 @@ renderForm model =
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map LocationInput targetValue)
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateLocation model.rampLocationId model.rampLocationOptions) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateLocation model.rampLocationId model.rampLocationOptions)) )
+                        [ ( "is-valid", model.showValidation && isValid locationValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid locationValidationResult) )
                         ]
                     ]
                     ([ option
@@ -1407,7 +1542,7 @@ renderForm model =
                         ++ List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateLocation model.rampLocationId model.rampLocationOptions)) ]
+                    [ text (feedbackText locationValidationResult) ]
                 , div [ class "form-text", class "mb-3" ]
                     [ text ((Maybe.withDefault { label = "", enabled = True } (Dict.get model.studentDefaultLocationId model.rampLocationOptions)).label ++ "-based members should select ")
                     , strong [] [ text (Maybe.withDefault { label = "", enabled = True } (Dict.get model.studentDefaultLocationId model.rampLocationOptions)).label ]
@@ -1427,8 +1562,8 @@ renderForm model =
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map RoleInput targetValue)
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateRole model.rampRoleId model.rampRoleOptions) )
-                        , ( "is-invalid", model.showValidation && not (isValid (validateRole model.rampRoleId model.rampRoleOptions)) )
+                        [ ( "is-valid", model.showValidation && isValid roleValidationResult )
+                        , ( "is-invalid", model.showValidation && not (isValid roleValidationResult) )
                         ]
                     ]
                     ([ option
@@ -1449,25 +1584,25 @@ renderForm model =
                         ++ List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampObjectLabel (toList model.rampRoleOptions))
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateRole model.rampRoleId model.rampRoleOptions)) ]
+                    [ text (feedbackText roleValidationResult) ]
                 , div [ class "form-text", class "d-md-none", class "mb-3" ]
-                    [ text "Most members should select "
-                    , strong [] [ text "Employee" ]
-                    , text ", unless you have a specific need for additional access. Read more about roles in the "
-                    , a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank" ] [ text "Ramp help center" ]
-                    , text "."
-                    ]
+                    ([ text "Most members should select "
+                     , strong [] [ text "Employee" ]
+                     , text ", unless you have a specific need for additional access. Read more about roles in the "
+                     ]
+                        ++ userRolesRampHelpCenterLink
+                    )
                 , div [ class "form-text", class "d-none", class "mb-3", class "d-md-block" ]
-                    [ text "Corporation staff that need to manage our Ramp account should select "
-                    , strong [] [ text "Admin" ]
-                    , text ". Members that need to view all activity within Ramp should select "
-                    , strong [] [ text "Bookkeeper" ]
-                    , text ". All other members should select "
-                    , strong [] [ text "Employee" ]
-                    , text ". Read more about roles in the "
-                    , a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank" ] [ text "Ramp help center" ]
-                    , text "."
-                    ]
+                    ([ text "Corporation staff that need to manage our Ramp account should select "
+                     , strong [] [ text "Admin" ]
+                     , text ". Members that need to view all activity within Ramp should select "
+                     , strong [] [ text "Bookkeeper" ]
+                     , text ". All other members should select "
+                     , strong [] [ text "Employee" ]
+                     , text ". Read more about roles in the "
+                     ]
+                        ++ userRolesRampHelpCenterLink
+                    )
                 ]
             , div [ class "col-12" ]
                 [ div [ class "form-check" ]
@@ -1494,8 +1629,8 @@ renderForm model =
                     [ type_ "text"
                     , class "form-control"
                     , classList
-                        [ ( "is-valid", model.showValidation && (isValid (validateAddressLineOne model.addressLineOne) && Maybe.withDefault True model.addressIsValid) )
-                        , ( "is-invalid", model.showValidation && (not (isValid (validateAddressLineOne model.addressLineOne)) || not (Maybe.withDefault True model.addressIsValid)) )
+                        [ ( "is-valid", model.showValidation && (isValid addressLineOneValidationResult && Maybe.withDefault True model.addressIsValid) )
+                        , ( "is-invalid", model.showValidation && (not (isValid addressLineOneValidationResult) || not (Maybe.withDefault True model.addressIsValid)) )
                         ]
                     , id "address_line_one"
                     , name "address_line_one"
@@ -1512,7 +1647,7 @@ renderForm model =
                     []
                 , div [ class "invalid-feedback" ]
                     [ text
-                        (if isValid (validateAddressLineOne model.addressLineOne) then
+                        (if isValid addressLineOneValidationResult then
                             feedbackText (validateAddressLineOneGoogleResult model.addressIsValid)
 
                          else
@@ -1525,8 +1660,8 @@ renderForm model =
                     [ type_ "text"
                     , class "form-control"
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model)) && Maybe.withDefault True model.addressIsValid )
-                        , ( "is-invalid", model.showValidation && (not (isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model))) || not (Maybe.withDefault True model.addressIsValid)) )
+                        [ ( "is-valid", model.showValidation && isValid addressLineTwoValidationResult && Maybe.withDefault True model.addressIsValid )
+                        , ( "is-invalid", model.showValidation && not (isValid addressLineTwoValidationResult) || not (Maybe.withDefault True model.addressIsValid) )
                         ]
                     , id "address_line_two"
                     , name "address_line_two"
@@ -1539,7 +1674,7 @@ renderForm model =
                     ]
                     []
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model))) ]
+                    [ text (feedbackText addressLineTwoValidationResult) ]
                 ]
             , div [ class "col-md-6", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for "city", class "form-label" ] [ text "City" ]
@@ -1547,8 +1682,8 @@ renderForm model =
                     [ type_ "text"
                     , class "form-control"
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateCity model.city) && Maybe.withDefault True model.addressIsValid )
-                        , ( "is-invalid", model.showValidation && (not (isValid (validateCity model.city)) || not (Maybe.withDefault True model.addressIsValid)) )
+                        [ ( "is-valid", model.showValidation && isValid cityValidationResult && Maybe.withDefault True model.addressIsValid )
+                        , ( "is-invalid", model.showValidation && (not (isValid cityValidationResult) || not (Maybe.withDefault True model.addressIsValid)) )
                         ]
                     , id "city"
                     , name "city"
@@ -1563,7 +1698,7 @@ renderForm model =
                     ]
                     []
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateCity model.city)) ]
+                    [ text (feedbackText cityValidationResult) ]
                 ]
             , div [ class "col-md-3", class "col-8", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for "state", class "form-label" ] [ text "State" ]
@@ -1576,8 +1711,8 @@ renderForm model =
                     , required True
                     , readonly (model.formState /= Editing)
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateState model.state) && Maybe.withDefault True model.addressIsValid )
-                        , ( "is-invalid", model.showValidation && (not (isValid (validateState model.state)) || not (Maybe.withDefault True model.addressIsValid)) )
+                        [ ( "is-valid", model.showValidation && isValid stateValidationResult && Maybe.withDefault True model.addressIsValid )
+                        , ( "is-invalid", model.showValidation && (not (isValid stateValidationResult) || not (Maybe.withDefault True model.addressIsValid)) )
                         ]
                     , on "change" (Json.Decode.map StateInput targetValue)
                     ]
@@ -1599,7 +1734,7 @@ renderForm model =
                         ++ List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
                     )
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateState model.state)) ]
+                    [ text (feedbackText stateValidationResult) ]
                 ]
             , div [ class "col-md-3", class "col-4", class "mb-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for "zip_code", class "form-label" ] [ text "ZIP Code" ]
@@ -1618,45 +1753,25 @@ renderForm model =
                     , on "change" (succeed FormChanged)
                     , Html.Attributes.value model.zip
                     , classList
-                        [ ( "is-valid", model.showValidation && isValid (validateZipCode model.zip) && Maybe.withDefault True model.addressIsValid )
-                        , ( "is-invalid", model.showValidation && (not (isValid (validateZipCode model.zip)) || not (Maybe.withDefault True model.addressIsValid)) )
+                        [ ( "is-valid", model.showValidation && isValid zipValidationResult && Maybe.withDefault True model.addressIsValid )
+                        , ( "is-invalid", model.showValidation && (not (isValid zipValidationResult) || not (Maybe.withDefault True model.addressIsValid)) )
                         ]
                     ]
                     []
                 , div [ class "invalid-feedback" ]
-                    [ text (feedbackText (validateZipCode model.zip)) ]
+                    [ text (feedbackText zipValidationResult) ]
                 ]
             , div [ class "form-text", class "d-none", class "mb-3", classList [ ( "d-sm-block", model.orderPhysicalCard ) ] ]
                 [ text
                     ("Your physical card should be delivered by "
-                        ++ formatTime model.zone
-                            (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
-                                Sat ->
-                                    millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
-
-                                Sun ->
-                                    millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
-
-                                _ ->
-                                    millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
-                            )
+                        ++ physicalCardEstimatedDeliveryDate
                         ++ "."
                     )
                 ]
             , div [ class "form-text", class "d-sm-none", class "mb-3", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ text
                     ("Your card should be delivered by "
-                        ++ formatTime model.zone
-                            (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
-                                Sat ->
-                                    millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
-
-                                Sun ->
-                                    millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
-
-                                _ ->
-                                    millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
-                            )
+                        ++ physicalCardEstimatedDeliveryDate
                         ++ "."
                     )
                 ]
@@ -1933,46 +2048,18 @@ validateState selectedState =
             Invalid "Please select your state"
 
 
-validateDepartment : Maybe String -> Dict String RampObject -> ValidationResult
-validateDepartment selectedDepartment departmentOptions =
-    case selectedDepartment of
-        Just selectedDepartmentId ->
-            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedDepartmentId departmentOptions)).enabled == True then
+validateRampObject : String -> Maybe String -> Dict String RampObject -> ValidationResult
+validateRampObject objectName selectedObject objectOptions =
+    case selectedObject of
+        Just selectedObjectId ->
+            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled == True then
                 Valid
 
             else
-                Invalid departmentFeedbackText
+                Invalid ("Please select your " ++ objectName)
 
         Nothing ->
-            Invalid departmentFeedbackText
-
-
-validateLocation : Maybe String -> Dict String RampObject -> ValidationResult
-validateLocation selectedLocation locationOptions =
-    case selectedLocation of
-        Just selectedLocationId ->
-            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedLocationId locationOptions)).enabled == True then
-                Valid
-
-            else
-                Invalid locationFeedbackText
-
-        Nothing ->
-            Invalid locationFeedbackText
-
-
-validateRole : Maybe String -> Dict String RampObject -> ValidationResult
-validateRole selectedRole roleOptions =
-    case selectedRole of
-        Just selectedRoleId ->
-            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedRoleId roleOptions)).enabled == True then
-                Valid
-
-            else
-                Invalid roleFeedbackText
-
-        Nothing ->
-            Invalid roleFeedbackText
+            Invalid ("Please select your " ++ objectName)
 
 
 validateZipCode : String -> ValidationResult
@@ -2001,13 +2088,13 @@ validateModel model =
     else if not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) then
         Invalid "manager"
 
-    else if not (isValid (validateDepartment model.rampDepartmentId model.rampDepartmentOptions)) then
+    else if not (isValid (validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions)) then
         Invalid "department"
 
-    else if not (isValid (validateLocation model.rampLocationId model.rampLocationOptions)) then
+    else if not (isValid (validateRampObject "location" model.rampLocationId model.rampLocationOptions)) then
         Invalid "location"
 
-    else if not (isValid (validateRole model.rampRoleId model.rampRoleOptions)) then
+    else if not (isValid (validateRampObject "role" model.rampRoleId model.rampRoleOptions)) then
         Invalid "role"
 
     else if model.orderPhysicalCard && not (isValid (validateAddressLineOne model.addressLineOne)) then
@@ -2205,7 +2292,7 @@ stringifyModel model =
             , ( stateFieldName
               , case model.state of
                     Just state ->
-                        Json.Encode.string state
+                        Json.Encode.string (String.trim state)
 
                     Nothing ->
                         Json.Encode.null
@@ -2393,6 +2480,39 @@ checkCampusAddress model =
 
 buildInitialModel : Value -> Model
 buildInitialModel value =
+    let
+        serverDataEmailAddress : String
+        serverDataEmailAddress =
+            Result.withDefault "" (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value)
+
+        emailAddressVerified : Bool
+        emailAddressVerified =
+            Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value)
+
+        apiaryManagerOptions : Dict Int String
+        apiaryManagerOptions =
+            Dict.fromList (List.filterMap stringStringTupleToMaybeIntStringTuple (Result.withDefault [] (decodeValue (at [ serverDataFieldName, apiaryManagerOptionsFieldName ] (keyValuePairs string)) value)))
+
+        apiarySelfId : Int
+        apiarySelfId =
+            Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value)
+
+        rampManagerOptions : Dict String RampObject
+        rampManagerOptions =
+            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)
+
+        rampDepartmentOptions : Dict String RampObject
+        rampDepartmentOptions =
+            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)
+
+        rampLocationOptions : Dict String RampObject
+        rampLocationOptions =
+            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)
+
+        rampRoleOptions : Dict String RampObject
+        rampRoleOptions =
+            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)
+    in
     Model
         (String.trim
             (Result.withDefault
@@ -2406,30 +2526,30 @@ buildInitialModel value =
                 (decodeString (field lastNameFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
             )
         )
-        (if Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value) then
-            String.trim
-                (Result.withDefault
-                    ""
-                    (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value)
-                )
+        (if emailAddressVerified then
+            String.trim serverDataEmailAddress
 
          else
             String.trim
                 (Result.withDefault
-                    (Result.withDefault "" (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value))
+                    serverDataEmailAddress
                     (decodeString (field emailAddressFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
                 )
         )
-        (Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value))
-        (Dict.fromList (List.filterMap stringStringTupleToMaybeIntStringTuple (Result.withDefault [] (decodeValue (at [ serverDataFieldName, apiaryManagerOptionsFieldName ] (keyValuePairs string)) value))))
+        emailAddressVerified
+        apiaryManagerOptions
         (case decodeString (field managerApiaryIdFieldName int) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok managerId ->
-                Just managerId
+                if apiarySelfId == managerId || not (Dict.member managerId apiaryManagerOptions) then
+                    Nothing
+
+                else
+                    Just managerId
 
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, managerApiaryIdFieldName ] int) value of
                     Ok managerId ->
-                        if Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value) == managerId then
+                        if apiarySelfId == managerId || not (Dict.member managerId apiaryManagerOptions) then
                             Nothing
 
                         else
@@ -2440,7 +2560,7 @@ buildInitialModel value =
         )
         (case decodeString (field managerRampIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok managerId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId rampManagerOptions)).enabled then
                     Just managerId
 
                 else
@@ -2449,7 +2569,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, managerRampIdFieldName ] string) value of
                     Ok managerId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId rampManagerOptions)).enabled then
                             Just managerId
 
                         else
@@ -2460,7 +2580,7 @@ buildInitialModel value =
         )
         Nothing
         ""
-        (Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value))
+        apiarySelfId
         (Result.withDefault True (decodeString (field orderPhysicalCardFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value))))
         (String.trim
             (Result.withDefault
@@ -2522,12 +2642,12 @@ buildInitialModel value =
             (Result.withDefault False (decodeValue (at [ serverDataFieldName, showAdvancedOptionsFieldName ] bool) value))
             (decodeString (field showAdvancedOptionsFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
         )
-        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value))
-        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value))
-        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value))
+        rampDepartmentOptions
+        rampLocationOptions
+        rampRoleOptions
         (case decodeString (field departmentIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok departmentId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId rampDepartmentOptions)).enabled then
                     Just departmentId
 
                 else
@@ -2536,7 +2656,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, departmentIdFieldName ] string) value of
                     Ok departmentId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId rampDepartmentOptions)).enabled then
                             Just departmentId
 
                         else
@@ -2547,7 +2667,7 @@ buildInitialModel value =
         )
         (case decodeString (field locationIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok locationId ->
-                if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                if Dict.member locationId rampLocationOptions then
                     Just locationId
 
                 else
@@ -2556,7 +2676,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, locationIdFieldName ] string) value of
                     Ok locationId ->
-                        if Dict.member locationId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)) then
+                        if Dict.member locationId rampLocationOptions then
                             Just locationId
 
                         else
@@ -2567,7 +2687,7 @@ buildInitialModel value =
         )
         (case decodeString (field roleIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok roleId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId rampRoleOptions)).enabled then
                     Just roleId
 
                 else
@@ -2576,7 +2696,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, roleIdFieldName ] string) value of
                     Ok roleId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)))).enabled then
+                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId rampRoleOptions)).enabled then
                             Just roleId
 
                         else
@@ -2589,7 +2709,7 @@ buildInitialModel value =
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultDepartmentForNonStudents" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForStudents" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
-        (Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value))
+        rampManagerOptions
 
 
 stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )
@@ -2714,8 +2834,17 @@ labelMatches maybeGivenLabel rampId rampObject =
 
 getManagerRampIdFromApiaryId : Model -> Maybe String
 getManagerRampIdFromApiaryId model =
-    if Dict.size (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions) == 1 && (Tuple.second (Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions))))).enabled then
-        Just (Tuple.first (Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList (Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions)))))
+    let
+        filteredOptions : Dict String RampObject
+        filteredOptions =
+            Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions
+
+        matchingOption : ( String, RampObject )
+        matchingOption =
+            Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList filteredOptions))
+    in
+    if Dict.size filteredOptions == 1 && (Tuple.second matchingOption).enabled then
+        Just (Tuple.first matchingOption)
 
     else
         Nothing
