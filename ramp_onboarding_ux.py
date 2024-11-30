@@ -1281,3 +1281,15 @@ def ping() -> Dict[str, str]:
     Returns an arbitrary successful response, for health checks
     """
     return {"status": "ok"}
+
+
+@app.get("/clear-cache")
+def clear_cache() -> Dict[str, str]:
+    """
+    Clears the cache
+    """
+    if "user_state" not in session:
+        raise Unauthorized("Not logged in")
+
+    cache.clear()
+    return {"status": "ok"}
