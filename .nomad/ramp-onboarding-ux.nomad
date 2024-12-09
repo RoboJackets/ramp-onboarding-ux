@@ -210,6 +210,8 @@ job "ramp-onboarding-ux" {
         interval = "1m"
         mode = "fail"
       }
+
+      shutdown_delay = "30s"
     }
 
     task "redis" {
@@ -294,7 +296,7 @@ EOH
         mode = "fail"
       }
 
-      shutdown_delay = "30s"
+      shutdown_delay = "60s"
     }
   }
 
