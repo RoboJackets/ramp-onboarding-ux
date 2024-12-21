@@ -267,6 +267,9 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
         headers={
             "Authorization": "Bearer " + ramp_access_token,
         },
+        params={
+            "page_size": 100,
+        },
         timeout=(5, 5),
     )
 
