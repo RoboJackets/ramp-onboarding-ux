@@ -1806,15 +1806,15 @@ renderForm model =
             ]
         , div [ class "mb-2", class "mb-md-5", class "col-12", class "form-text" ]
             [ text "By creating an account, you confirm that you have read and agree to the "
-            , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary" ] [ text "RoboJackets, Inc. Expense Policy" ]
+            , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text "RoboJackets, Inc. Expense Policy" ]
             , text ", "
-            , a [ href "https://ramp.com/legal/cookie-policy", class "text-secondary" ] [ text "Ramp Cookie Policy" ]
+            , a [ href "https://ramp.com/legal/cookie-policy", class "text-secondary", target "_blank" ] [ text "Ramp Cookie Policy" ]
             , text ", "
-            , a [ href "https://ramp.com/legal/privacy-policy", class "text-secondary" ] [ text "Ramp Privacy Policy" ]
+            , a [ href "https://ramp.com/legal/privacy-policy", class "text-secondary", target "_blank" ] [ text "Ramp Privacy Policy" ]
             , text ", "
-            , a [ href "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf", class "text-secondary" ] [ text "Sutton Bank Privacy Policy" ]
+            , a [ href "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf", class "text-secondary", target "_blank" ] [ text "Sutton Bank Privacy Policy" ]
             , text ", and "
-            , a [ href "https://ramp.com/legal/authorized-user-terms", class "text-secondary" ] [ text "Ramp Authorized User Agreement" ]
+            , a [ href "https://ramp.com/legal/authorized-user-terms", class "text-secondary", target "_blank" ] [ text "Ramp Authorized User Agreement" ]
             , text "."
             ]
         ]
