@@ -1132,13 +1132,13 @@ types-pyasn1 = "*"
 
 [[package]]
 name = "types-pyasn1"
-version = "0.6.0.20240913"
+version = "0.6.0.20250208"
 description = "Typing stubs for pyasn1"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "types-pyasn1-0.6.0.20240913.tar.gz", hash = "sha256:a1da054db13d3d4ccfa69c515678154014336ad3d9f9ade01845f9edb1a2bc71"},
-    {file = "types_pyasn1-0.6.0.20240913-py3-none-any.whl", hash = "sha256:95f3cb1fbd63ff91cd0410945f8aeae6b0be359533c00f39d8e17124884157af"},
+    {file = "types_pyasn1-0.6.0.20250208-py3-none-any.whl", hash = "sha256:4a4fef8801efa983a88a1db52f6d7ac70cb1ad48abf25fad59134237603d5334"},
+    {file = "types_pyasn1-0.6.0.20250208.tar.gz", hash = "sha256:14c6a0463555fb74ec81aca67ad2eb6d8409895359238511a3eceda7b5426235"},
 ]
 
 [[package]]
