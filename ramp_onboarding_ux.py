@@ -365,7 +365,6 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             raise InternalServerError("Failed to retrieve user from Ramp")
 
         if ramp_user_response.json()["status"] == "USER_ACTIVE":
-            session.clear()
             return render_template(
                 "provisioned.html",
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
