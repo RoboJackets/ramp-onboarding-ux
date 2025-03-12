@@ -20,9 +20,6 @@
     ],
     "packageRules": [
         {
-            "matchCategories": [
-                "python"
-            ],
             "matchDepNames": [
                 "python"
             ],
