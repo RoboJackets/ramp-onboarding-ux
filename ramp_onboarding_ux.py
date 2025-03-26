@@ -445,7 +445,11 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
                 },
                 "BUSINESS_ADMIN": {
                     "label": "Admin",
-                    "enabled": not session["is_student"],
+                    "enabled": session["can_request_business_admin"],
+                },
+                "IT_ADMIN": {
+                    "label": "IT admin",
+                    "enabled": session["can_request_it_admin"],
                 },
             },
             "roleId": "BUSINESS_USER",
@@ -480,6 +484,8 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
     session["sub"] = userinfo["sub"]
     session["ramp_user_id"] = userinfo["rampUserId"] if "rampUserId" in userinfo else None
     session["is_student"] = True
+    session["can_request_business_admin"] = False
+    session["can_request_it_admin"] = False
 
     if "googleWorkspaceAccount" in userinfo:
         session["email_address"] = userinfo["googleWorkspaceAccount"]
@@ -536,6 +542,9 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                     if role["name"] != "member" and role["name"] != "non-member":
                         role_check = True
 
+                    if role["name"] == "admin":
+                        session["can_request_it_admin"] = True
+
             travel_check = False
 
             if "travel" in apiary_user and apiary_user["travel"] is not None:
@@ -560,6 +569,7 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                 session["manager_id"] = None
 
             if "is_student" in apiary_user and apiary_user["is_student"] is False:
+                session["can_request_business_admin"] = True
                 session["is_student"] = False
 
         else:
@@ -974,10 +984,13 @@ def create_ramp_account() -> Dict[str, str]:  # pylint: disable=too-many-branche
     if not session["email_verified"]:
         raise BadRequest("Email address must be verified")
 
-    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "BUSINESS_ADMIN"]:  # type: ignore  # noqa
+    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "IT_ADMIN", "BUSINESS_ADMIN"]:  # type: ignore  # noqa
         raise BadRequest("Invalid role")
 
-    if request.json["role"] == "BUSINESS_ADMIN" and session["is_student"] is True:  # type: ignore
+    if request.json["role"] == "BUSINESS_ADMIN" and session["can_request_business_admin"] is not True:  # type: ignore  # noqa
+        raise Unauthorized("Invalid role")
+
+    if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:  # type: ignore  # noqa
         raise Unauthorized("Invalid role")
 
     keycloak_access_token = get_keycloak_access_token()

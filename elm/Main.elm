@@ -244,6 +244,11 @@ statesMap =
     Dict.fromList [ ( "AK", "Alaska" ), ( "AL", "Alabama" ), ( "AR", "Arkansas" ), ( "AZ", "Arizona" ), ( "CA", "California" ), ( "CO", "Colorado" ), ( "CT", "Connecticut" ), ( "DC", "District of Columbia" ), ( "DE", "Delaware" ), ( "FL", "Florida" ), ( "GA", "Georgia" ), ( "HI", "Hawaii" ), ( "IA", "Iowa" ), ( "ID", "Idaho" ), ( "IL", "Illinois" ), ( "IN", "Indiana" ), ( "KS", "Kansas" ), ( "KY", "Kentucky" ), ( "LA", "Louisiana" ), ( "MA", "Massachusetts" ), ( "MD", "Maryland" ), ( "ME", "Maine" ), ( "MI", "Michigan" ), ( "MN", "Minnesota" ), ( "MO", "Missouri" ), ( "MS", "Mississippi" ), ( "MT", "Montana" ), ( "NC", "North Carolina" ), ( "ND", "North Dakota" ), ( "NE", "Nebraska" ), ( "NH", "New Hampshire" ), ( "NJ", "New Jersey" ), ( "NM", "New Mexico" ), ( "NV", "Nevada" ), ( "NY", "New York" ), ( "OH", "Ohio" ), ( "OK", "Oklahoma" ), ( "OR", "Oregon" ), ( "PA", "Pennsylvania" ), ( "RI", "Rhode Island" ), ( "SC", "South Carolina" ), ( "SD", "South Dakota" ), ( "TN", "Tennessee" ), ( "TX", "Texas" ), ( "UT", "Utah" ), ( "VA", "Virginia" ), ( "VT", "Vermont" ), ( "WA", "Washington" ), ( "WI", "Wisconsin" ), ( "WV", "West Virginia" ), ( "WY", "Wyoming" ) ]
 
 
+rampRoleRankOrder : Dict String Int
+rampRoleRankOrder =
+    Dict.fromList [ ( "BUSINESS_ADMIN", 0 ), ( "IT_ADMIN", 1 ), ( "BUSINESS_BOOKKEEPER", 2 ), ( "BUSINESS_USER", 3 ) ]
+
+
 
 -- TYPES
 
@@ -1589,7 +1594,7 @@ renderForm model =
                         ]
                         [ text "Select your role..." ]
                      ]
-                        ++ List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampObjectLabel (toList model.rampRoleOptions))
+                        ++ List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText roleValidationResult) ]
@@ -1603,6 +1608,8 @@ renderForm model =
                 , div [ class "form-text", class "d-none", class "mb-3", class "d-md-block" ]
                     ([ text "Corporation staff that need to manage our Ramp account should select "
                      , strong [] [ text "Admin" ]
+                     , text ". Technology staff that need to manage users within Ramp should select "
+                     , strong [] [ text "IT admin" ]
                      , text ". Members that need to view all activity within Ramp should select "
                      , strong [] [ text "Bookkeeper" ]
                      , text ". All other members should select "
@@ -2841,6 +2848,11 @@ formatTime zone time =
 sortByRampObjectLabel : ( String, RampObject ) -> ( String, RampObject ) -> Order
 sortByRampObjectLabel first second =
     compare (Tuple.second first).label (Tuple.second second).label
+
+
+sortByRampRoleRankOrder : ( String, RampObject ) -> ( String, RampObject ) -> Order
+sortByRampRoleRankOrder first second =
+    compare (Maybe.withDefault 0 (Dict.get (Tuple.first first) rampRoleRankOrder)) (Maybe.withDefault 0 (Dict.get (Tuple.first second) rampRoleRankOrder))
 
 
 labelMatches : Maybe String -> String -> RampObject -> Bool
