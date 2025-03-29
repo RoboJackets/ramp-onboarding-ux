@@ -129,7 +129,7 @@ job "ramp-onboarding-ux" {
           "/var/opt/nomad/run/${NOMAD_JOB_NAME}-${NOMAD_ALLOC_ID}.sock",
           "--chmod-socket=777",
           "--http-socket",
-          "0.0.0.0:${NOMAD_PORT_http}",
+          "127.0.0.1:${NOMAD_PORT_http}",
           "--chdir=/app/",
           "--module=ramp_onboarding_ux:app",
           "--buffer-size=8192",
@@ -175,6 +175,8 @@ job "ramp-onboarding-ux" {
         name = "${NOMAD_JOB_NAME}"
 
         port = "http"
+
+        address = "127.0.0.1"
 
         tags = [
           "uwsgi",
