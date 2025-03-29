@@ -164,6 +164,13 @@ job "ramp-onboarding-ux" {
         env = true
       }
 
+      template {
+        data = "FLASK_SERVER_NAME=\"${var.hostname}\""
+
+        destination = "/secrets/.flask_server_name"
+        env = true
+      }
+
       service {
         name = "${NOMAD_JOB_NAME}"
 
