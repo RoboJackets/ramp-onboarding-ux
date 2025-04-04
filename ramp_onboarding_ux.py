@@ -2,10 +2,12 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
+import base64
 from collections import defaultdict
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
+from hashlib import file_digest
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
 from uuid import uuid4
@@ -102,6 +104,19 @@ def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
     Don't cache Ramp user lookup calls if the user doesn't have an active Ramp account
     """
     return "rampUserId" not in response
+
+
+def generate_subresource_integrity_hash(file: str) -> str:
+    """
+    Calculate the subresource integrity hash for a given file
+    """
+    with open(file[1:], "rb") as f:
+        d = file_digest(f, "sha512")
+
+    return "sha512-" + base64.b64encode(d.digest()).decode("utf-8")
+
+
+app.jinja_env.globals["calculate_integrity"] = generate_subresource_integrity_hash
 
 
 @cache.cached(timeout=55, key_prefix="keycloak_access_token", response_filter=dont_cache_none)
