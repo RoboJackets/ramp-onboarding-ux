@@ -115,6 +115,8 @@ job "ramp-onboarding-ux" {
     task "web" {
       driver = "docker"
 
+      consul {}
+
       config {
         image = var.image
 
