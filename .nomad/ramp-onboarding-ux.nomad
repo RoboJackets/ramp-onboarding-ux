@@ -126,7 +126,7 @@ job "ramp-onboarding-ux" {
           "/usr/local/bin/uwsgi",
           "--master",
           "--enable-threads",
-          "--processes=${attr.cpu.numcores}",
+          "--processes=${ATTR_CPU_NUMCORES}",
           "--uwsgi-socket",
           "/var/opt/nomad/run/${NOMAD_JOB_NAME}-${NOMAD_ALLOC_ID}.sock",
           "--chmod-socket=777",
@@ -171,6 +171,10 @@ job "ramp-onboarding-ux" {
 
         destination = "/secrets/.flask_server_name"
         env = true
+      }
+
+      env {
+        ATTR_CPU_NUMCORES = "${attr.cpu.numcores}"
       }
 
       service {
