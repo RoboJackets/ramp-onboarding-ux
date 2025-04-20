@@ -126,7 +126,7 @@ job "ramp-onboarding-ux" {
           "/usr/local/bin/uwsgi",
           "--master",
           "--enable-threads",
-          "--processes=4",
+          "--processes=${attr.cpu.numcores}",
           "--uwsgi-socket",
           "/var/opt/nomad/run/${NOMAD_JOB_NAME}-${NOMAD_ALLOC_ID}.sock",
           "--chmod-socket=777",
