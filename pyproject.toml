@@ -16,7 +16,7 @@ uwsgi = "2.0.29"
 sentry-sdk = {extras = ["pure-eval", "flask"], version = "2.28.0"}
 google-auth = "2.40.1"
 flask-caching = "2.3.1"
-redis = "6.0.0"
+redis = "6.1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "25.1.0"
