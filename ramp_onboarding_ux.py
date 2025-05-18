@@ -14,6 +14,8 @@ from uuid import uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
+from celery import Celery, Task, shared_task
+
 from flask import Flask, Response, redirect, render_template, request, session, url_for
 from flask.helpers import get_debug_flag
 
@@ -46,6 +48,29 @@ def traces_sampler(sampling_context: Dict[str, Dict[str, str]]) -> bool:
     return request_uri != "/ping"
 
 
+def init_celery(flask: Flask) -> Celery:
+    """
+    Initialize Celery
+    """
+
+    class FlaskTask(Task):  # type: ignore  # pylint: disable=abstract-method
+        """
+        Extend default Task class to have Flask context available
+
+        https://flask.palletsprojects.com/en/stable/patterns/celery/
+        """
+
+        def __call__(self, *args, **kwargs):  # type: ignore
+            with flask.app_context():
+                return self.run(*args, **kwargs)
+
+    new_celery_app = Celery("ramp_onboarding_ux", task_cls=FlaskTask)
+    new_celery_app.config_from_object(flask.config, namespace="CELERY")
+    new_celery_app.set_default()
+    flask.extensions["celery"] = new_celery_app
+    return new_celery_app
+
+
 sentry_sdk.init(
     debug=get_debug_flag(),
     integrations=[
@@ -63,6 +88,8 @@ sentry_sdk.init(
 
 app = Flask(__name__)
 app.config.from_prefixed_env()
+
+celery_app = init_celery(app)
 
 oauth = OAuth(app)
 oauth.register(
@@ -308,6 +335,51 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
         name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
 
     return name_map, users
+
+
+@shared_task
+def remove_eligible_role(keycloak_user_id: str) -> None:
+    """
+    Remove the eligible role from this user in Keycloak, after they are provisioned
+    """
+    remove_eligible_role_response = delete(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + keycloak_user_id
+        + "/role-mappings/clients/"
+        + app.config["KEYCLOAK_CLIENT_UUID"],
+        headers={
+            "Authorization": "Bearer " + get_keycloak_access_token(),
+        },
+        timeout=(5, 5),
+        json=[{"id": app.config["KEYCLOAK_CLIENT_ROLE_ELIGIBLE"], "name": "eligible"}],
+    )
+
+    if remove_eligible_role_response.status_code != 204:
+        print("Keycloak returned status code:", remove_eligible_role_response.status_code)
+        print("Response body:", remove_eligible_role_response.text)
+
+
+@shared_task
+def import_user_to_org_chart(ramp_user_id: str) -> None:
+    """
+    Notify OrgChart after a user is invited to Ramp
+    """
+    org_chart_response = post(
+        url=app.config["ORG_CHART_NOTIFY_URL"],
+        headers={
+            "Accept": "application/json",
+            "Authorization": "Token " + app.config["ORG_CHART_TOKEN"],
+        },
+        timeout=(5, 5),
+        json={"ramp_user_id": ramp_user_id},
+    )
+
+    if org_chart_response.status_code != 202:
+        print("OrgChart returned status code:", org_chart_response.status_code)
+        print("Response body:", org_chart_response.text)
 
 
 @app.get("/")
@@ -1182,24 +1254,8 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
             print("Keycloak returned status code:", update_keycloak_user_response.status_code)
             print("Response body:", update_keycloak_user_response.text)
 
-        remove_eligible_role_response = delete(
-            url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users/"
-            + session["sub"]
-            + "/role-mappings/clients/"
-            + app.config["KEYCLOAK_CLIENT_UUID"],
-            headers={
-                "Authorization": "Bearer " + keycloak_access_token,
-            },
-            timeout=(5, 5),
-            json=[{"id": app.config["KEYCLOAK_CLIENT_ROLE_ELIGIBLE"], "name": "eligible"}],
-        )
-
-        if remove_eligible_role_response.status_code != 204:
-            print("Keycloak returned status code:", remove_eligible_role_response.status_code)
-            print("Response body:", remove_eligible_role_response.text)
+        remove_eligible_role.delay(session["sub"])
+        import_user_to_org_chart.delay(ramp_task_status.json()["data"]["user_id"])
 
     return {
         "taskStatus": ramp_task_status.json()["status"],
