@@ -354,6 +354,7 @@ type alias Model =
     , studentDefaultLocationId : String
     , nonStudentDefaultLocationId : String
     , managerRampOptions : Dict String RampObject
+    , rampSingleSignOnUri : String
     }
 
 
@@ -1018,7 +1019,7 @@ update msg model =
                                     }
 
                             else
-                                Nav.load "/"
+                                Nav.load model.rampSingleSignOnUri
 
                         Just "IN_PROGRESS" ->
                             getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
@@ -1088,7 +1089,7 @@ update msg model =
                 Ok orderPhysicalCardTaskStatus ->
                     case orderPhysicalCardTaskStatus.taskStatus of
                         Just "SUCCESS" ->
-                            Nav.load "/"
+                            Nav.load model.rampSingleSignOnUri
 
                         Just "IN_PROGRESS" ->
                             getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
@@ -1819,9 +1820,11 @@ renderForm model =
             , text ", "
             , a [ href "https://ramp.com/legal/privacy-policy", class "text-secondary", target "_blank" ] [ text "Ramp Privacy Policy" ]
             , text ", "
-            , a [ href "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf", class "text-secondary", target "_blank" ] [ text "Sutton Bank Privacy Policy" ]
-            , text ", and "
             , a [ href "https://ramp.com/legal/authorized-user-terms", class "text-secondary", target "_blank" ] [ text "Ramp Authorized User Agreement" ]
+            , text ", "
+            , a [ href "https://ramp.com/legal/authorized-user-card-addendum", class "text-secondary", target "_blank" ] [ text "Ramp Authorized User Payment Card Addendum" ]
+            , text ", and "
+            , a [ href "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf", class "text-secondary", target "_blank" ] [ text "Sutton Privacy Policy" ]
             , text "."
             ]
         ]
@@ -2738,6 +2741,7 @@ buildInitialModel value =
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForStudents" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
         rampManagerOptions
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSingleSignOnUri" ] string) value)))
 
 
 stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )

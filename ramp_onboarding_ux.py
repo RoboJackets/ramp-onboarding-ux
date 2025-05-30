@@ -10,6 +10,7 @@ from email.headerregistry import Address
 from hashlib import file_digest
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
+from urllib.parse import urlunparse
 from uuid import uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
@@ -179,7 +180,7 @@ def get_ramp_access_token() -> Union[str, None]:
         url=app.config["RAMP_API_URL"] + "/developer/v1/token",
         data={
             "grant_type": "client_credentials",
-            "scope": "users:read users:write departments:read locations:read cards:write",
+            "scope": "users:read users:write departments:read locations:read cards:write business:read",  # noqa
         },
         auth=(
             app.config["RAMP_CLIENT_ID"],
@@ -337,6 +338,32 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
     return name_map, users
 
 
+@cache.cached(timeout=0, key_prefix="ramp_business")
+def get_ramp_business_id() -> str:
+    """
+    Get the business ID from Ramp
+    """
+    ramp_access_token = get_ramp_access_token()
+
+    if ramp_access_token is None:
+        raise InternalServerError("Failed to retrieve access token for Ramp")
+
+    ramp_business_id_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/business",
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if ramp_business_id_response.status_code != 200:
+        print("Ramp returned status code:", ramp_business_id_response.status_code)
+        print("Response body:", ramp_business_id_response.text)
+        raise InternalServerError("Failed to retrieve business from Ramp")
+
+    return ramp_business_id_response.json()["id"]  # type: ignore
+
+
 @shared_task
 def remove_eligible_role(keycloak_user_id: str) -> None:
     """
@@ -380,6 +407,70 @@ def import_user_to_org_chart(ramp_user_id: str) -> None:
     if org_chart_response.status_code != 202:
         print("OrgChart returned status code:", org_chart_response.status_code)
         print("Response body:", org_chart_response.text)
+
+
+@shared_task
+def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> None:
+    """
+    Store the Ramp user ID in Keycloak
+    """
+    keycloak_access_token = get_keycloak_access_token()
+
+    if keycloak_access_token is None:
+        raise Exception(  # pylint: disable=broad-exception-raised
+            "Failed to retrieve access token for Keycloak"
+        )
+
+    get_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + keycloak_user_id,
+        headers={
+            "Authorization": "Bearer " + keycloak_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if get_keycloak_user_response.status_code != 200:
+        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
+        print("Response body:", get_keycloak_user_response.text)
+        raise Exception(  # pylint: disable=broad-exception-raised
+            "Failed to retrieve user from Keycloak"
+        )
+
+    new_user = get_keycloak_user_response.json()
+    if "id" in new_user:
+        del new_user["id"]
+
+    if "username" in new_user:
+        del new_user["username"]
+
+    if "attributes" not in new_user:
+        new_user["attributes"] = {"rampUserId": [ramp_user_id]}
+    else:
+        new_user["attributes"]["rampUserId"] = [ramp_user_id]
+
+    update_keycloak_user_response = put(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + keycloak_user_id,
+        json=new_user,
+        headers={
+            "Authorization": "Bearer " + keycloak_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if update_keycloak_user_response.status_code != 204:
+        print("Keycloak returned status code:", update_keycloak_user_response.status_code)
+        print("Response body:", update_keycloak_user_response.text)
+        raise Exception(  # pylint: disable=broad-exception-raised
+            "Failed to update user in Keycloak"
+        )
 
 
 @app.get("/")
@@ -544,6 +635,16 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
             "defaultDepartmentForNonStudents": app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"],
             "defaultLocationForStudents": app.config["RAMP_DEFAULT_LOCATION_STUDENTS"],
             "defaultLocationForNonStudents": app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"],
+            "rampSingleSignOnUri": urlunparse(
+                (
+                    "https",
+                    app.config["RAMP_UI_HOSTNAME"],
+                    "/sign-in/saml/" + get_ramp_business_id(),
+                    "",
+                    "",
+                    "",
+                )
+            ),
         },
     )
 
@@ -1199,63 +1300,9 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
     if ramp_task_status.json()["status"] == "SUCCESS":
         session["ramp_user_id"] = ramp_task_status.json()["data"]["user_id"]
 
-        keycloak_access_token = get_keycloak_access_token()
-
-        if keycloak_access_token is None:
-            return {
-                "taskStatus": ramp_task_status.json()["status"],
-            }
-
-        get_keycloak_user_response = get(
-            url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users/"
-            + session["sub"],
-            headers={
-                "Authorization": "Bearer " + keycloak_access_token,
-            },
-            timeout=(5, 5),
-        )
-
-        if get_keycloak_user_response.status_code != 200:
-            print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-            print("Response body:", get_keycloak_user_response.text)
-            return {
-                "taskStatus": ramp_task_status.json()["status"],
-            }
-
-        new_user = get_keycloak_user_response.json()
-        if "id" in new_user:
-            del new_user["id"]
-
-        if "username" in new_user:
-            del new_user["username"]
-
-        if "attributes" not in new_user:
-            new_user["attributes"] = {"rampUserId": [ramp_task_status.json()["data"]["user_id"]]}
-        else:
-            new_user["attributes"]["rampUserId"] = [ramp_task_status.json()["data"]["user_id"]]
-
-        update_keycloak_user_response = put(
-            url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users/"
-            + session["sub"],
-            json=new_user,
-            headers={
-                "Authorization": "Bearer " + keycloak_access_token,
-            },
-            timeout=(5, 5),
-        )
-
-        if update_keycloak_user_response.status_code != 204:
-            print("Keycloak returned status code:", update_keycloak_user_response.status_code)
-            print("Response body:", update_keycloak_user_response.text)
-
+        store_ramp_user_id_in_keycloak.delay(session["sub"], session["ramp_user_id"])
         remove_eligible_role.delay(session["sub"])
-        import_user_to_org_chart.delay(ramp_task_status.json()["data"]["user_id"])
+        import_user_to_org_chart.delay(session["ramp_user_id"])
 
     return {
         "taskStatus": ramp_task_status.json()["status"],
