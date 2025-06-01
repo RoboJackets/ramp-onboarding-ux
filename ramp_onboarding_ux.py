@@ -1433,6 +1433,8 @@ def login() -> Any:
             )
             address_validation_response.raise_for_status()
 
+            print(address_validation_response.text)
+
             address_validation_json = address_validation_response.json()
 
             session["address_line_one"] = ""
