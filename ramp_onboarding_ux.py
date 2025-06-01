@@ -31,7 +31,7 @@ from ldap3 import Connection, Server
 from requests import delete, get, post, put
 
 import sentry_sdk
-from sentry_sdk import capture_message, set_user
+from sentry_sdk import set_user
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
@@ -174,7 +174,7 @@ app.jinja_env.globals["calculate_integrity"] = generate_subresource_integrity_ha
 
 
 @cache.cached(timeout=55, key_prefix="keycloak_access_token", response_filter=dont_cache_none)
-def get_keycloak_access_token() -> Union[str, None]:
+def get_keycloak_access_token() -> str:
     """
     Get an access token for Keycloak.
     """
@@ -187,18 +187,12 @@ def get_keycloak_access_token() -> Union[str, None]:
         },
         timeout=(5, 5),
     )
-
-    if keycloak_access_token_response.status_code == 200:
-        return keycloak_access_token_response.json()["access_token"]  # type: ignore
-
-    print("Keycloak returned status code:", keycloak_access_token_response.status_code)
-    print("Response body:", keycloak_access_token_response.text)
-
-    return None
+    keycloak_access_token_response.raise_for_status()
+    return keycloak_access_token_response.json()["access_token"]  # type: ignore
 
 
 @cache.cached(timeout=863995, key_prefix="ramp_access_token", response_filter=dont_cache_none)
-def get_ramp_access_token() -> Union[str, None]:
+def get_ramp_access_token() -> str:
     """
     Get an access token for Ramp.
     """
@@ -214,14 +208,8 @@ def get_ramp_access_token() -> Union[str, None]:
         ),
         timeout=(5, 5),
     )
-
-    if ramp_access_token_response.status_code == 200:
-        return ramp_access_token_response.json()["access_token"]  # type: ignore
-
-    print("Ramp returned status code:", ramp_access_token_response.status_code)
-    print("Response body:", ramp_access_token_response.text)
-
-    return None
+    ramp_access_token_response.raise_for_status()
+    return ramp_access_token_response.json()["access_token"]  # type: ignore
 
 
 @cache.cached(key_prefix="apiary_managers")
@@ -237,18 +225,12 @@ def get_apiary_managers() -> Dict[int, str]:
         },
         timeout=(5, 5),
     )
+    apiary_managers_response.raise_for_status()
 
     managers = {}
 
-    if apiary_managers_response.status_code == 200:
-        apiary_managers_json = apiary_managers_response.json()
-
-        for manager in apiary_managers_json["users"]:
-            managers[manager["id"]] = manager["full_name"]
-    else:
-        print("Apiary returned status code:", apiary_managers_response.status_code)
-        print("Response body:", apiary_managers_response.text)
-        raise InternalServerError("Unable to load managers from Apiary")
+    for manager in apiary_managers_response.json()["users"]:
+        managers[manager["id"]] = manager["full_name"]
 
     return managers
 
@@ -258,23 +240,14 @@ def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of departments from Ramp
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_departments_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/departments",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_departments_response.status_code != 200:
-        print("Ramp returned status code:", ramp_departments_response.status_code)
-        print("Response body:", ramp_departments_response.text)
-        raise InternalServerError("Failed to retrieve departments from Ramp")
+    ramp_departments_response.raise_for_status()
 
     departments = {}
 
@@ -292,23 +265,14 @@ def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of locations from Ramp
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_locations_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_locations_response.status_code != 200:
-        print("Ramp returned status code:", ramp_locations_response.status_code)
-        print("Response body:", ramp_locations_response.text)
-        raise InternalServerError("Failed to retrieve locations from Ramp")
+    ramp_locations_response.raise_for_status()
 
     locations = {}
 
@@ -326,26 +290,17 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
     """
     Get the list of users from Ramp
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_users_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         params={
             "page_size": 100,
         },
         timeout=(5, 5),
     )
-
-    if ramp_users_response.status_code != 200:
-        print("Ramp returned status code:", ramp_users_response.status_code)
-        print("Response body:", ramp_users_response.text)
-        raise InternalServerError("Failed to retrieve users from Ramp")
+    ramp_users_response.raise_for_status()
 
     users = {}
 
@@ -369,24 +324,14 @@ def get_ramp_business_id() -> str:
     """
     Get the business ID from Ramp
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_business_id_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/business",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_business_id_response.status_code != 200:
-        print("Ramp returned status code:", ramp_business_id_response.status_code)
-        print("Response body:", ramp_business_id_response.text)
-        raise InternalServerError("Failed to retrieve business from Ramp")
-
+    ramp_business_id_response.raise_for_status()
     return ramp_business_id_response.json()["id"]  # type: ignore
 
 
@@ -414,11 +359,6 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     Get the Slack user ID for a given Keycloak or Ramp user.
     """
     if "keycloak_user_id" in kwargs and kwargs["keycloak_user_id"] is not None:
-        keycloak_access_token = get_keycloak_access_token()
-
-        if keycloak_access_token is None:
-            raise Exception("Failed to retrieve access token for Keycloak")
-
         get_keycloak_user_response = get(
             url=app.config["KEYCLOAK_SERVER"]
             + "/admin/realms/"
@@ -426,15 +366,11 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             + "/users/"
             + kwargs["keycloak_user_id"],
             headers={
-                "Authorization": "Bearer " + keycloak_access_token,
+                "Authorization": "Bearer " + get_keycloak_access_token(),
             },
             timeout=(5, 5),
         )
-
-        if get_keycloak_user_response.status_code != 200:
-            print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-            print("Response body:", get_keycloak_user_response.text)
-            raise InternalServerError("Failed to retrieve user from Keycloak")
+        get_keycloak_user_response.raise_for_status()
 
         keycloak_user = get_keycloak_user_response.json()
 
@@ -522,30 +458,19 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                         return slack_user_id  # type: ignore
 
     if "ramp_user_id" in kwargs and kwargs["ramp_user_id"] is not None:
-        ramp_access_token = get_ramp_access_token()
-
         ramp_user_response = get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + kwargs["ramp_user_id"],
             headers={
-                "Authorization": "Bearer " + ramp_access_token,
+                "Authorization": "Bearer " + get_ramp_access_token(),
             },
             timeout=(5, 5),
         )
-
-        if ramp_user_response.status_code != 200:
-            print("Ramp returned status code:", ramp_user_response.status_code)
-            print("Response body:", ramp_user_response.text)
-            raise InternalServerError("Failed to retrieve user from Ramp")
+        ramp_user_response.raise_for_status()
 
         slack_user_id = get_slack_user_id_by_email(ramp_user_response.json()["email"])
 
         if slack_user_id is not None:
             return slack_user_id  # type: ignore
-
-        keycloak_access_token = get_keycloak_access_token()
-
-        if keycloak_access_token is None:
-            raise Exception("Failed to retrieve access token for Keycloak")
 
         search_keycloak_user_response = get(
             url=app.config["KEYCLOAK_SERVER"]
@@ -553,18 +478,14 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             + app.config["KEYCLOAK_REALM"]
             + "/users",
             headers={
-                "Authorization": "Bearer " + keycloak_access_token,
+                "Authorization": "Bearer " + get_keycloak_access_token(),
             },
             params={
                 "q": "rampUserId:" + kwargs["ramp_user_id"],
             },
             timeout=(5, 5),
         )
-
-        if search_keycloak_user_response.status_code != 200:
-            print("Keycloak returned status code:", search_keycloak_user_response.status_code)
-            print("Response body:", search_keycloak_user_response.text)
-            raise Exception("Failed to retrieve user from Keycloak")
+        search_keycloak_user_response.raise_for_status()
 
         if len(search_keycloak_user_response.json()) == 1:
             return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])  # type: ignore  # noqa
@@ -576,18 +497,14 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                 + app.config["KEYCLOAK_REALM"]
                 + "/users",
                 headers={
-                    "Authorization": "Bearer " + keycloak_access_token,
+                    "Authorization": "Bearer " + get_keycloak_access_token(),
                 },
                 params={
                     "q": "googleWorkspaceAccount:" + ramp_user_response.json()["email"],
                 },
                 timeout=(5, 5),
             )
-
-            if search_keycloak_user_response.status_code != 200:
-                print("Keycloak returned status code:", search_keycloak_user_response.status_code)
-                print("Response body:", search_keycloak_user_response.text)
-                raise Exception("Failed to retrieve user from Keycloak")
+            search_keycloak_user_response.raise_for_status()
 
             if len(search_keycloak_user_response.json()) == 1:
                 return get_slack_user_id(  # type: ignore
@@ -622,10 +539,7 @@ def remove_eligible_role(keycloak_user_id: str) -> None:
         timeout=(5, 5),
         json=[{"id": app.config["KEYCLOAK_CLIENT_ROLE_ELIGIBLE"], "name": "eligible"}],
     )
-
-    if remove_eligible_role_response.status_code != 204:
-        print("Keycloak returned status code:", remove_eligible_role_response.status_code)
-        print("Response body:", remove_eligible_role_response.text)
+    remove_eligible_role_response.raise_for_status()
 
 
 @shared_task
@@ -642,10 +556,7 @@ def import_user_to_org_chart(ramp_user_id: str) -> None:
         timeout=(5, 5),
         json={"ramp_user_id": ramp_user_id},
     )
-
-    if org_chart_response.status_code != 202:
-        print("OrgChart returned status code:", org_chart_response.status_code)
-        print("Response body:", org_chart_response.text)
+    org_chart_response.raise_for_status()
 
 
 @shared_task
@@ -653,11 +564,6 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     """
     Store the Ramp user ID in Keycloak
     """
-    keycloak_access_token = get_keycloak_access_token()
-
-    if keycloak_access_token is None:
-        raise Exception("Failed to retrieve access token for Keycloak")
-
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
@@ -665,15 +571,11 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
         + "/users/"
         + keycloak_user_id,
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if get_keycloak_user_response.status_code != 200:
-        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-        print("Response body:", get_keycloak_user_response.text)
-        raise Exception("Failed to retrieve user from Keycloak")
+    get_keycloak_user_response.raise_for_status()
 
     new_user = get_keycloak_user_response.json()
     if "id" in new_user:
@@ -695,15 +597,11 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
         + keycloak_user_id,
         json=new_user,
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if update_keycloak_user_response.status_code != 204:
-        print("Keycloak returned status code:", update_keycloak_user_response.status_code)
-        print("Response body:", update_keycloak_user_response.text)
-        raise Exception("Failed to update user in Keycloak")
+    update_keycloak_user_response.raise_for_status()
 
 
 @shared_task
@@ -715,11 +613,6 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
     if cache.get("slack_ineligible_message_" + keycloak_user_id) is not None:
         return
 
-    keycloak_access_token = get_keycloak_access_token()
-
-    if keycloak_access_token is None:
-        raise Exception("Failed to retrieve access token for Keycloak")
-
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
@@ -727,15 +620,11 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
         + "/users/"
         + keycloak_user_id,
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if get_keycloak_user_response.status_code != 200:
-        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-        print("Response body:", get_keycloak_user_response.text)
-        raise Exception("Failed to retrieve user from Keycloak")
+    get_keycloak_user_response.raise_for_status()
 
     view_in_keycloak_button = ButtonElement(
         text="View in Keycloak",
@@ -814,7 +703,8 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
             ]
         )
     else:
-        raise Exception("Failed to retrieve user from Apiary")
+        actions = ActionsBlock(elements=[])
+        apiary_user_response.raise_for_status()
 
     slack_user_id = get_slack_user_id(keycloak_user_id=keycloak_user_id)
 
@@ -853,20 +743,14 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     Send Slack notifications to the central notifications channel, manager, and new member, when
     someone joins Ramp.
     """
-    ramp_access_token = get_ramp_access_token()
-
     new_ramp_user_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if new_ramp_user_response.status_code != 200:
-        print("Ramp returned status code:", new_ramp_user_response.status_code)
-        print("Response body:", new_ramp_user_response.text)
-        raise InternalServerError("Failed to retrieve user from Ramp")
+    new_ramp_user_response.raise_for_status()
 
     if new_ramp_user_response.json()["manager_id"] is None:
         ramp_manager_user_response = None
@@ -877,15 +761,11 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
             + "/developer/v1/users/"
             + new_ramp_user_response.json()["manager_id"],
             headers={
-                "Authorization": "Bearer " + ramp_access_token,
+                "Authorization": "Bearer " + get_ramp_access_token(),
             },
             timeout=(5, 5),
         )
-
-        if ramp_manager_user_response.status_code != 200:
-            print("Ramp returned status code:", ramp_manager_user_response.status_code)
-            print("Response body:", ramp_manager_user_response.text)
-            raise InternalServerError("Failed to retrieve user from Ramp")
+        ramp_manager_user_response.raise_for_status()
 
         manager_slack_user_id = get_slack_user_id(
             ramp_user_id=new_ramp_user_response.json()["manager_id"]
@@ -969,11 +849,6 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
 
     possessive_pronoun = "their"
 
-    keycloak_access_token = get_keycloak_access_token()
-
-    if keycloak_access_token is None:
-        raise Exception("Failed to retrieve access token for Keycloak")
-
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
@@ -981,15 +856,11 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         + "/users/"
         + keycloak_user_id,
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if get_keycloak_user_response.status_code != 200:
-        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-        print("Response body:", get_keycloak_user_response.text)
-        raise Exception("Failed to retrieve user from Keycloak")
+    get_keycloak_user_response.raise_for_status()
 
     apiary_user_response = get(
         url=app.config["APIARY_URL"]
@@ -1001,18 +872,16 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         },
         timeout=(5, 5),
     )
+    apiary_user_response.raise_for_status()
 
-    if apiary_user_response.status_code == 200:
-        if (
-            "gender" in apiary_user_response.json()["user"]
-            and apiary_user_response.json()["user"]["gender"] is not None
-        ):
-            if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
-                possessive_pronoun = "his"
-            elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
-                possessive_pronoun = "her"
-    else:
-        raise Exception("Failed to retrieve user from Apiary")
+    if (
+        "gender" in apiary_user_response.json()["user"]
+        and apiary_user_response.json()["user"]["gender"] is not None
+    ):
+        if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
+            possessive_pronoun = "his"
+        elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
+            possessive_pronoun = "her"
 
     if manager_slack_user_id is not None:
         manager_slack_profile = slack.users_profile_get(user=manager_slack_user_id)
@@ -1142,16 +1011,12 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         cards_response = get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/cards",
             headers={
-                "Authorization": "Bearer " + ramp_access_token,
+                "Authorization": "Bearer " + get_ramp_access_token(),
             },
             params={"user_id": ramp_user_id},
             timeout=(5, 5),
         )
-
-        if cards_response.status_code != 200:
-            print("Ramp returned status code:", cards_response.status_code)
-            print("Response body:", cards_response.text)
-            raise InternalServerError("Failed to retrieve cards from Ramp")
+        cards_response.raise_for_status()
 
         if len(cards_response.json()["data"]) > 0:
             activate_physical_card_tip = [
@@ -1248,11 +1113,6 @@ def index() -> Any:
     )
 
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
-        keycloak_access_token = get_keycloak_access_token()
-
-        if keycloak_access_token is None:
-            raise InternalServerError("Failed to retrieve access token for Keycloak")
-
         keycloak_user_response = get(
             url=app.config["KEYCLOAK_SERVER"]
             + "/admin/realms/"
@@ -1260,15 +1120,11 @@ def index() -> Any:
             + "/users/"
             + session["sub"],
             headers={
-                "Authorization": "Bearer " + keycloak_access_token,
+                "Authorization": "Bearer " + get_keycloak_access_token(),
             },
             timeout=(5, 5),
         )
-
-        if keycloak_user_response.status_code != 200:
-            print("Keycloak returned status code:", keycloak_user_response.status_code)
-            print("Response body:", keycloak_user_response.text)
-            raise InternalServerError("Failed to retrieve user from Keycloak")
+        keycloak_user_response.raise_for_status()
 
         user_json = keycloak_user_response.json()
         attributes = user_json["attributes"] if "attributes" in user_json else {}
@@ -1281,23 +1137,14 @@ def index() -> Any:
         ramp_user_id = session["ramp_user_id"]
 
     if ramp_user_id is not None:
-        ramp_access_token = get_ramp_access_token()
-
-        if ramp_access_token is None:
-            raise InternalServerError("Failed to retrieve access token for Ramp")
-
         ramp_user_response = get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
             headers={
-                "Authorization": "Bearer " + ramp_access_token,
+                "Authorization": "Bearer " + get_ramp_access_token(),
             },
             timeout=(5, 5),
         )
-
-        if ramp_user_response.status_code != 200:
-            print("Ramp returned status code:", ramp_user_response.status_code)
-            print("Response body:", ramp_user_response.text)
-            raise InternalServerError("Failed to retrieve user from Ramp")
+        ramp_user_response.raise_for_status()
 
         if ramp_user_response.json()["status"] == "USER_ACTIVE":
             return render_template(
@@ -1521,9 +1368,7 @@ def login() -> Any:
             pass
 
         else:
-            print("Apiary returned status code:", apiary_user_response.status_code)
-            print("Response body:", apiary_user_response.text)
-            raise InternalServerError("Unable to retrieve user information from Apiary")
+            apiary_user_response.raise_for_status()
 
     if session["user_state"] == "eligible":  # pylint: disable=too-many-nested-blocks
         with sentry_sdk.start_span(op="ldap.connect"):
@@ -1586,79 +1431,66 @@ def login() -> Any:
                 },
                 timeout=(5, 5),
             )
+            address_validation_response.raise_for_status()
 
-            print(address_validation_response.status_code)
-            print(address_validation_response.text)
+            address_validation_json = address_validation_response.json()
 
-            if address_validation_response.status_code == 200:
-                address_validation_json = address_validation_response.json()
+            session["address_line_one"] = ""
+            session["address_line_two"] = ""
+            session["city"] = ""
+            session["address_state"] = None
 
-                session["address_line_one"] = ""
-                session["address_line_two"] = ""
-                session["city"] = ""
-                session["address_state"] = None
+            if (
+                "result" in address_validation_json
+                and "address" in address_validation_json["result"]
+                and "postalAddress" in address_validation_json["result"]["address"]
+            ):
+                if "postalCode" in address_validation_json["result"]["address"]["postalAddress"]:
+                    session["zip_code"] = address_validation_json["result"]["address"][
+                        "postalAddress"
+                    ]["postalCode"]
+
+                    if fullmatch(r"^\d{5}-\d{4}$", session["zip_code"]):
+                        session["zip_code"] = session["zip_code"].split("-")[0]
+
+                if "locality" in address_validation_json["result"]["address"]["postalAddress"]:
+                    session["city"] = address_validation_json["result"]["address"]["postalAddress"][
+                        "locality"
+                    ]
 
                 if (
-                    "result" in address_validation_json
-                    and "address" in address_validation_json["result"]
-                    and "postalAddress" in address_validation_json["result"]["address"]
+                    "administrativeArea"
+                    in address_validation_json["result"]["address"]["postalAddress"]
                 ):
-                    if (
-                        "postalCode"
-                        in address_validation_json["result"]["address"]["postalAddress"]
-                    ):
-                        session["zip_code"] = address_validation_json["result"]["address"][
-                            "postalAddress"
-                        ]["postalCode"]
+                    session["address_state"] = address_validation_json["result"]["address"][
+                        "postalAddress"
+                    ]["administrativeArea"]
 
-                        if fullmatch(r"^\d{5}-\d{4}$", session["zip_code"]):
-                            session["zip_code"] = session["zip_code"].split("-")[0]
+                if (
+                    "addressLines" in address_validation_json["result"]["address"]["postalAddress"]
+                    and len(
+                        address_validation_json["result"]["address"]["postalAddress"][
+                            "addressLines"
+                        ]
+                    )
+                    > 0
+                ):
+                    session["address_line_one"] = address_validation_json["result"]["address"][
+                        "postalAddress"
+                    ]["addressLines"][0]
 
-                    if "locality" in address_validation_json["result"]["address"]["postalAddress"]:
-                        session["city"] = address_validation_json["result"]["address"][
-                            "postalAddress"
-                        ]["locality"]
-
-                    if (
-                        "administrativeArea"
-                        in address_validation_json["result"]["address"]["postalAddress"]
-                    ):
-                        session["address_state"] = address_validation_json["result"]["address"][
-                            "postalAddress"
-                        ]["administrativeArea"]
-
-                    if (
-                        "addressLines"
-                        in address_validation_json["result"]["address"]["postalAddress"]
-                        and len(
-                            address_validation_json["result"]["address"]["postalAddress"][
-                                "addressLines"
-                            ]
-                        )
-                        > 0
-                    ):
-                        session["address_line_one"] = address_validation_json["result"]["address"][
-                            "postalAddress"
-                        ]["addressLines"][0]
-
-                    if (
-                        "addressLines"
-                        in address_validation_json["result"]["address"]["postalAddress"]
-                        and len(
-                            address_validation_json["result"]["address"]["postalAddress"][
-                                "addressLines"
-                            ]
-                        )
-                        > 1
-                    ):
-                        session["address_line_two"] = address_validation_json["result"]["address"][
-                            "postalAddress"
-                        ]["addressLines"][1]
-            else:
-                capture_message(
-                    "Failed to validate homePostalAddress from Whitepages: "
-                    + address_validation_response.text
-                )
+                if (
+                    "addressLines" in address_validation_json["result"]["address"]["postalAddress"]
+                    and len(
+                        address_validation_json["result"]["address"]["postalAddress"][
+                            "addressLines"
+                        ]
+                    )
+                    > 1
+                ):
+                    session["address_line_two"] = address_validation_json["result"]["address"][
+                        "postalAddress"
+                    ]["addressLines"][1]
 
     if session["user_state"] == "ineligible":
         notify_slack_ineligible.delay(session["sub"])
@@ -1819,16 +1651,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
         },
         timeout=(5, 5),
     )
-
-    if apiary_user_response.status_code != 200:
-        print("Apiary returned status code:", apiary_user_response.status_code)
-        print("Response body:", apiary_user_response.text)
-        return {"error": "Failed to retrieve manager information from Apiary"}
-
-    keycloak_access_token = get_keycloak_access_token()
-
-    if keycloak_access_token is None:
-        return {"error": "Failed to retrieve access token for Keycloak"}
+    apiary_user_response.raise_for_status()
 
     keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
@@ -1840,15 +1663,11 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
             "exact": True,
         },
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if keycloak_user_response.status_code != 200:
-        print("Keycloak returned status code:", keycloak_user_response.status_code)
-        print("Response body:", keycloak_user_response.text)
-        return {"error": "Failed to search for manager in Keycloak"}
+    keycloak_user_response.raise_for_status()
 
     object_pronoun = "them"
     possessive_pronoun = "their"
@@ -1881,23 +1700,14 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     else:
         return {"error": "More than one result for manager search in Keycloak"}
 
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        return {"error": "Failed to retrieve access token for Ramp"}
-
     ramp_user_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_user_response.status_code != 200:
-        print("Ramp returned status code:", ramp_user_response.status_code)
-        print("Response body:", ramp_user_response.text)
-        return {"error": "Failed to retrieve manager from Ramp"}
+    ramp_user_response.raise_for_status()
 
     if ramp_user_response.json()["status"] == "USER_ACTIVE":
         return {
@@ -1942,11 +1752,6 @@ def create_ramp_account() -> Dict[str, str]:
     if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:  # type: ignore  # noqa
         raise Unauthorized("Invalid role")
 
-    keycloak_access_token = get_keycloak_access_token()
-
-    if keycloak_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Keycloak")
-
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
@@ -1954,15 +1759,11 @@ def create_ramp_account() -> Dict[str, str]:
         + "/users/"
         + session["sub"],
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if get_keycloak_user_response.status_code != 200:
-        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
-        print("Response body:", get_keycloak_user_response.text)
-        raise InternalServerError("Failed to retrieve user from Keycloak")
+    get_keycloak_user_response.raise_for_status()
 
     new_user = get_keycloak_user_response.json()
     if "id" in new_user:
@@ -1987,15 +1788,11 @@ def create_ramp_account() -> Dict[str, str]:
         + session["sub"],
         json=new_user,
         headers={
-            "Authorization": "Bearer " + keycloak_access_token,
+            "Authorization": "Bearer " + get_keycloak_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if keycloak_user_response.status_code != 204:
-        print("Keycloak returned status code:", keycloak_user_response.status_code)
-        print("Response body:", keycloak_user_response.text)
-        raise InternalServerError("Failed to update name and email address in Keycloak")
+    keycloak_user_response.raise_for_status()
 
     request_body = {
         "department_id": request.json["departmentId"],  # type: ignore
@@ -2011,24 +1808,15 @@ def create_ramp_account() -> Dict[str, str]:
     if request.json["role"] != "BUSINESS_ADMIN":  # type: ignore
         request_body["direct_manager_id"] = request.json["directManagerId"]  # type: ignore
 
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_invite_user_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         json=request_body,
         timeout=(5, 5),
     )
-
-    if ramp_invite_user_response.status_code != 201:
-        print("Ramp returned status code:", ramp_invite_user_response.status_code)
-        print("Response body:", ramp_invite_user_response.text)
-        raise InternalServerError("Failed to create user invitation")
+    ramp_invite_user_response.raise_for_status()
 
     return {
         "taskId": ramp_invite_user_response.json()["id"],
@@ -2040,23 +1828,14 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to create a Ramp account.
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_task_status = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred/status/" + task_id,
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_task_status.status_code != 200:
-        print("Ramp returned status code:", ramp_task_status.status_code)
-        print("Response body:", ramp_task_status.text)
-        raise InternalServerError("Failed to get task status")
+    ramp_task_status.raise_for_status()
 
     if ramp_task_status.json()["status"] == "SUCCESS":
         session["ramp_user_id"] = ramp_task_status.json()["data"]["user_id"]
@@ -2091,15 +1870,10 @@ def order_physical_card() -> Dict[str, str]:
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         raise InternalServerError("No Ramp user ID in session")
 
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_order_physical_card_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/cards/deferred/physical",
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         json={
             "display_name": "Physical Card",
@@ -2131,11 +1905,7 @@ def order_physical_card() -> Dict[str, str]:
         },
         timeout=(5, 5),
     )
-
-    if ramp_order_physical_card_response.status_code != 200:
-        print("Ramp returned status code:", ramp_order_physical_card_response.status_code)
-        print("Response body:", ramp_order_physical_card_response.text)
-        raise InternalServerError("Failed to order physical card")
+    ramp_order_physical_card_response.raise_for_status()
 
     return {
         "taskId": ramp_order_physical_card_response.json()["id"],
@@ -2147,23 +1917,14 @@ def get_physical_card_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to order a physical card.
     """
-    ramp_access_token = get_ramp_access_token()
-
-    if ramp_access_token is None:
-        raise InternalServerError("Failed to retrieve access token for Ramp")
-
     ramp_task_status = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/cards/deferred/status/" + task_id,
         headers={
-            "Authorization": "Bearer " + ramp_access_token,
+            "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-
-    if ramp_task_status.status_code != 200:
-        print("Ramp returned status code:", ramp_task_status.status_code)
-        print("Response body:", ramp_task_status.text)
-        raise InternalServerError("Failed to get task status")
+    ramp_task_status.raise_for_status()
 
     return {
         "taskStatus": ramp_task_status.json()["status"],
@@ -2208,11 +1969,7 @@ def handle_slack_event() -> Dict[str, str]:
             timeout=(5, 5),
             json=[{"id": app.config["KEYCLOAK_CLIENT_ROLE_ELIGIBLE"], "name": "eligible"}],
         )
-
-        if add_eligible_role_response.status_code != 204:
-            print("Keycloak returned status code:", add_eligible_role_response.status_code)
-            print("Response body:", add_eligible_role_response.text)
-            raise InternalServerError("Failed to add role in Keycloak")
+        add_eligible_role_response.raise_for_status()
 
         slack = WebhookClient(url=payload["response_url"])
         slack.send(
