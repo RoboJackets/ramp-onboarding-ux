@@ -12,7 +12,7 @@ from json import loads
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse, urlunparse
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
@@ -1960,7 +1960,7 @@ def handle_slack_event() -> Dict[str, str]:
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
-            + payload["actions"][0]["value"]
+            + str(UUID(payload["actions"][0]["value"]))
             + "/role-mappings/clients/"
             + app.config["KEYCLOAK_CLIENT_UUID"],
             headers={
