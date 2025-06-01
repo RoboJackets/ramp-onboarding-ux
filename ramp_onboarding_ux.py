@@ -169,7 +169,7 @@ app.jinja_env.globals["calculate_integrity"] = generate_subresource_integrity_ha
 @cache.cached(timeout=55, key_prefix="keycloak_access_token")
 def get_keycloak_access_token() -> str:
     """
-    Get an access token for Keycloak.
+    Get an access token for Keycloak
     """
     keycloak_access_token_response = post(
         url=app.config["KEYCLOAK_SERVER"] + "/realms/master/protocol/openid-connect/token",
@@ -187,7 +187,7 @@ def get_keycloak_access_token() -> str:
 @cache.cached(timeout=863995, key_prefix="ramp_access_token")
 def get_ramp_access_token() -> str:
     """
-    Get an access token for Ramp.
+    Get an access token for Ramp
     """
     ramp_access_token_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/token",
@@ -331,7 +331,7 @@ def get_ramp_business_id() -> str:
 @cache.memoize()
 def get_slack_user_id_by_email(email: str) -> Union[str, None]:
     """
-    Wrapper for the users.lookupByEmail function to memoize responses.
+    Wrapper for the users.lookupByEmail function to memoize responses
     """
     slack = WebClient(token=app.config["SLACK_API_TOKEN"])
 
@@ -349,7 +349,7 @@ def get_slack_user_id_by_email(email: str) -> Union[str, None]:
 @cache.memoize()
 def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     """
-    Get the Slack user ID for a given Keycloak or Ramp user.
+    Get the Slack user ID for a given Keycloak or Ramp user
     """
     if "keycloak_user_id" in kwargs and kwargs["keycloak_user_id"] is not None:
         get_keycloak_user_response = get(
@@ -601,7 +601,7 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
 def notify_slack_ineligible(keycloak_user_id: str) -> None:
     """
     Send a Slack notification to the central notifications channel when an ineligible user loads
-    the form.
+    the form
     """
     if cache.get("slack_ineligible_message_" + keycloak_user_id) is not None:
         return
@@ -734,7 +734,7 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
 def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> None:
     """
     Send Slack notifications to the central notifications channel, manager, and new member, when
-    someone joins Ramp.
+    someone joins Ramp
     """
     new_ramp_user_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
@@ -1624,7 +1624,7 @@ def verify_microsoft_complete() -> Response:
 @cache.cached(response_filter=only_cache_if_ramp_id_present)
 def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     """
-    Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account.
+    Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account
     """
     if "user_state" not in session:
         raise Unauthorized("Not logged in")
@@ -1721,7 +1721,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
 @app.post("/create-ramp-account")
 def create_ramp_account() -> Dict[str, str]:
     """
-    Creates a new Ramp account and returns the task status for the browser to poll.
+    Creates a new Ramp account and returns the task status for the browser to poll
     """
     if "user_state" not in session:
         raise Unauthorized("Not logged in")
@@ -1821,7 +1821,7 @@ def create_ramp_account() -> Dict[str, str]:
 @app.get("/create-ramp-account/<task_id>")
 def get_ramp_account_status(task_id: str) -> Dict[str, str]:
     """
-    Get the task status for a previous request to create a Ramp account.
+    Get the task status for a previous request to create a Ramp account
     """
     ramp_task_status = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred/status/" + task_id,
@@ -1848,7 +1848,7 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
 @app.post("/order-physical-card")
 def order_physical_card() -> Dict[str, str]:
     """
-    Order a physical card for the logged-in user.
+    Order a physical card for the logged-in user
     """
     if "user_state" not in session:
         raise Unauthorized("Not logged in")
@@ -1910,7 +1910,7 @@ def order_physical_card() -> Dict[str, str]:
 @app.get("/order-physical-card/<task_id>")
 def get_physical_card_status(task_id: str) -> Dict[str, str]:
     """
-    Get the task status for a previous request to order a physical card.
+    Get the task status for a previous request to order a physical card
     """
     ramp_task_status = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/cards/deferred/status/" + task_id,
@@ -1929,7 +1929,7 @@ def get_physical_card_status(task_id: str) -> Dict[str, str]:
 @app.post("/slack")
 def handle_slack_event() -> Dict[str, str]:
     """
-    Handle an interaction event from Slack.
+    Handle an interaction event from Slack
 
     https://docs.slack.dev/interactivity/handling-user-interaction#payloads
     """
