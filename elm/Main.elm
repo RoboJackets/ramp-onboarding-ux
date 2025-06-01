@@ -976,6 +976,9 @@ update msg model =
                                 Just "SUCCESS" ->
                                     OrderingPhysicalCard
 
+                                Just "STARTED" ->
+                                    CreatingRampAccount
+
                                 Just "IN_PROGRESS" ->
                                     CreatingRampAccount
 
@@ -1020,6 +1023,9 @@ update msg model =
 
                             else
                                 Nav.load model.rampSingleSignOnUri
+
+                        Just "STARTED" ->
+                            getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
 
                         Just "IN_PROGRESS" ->
                             getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
@@ -1075,6 +1081,9 @@ update msg model =
                                 Just "SUCCESS" ->
                                     ProvisioningComplete
 
+                                Just "STARTED" ->
+                                    OrderingPhysicalCard
+
                                 Just "IN_PROGRESS" ->
                                     OrderingPhysicalCard
 
@@ -1090,6 +1099,9 @@ update msg model =
                     case orderPhysicalCardTaskStatus.taskStatus of
                         Just "SUCCESS" ->
                             Nav.load model.rampSingleSignOnUri
+
+                        Just "STARTED" ->
+                            getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
 
                         Just "IN_PROGRESS" ->
                             getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
