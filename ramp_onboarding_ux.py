@@ -8,9 +8,10 @@ from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
 from hashlib import file_digest
+from json import loads
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
-from urllib.parse import urlunparse
+from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
@@ -34,7 +35,32 @@ from sentry_sdk import capture_message, set_user
 from sentry_sdk.integrations.flask import FlaskIntegration
 from sentry_sdk.integrations.pure_eval import PureEvalIntegration
 
+from slack_sdk import WebClient, WebhookClient
+from slack_sdk.errors import SlackApiError
+from slack_sdk.models.blocks import (
+    ActionsBlock,
+    ButtonElement,
+    ConfirmObject,
+    ContextBlock,
+    MarkdownTextObject,
+    PlainTextObject,
+    RichTextBlock,
+    RichTextListElement,
+    RichTextSectionElement,
+    SectionBlock,
+)
+from slack_sdk.models.blocks.block_elements import RichTextElementParts
+from slack_sdk.signature import SignatureVerifier
+
 from werkzeug.exceptions import BadRequest, InternalServerError, Unauthorized
+
+
+ROLE_LABELS = {
+    "BUSINESS_USER": "Employee",
+    "BUSINESS_BOOKKEEPER": "Bookkeeper",
+    "BUSINESS_ADMIN": "Admin",
+    "IT_ADMIN": "IT admin",
+}
 
 
 def traces_sampler(sampling_context: Dict[str, Dict[str, str]]) -> bool:
@@ -180,7 +206,7 @@ def get_ramp_access_token() -> Union[str, None]:
         url=app.config["RAMP_API_URL"] + "/developer/v1/token",
         data={
             "grant_type": "client_credentials",
-            "scope": "users:read users:write departments:read locations:read cards:write business:read",  # noqa
+            "scope": "users:read users:write cards:read cards:write departments:read locations:read business:read",  # noqa
         },
         auth=(
             app.config["RAMP_CLIENT_ID"],
@@ -198,7 +224,7 @@ def get_ramp_access_token() -> Union[str, None]:
     return None
 
 
-@cache.cached(timeout=0, key_prefix="apiary_managers")
+@cache.cached(key_prefix="apiary_managers")
 def get_apiary_managers() -> Dict[int, str]:
     """
     Get the list of managers from Apiary
@@ -227,7 +253,7 @@ def get_apiary_managers() -> Dict[int, str]:
     return managers
 
 
-@cache.cached(timeout=0, key_prefix="ramp_departments")
+@cache.cached(key_prefix="ramp_departments")
 def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of departments from Ramp
@@ -261,7 +287,7 @@ def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     return departments
 
 
-@cache.cached(timeout=0, key_prefix="ramp_locations")
+@cache.cached(key_prefix="ramp_locations")
 def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of locations from Ramp
@@ -295,7 +321,7 @@ def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
     return locations
 
 
-@cache.cached(timeout=0, key_prefix="ramp_users")
+@cache.cached(key_prefix="ramp_users")
 def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[str, bool]]]]:
     """
     Get the list of users from Ramp
@@ -338,7 +364,7 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
     return name_map, users
 
 
-@cache.cached(timeout=0, key_prefix="ramp_business")
+@cache.cached(key_prefix="ramp_business")
 def get_ramp_business_id() -> str:
     """
     Get the business ID from Ramp
@@ -362,6 +388,219 @@ def get_ramp_business_id() -> str:
         raise InternalServerError("Failed to retrieve business from Ramp")
 
     return ramp_business_id_response.json()["id"]  # type: ignore
+
+
+@cache.memoize()
+def get_slack_user_id_by_email(email: str) -> Union[str, None]:
+    """
+    Wrapper for the users.lookupByEmail function to memoize responses.
+    """
+    slack = WebClient(token=app.config["SLACK_API_TOKEN"])
+
+    try:
+        slack_response = slack.users_lookupByEmail(email=email)
+
+        if slack_response.data["ok"]:  # type: ignore
+            return slack_response.data["user"]["id"]  # type: ignore
+    except SlackApiError:
+        pass
+
+    return None
+
+
+@cache.memoize()
+def get_slack_user_id(**kwargs: str) -> Union[str, None]:
+    """
+    Get the Slack user ID for a given Keycloak or Ramp user.
+    """
+    if "keycloak_user_id" in kwargs and kwargs["keycloak_user_id"] is not None:
+        keycloak_access_token = get_keycloak_access_token()
+
+        if keycloak_access_token is None:
+            raise Exception("Failed to retrieve access token for Keycloak")
+
+        get_keycloak_user_response = get(
+            url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users/"
+            + kwargs["keycloak_user_id"],
+            headers={
+                "Authorization": "Bearer " + keycloak_access_token,
+            },
+            timeout=(5, 5),
+        )
+
+        if get_keycloak_user_response.status_code != 200:
+            print("Keycloak returned status code:", get_keycloak_user_response.status_code)
+            print("Response body:", get_keycloak_user_response.text)
+            raise InternalServerError("Failed to retrieve user from Keycloak")
+
+        keycloak_user = get_keycloak_user_response.json()
+
+        if (
+            "attributes" in keycloak_user
+            and keycloak_user["attributes"] is not None
+            and "googleWorkspaceAccount" in keycloak_user["attributes"]
+            and keycloak_user["attributes"]["googleWorkspaceAccount"] is not None
+            and len(keycloak_user["attributes"]["googleWorkspaceAccount"]) > 0
+        ):
+            slack_user_id = get_slack_user_id_by_email(
+                keycloak_user["attributes"]["googleWorkspaceAccount"][0]
+            )
+
+            if slack_user_id is not None:
+                return slack_user_id  # type: ignore
+
+        if "email" in keycloak_user and keycloak_user["email"] is not None:
+            slack_user_id = get_slack_user_id_by_email(keycloak_user["email"])
+
+            if slack_user_id is not None:
+                return slack_user_id  # type: ignore
+
+        if "username" in keycloak_user and keycloak_user["username"] is not None:
+            slack_user_id = get_slack_user_id_by_email(keycloak_user["username"] + "@gatech.edu")
+
+            if slack_user_id is not None:
+                return slack_user_id  # type: ignore
+
+        if "username" in keycloak_user and keycloak_user["username"] is not None:
+            apiary_user_response = get(
+                url=app.config["APIARY_URL"] + "/api/v1/users/" + keycloak_user["username"],
+                headers={
+                    "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
+                    "Accept": "application/json",
+                },
+                timeout=(5, 5),
+            )
+
+            if apiary_user_response.status_code == 200:
+                apiary_user = apiary_user_response.json()["user"]
+
+                if "gt_email" in apiary_user and apiary_user["gt_email"] is not None:
+                    slack_user_id = get_slack_user_id_by_email(apiary_user["gt_email"])
+
+                    if slack_user_id is not None:
+                        return slack_user_id  # type: ignore
+
+                if "gmail_address" in apiary_user and apiary_user["gmail_address"] is not None:
+                    slack_user_id = get_slack_user_id_by_email(apiary_user["gmail_address"])
+
+                    if slack_user_id is not None:
+                        return slack_user_id  # type: ignore
+
+                if "clickup_email" in apiary_user and apiary_user["clickup_email"] is not None:
+                    slack_user_id = get_slack_user_id_by_email(apiary_user["clickup_email"])
+
+                    if slack_user_id is not None:
+                        return slack_user_id  # type: ignore
+
+        with sentry_sdk.start_span(op="ldap.connect"):
+            ldap = Connection(
+                Server("whitepages.gatech.edu", connect_timeout=1),
+                auto_bind=True,
+                raise_exceptions=True,
+                receive_timeout=1,
+            )
+        with sentry_sdk.start_span(op="ldap.search"):
+            result = ldap.search(
+                search_base="dc=whitepages,dc=gatech,dc=edu",
+                search_filter="(uid=" + keycloak_user["username"] + ")",
+                attributes=["mail"],
+            )
+
+        if result is True:
+            for entry in ldap.entries:
+                if (
+                    "mail" in entry
+                    and entry["mail"] is not None
+                    and entry["mail"].value is not None
+                ):
+                    slack_user_id = get_slack_user_id_by_email(entry["mail"].value)
+
+                    if slack_user_id is not None:
+                        return slack_user_id  # type: ignore
+
+    if "ramp_user_id" in kwargs and kwargs["ramp_user_id"] is not None:
+        ramp_access_token = get_ramp_access_token()
+
+        ramp_user_response = get(
+            url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + kwargs["ramp_user_id"],
+            headers={
+                "Authorization": "Bearer " + ramp_access_token,
+            },
+            timeout=(5, 5),
+        )
+
+        if ramp_user_response.status_code != 200:
+            print("Ramp returned status code:", ramp_user_response.status_code)
+            print("Response body:", ramp_user_response.text)
+            raise InternalServerError("Failed to retrieve user from Ramp")
+
+        slack_user_id = get_slack_user_id_by_email(ramp_user_response.json()["email"])
+
+        if slack_user_id is not None:
+            return slack_user_id  # type: ignore
+
+        keycloak_access_token = get_keycloak_access_token()
+
+        if keycloak_access_token is None:
+            raise Exception("Failed to retrieve access token for Keycloak")
+
+        search_keycloak_user_response = get(
+            url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users",
+            headers={
+                "Authorization": "Bearer " + keycloak_access_token,
+            },
+            params={
+                "q": "rampUserId:" + kwargs["ramp_user_id"],
+            },
+            timeout=(5, 5),
+        )
+
+        if search_keycloak_user_response.status_code != 200:
+            print("Keycloak returned status code:", search_keycloak_user_response.status_code)
+            print("Response body:", search_keycloak_user_response.text)
+            raise Exception("Failed to retrieve user from Keycloak")
+
+        if len(search_keycloak_user_response.json()) == 1:
+            return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])  # type: ignore  # noqa
+
+        if len(search_keycloak_user_response.json()) == 0:
+            search_keycloak_user_response = get(
+                url=app.config["KEYCLOAK_SERVER"]
+                + "/admin/realms/"
+                + app.config["KEYCLOAK_REALM"]
+                + "/users",
+                headers={
+                    "Authorization": "Bearer " + keycloak_access_token,
+                },
+                params={
+                    "q": "googleWorkspaceAccount:" + ramp_user_response.json()["email"],
+                },
+                timeout=(5, 5),
+            )
+
+            if search_keycloak_user_response.status_code != 200:
+                print("Keycloak returned status code:", search_keycloak_user_response.status_code)
+                print("Response body:", search_keycloak_user_response.text)
+                raise Exception("Failed to retrieve user from Keycloak")
+
+            if len(search_keycloak_user_response.json()) == 1:
+                return get_slack_user_id(  # type: ignore
+                    keycloak_user_id=search_keycloak_user_response.json()[0]["id"]
+                )
+
+            if len(search_keycloak_user_response.json()) == 0:
+                return None
+
+        if len(search_keycloak_user_response.json()) > 1:
+            raise Exception("Received more than one matching user from Keycloak")
+
+    return None
 
 
 @shared_task
@@ -417,9 +656,7 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     keycloak_access_token = get_keycloak_access_token()
 
     if keycloak_access_token is None:
-        raise Exception(  # pylint: disable=broad-exception-raised
-            "Failed to retrieve access token for Keycloak"
-        )
+        raise Exception("Failed to retrieve access token for Keycloak")
 
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
@@ -436,9 +673,7 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     if get_keycloak_user_response.status_code != 200:
         print("Keycloak returned status code:", get_keycloak_user_response.status_code)
         print("Response body:", get_keycloak_user_response.text)
-        raise Exception(  # pylint: disable=broad-exception-raised
-            "Failed to retrieve user from Keycloak"
-        )
+        raise Exception("Failed to retrieve user from Keycloak")
 
     new_user = get_keycloak_user_response.json()
     if "id" in new_user:
@@ -468,13 +703,535 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     if update_keycloak_user_response.status_code != 204:
         print("Keycloak returned status code:", update_keycloak_user_response.status_code)
         print("Response body:", update_keycloak_user_response.text)
-        raise Exception(  # pylint: disable=broad-exception-raised
-            "Failed to update user in Keycloak"
+        raise Exception("Failed to update user in Keycloak")
+
+
+@shared_task
+def notify_slack_ineligible(keycloak_user_id: str) -> None:
+    """
+    Send a Slack notification to the central notifications channel when an ineligible user loads
+    the form.
+    """
+    if cache.get("slack_ineligible_message_" + keycloak_user_id) is not None:
+        return
+
+    keycloak_access_token = get_keycloak_access_token()
+
+    if keycloak_access_token is None:
+        raise Exception("Failed to retrieve access token for Keycloak")
+
+    get_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + keycloak_user_id,
+        headers={
+            "Authorization": "Bearer " + keycloak_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if get_keycloak_user_response.status_code != 200:
+        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
+        print("Response body:", get_keycloak_user_response.text)
+        raise Exception("Failed to retrieve user from Keycloak")
+
+    view_in_keycloak_button = ButtonElement(
+        text="View in Keycloak",
+        action_id="view_in_keycloak",
+        url=urlunparse(
+            (
+                urlparse(app.config["KEYCLOAK_SERVER"]).scheme,
+                urlparse(app.config["KEYCLOAK_SERVER"]).hostname,
+                "/admin/master/console/",
+                "",
+                "",
+                "/"
+                + app.config["KEYCLOAK_REALM"]
+                + "/users/"
+                + str(keycloak_user_id)
+                + "/settings",
+            )
+        ),
+    )
+
+    apiary_user_response = get(
+        url=app.config["APIARY_URL"]
+        + "/api/v1/users/"
+        + get_keycloak_user_response.json()["username"],
+        headers={
+            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
+            "Accept": "application/json",
+        },
+        timeout=(5, 5),
+    )
+
+    if apiary_user_response.status_code == 200:
+        personal_pronoun_is = "they are"
+
+        if (
+            "gender" in apiary_user_response.json()["user"]
+            and apiary_user_response.json()["user"]["gender"] is not None
+        ):
+            if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
+                personal_pronoun_is = "he is"
+            elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
+                personal_pronoun_is = "she is"
+
+        actions = ActionsBlock(
+            elements=[
+                ButtonElement(
+                    text="View in Apiary",
+                    action_id="view_in_apiary",
+                    url=app.config["APIARY_URL"]
+                    + "/nova/resources/users/"
+                    + str(apiary_user_response.json()["user"]["id"]),
+                ),
+                view_in_keycloak_button,
+                ButtonElement(
+                    text="Grant Eligibility in Keycloak",
+                    action_id="grant_eligibility_in_keycloak",
+                    value=keycloak_user_id,
+                    style="primary",
+                    confirm=ConfirmObject(
+                        title="Grant Eligibility in Keycloak",
+                        text="Are you sure you want to grant "
+                        + get_keycloak_user_response.json()["firstName"]
+                        + " eligibility for a Ramp account in Keycloak? If "
+                        + personal_pronoun_is
+                        + " in a leadership role, an admin should likely assign a role within Apiary instead.",  # noqa
+                        confirm="Grant Eligibility",
+                        deny="Cancel",
+                    ),
+                ),
+            ]
+        )
+    elif apiary_user_response.status_code == 404:
+        actions = ActionsBlock(
+            elements=[
+                view_in_keycloak_button,
+            ]
+        )
+    else:
+        raise Exception("Failed to retrieve user from Apiary")
+
+    slack_user_id = get_slack_user_id(keycloak_user_id=keycloak_user_id)
+
+    user_name = (
+        get_keycloak_user_response.json()["firstName"]
+        + " "
+        + get_keycloak_user_response.json()["lastName"]
+    )
+
+    if slack_user_id is None:
+        user_mention = user_name
+    else:
+        user_mention = f"<@{slack_user_id}>"
+
+    slack = WebClient(token=app.config["SLACK_API_TOKEN"])
+
+    slack_response = slack.chat_postMessage(
+        channel=app.config["SLACK_NOTIFY_CHANNEL"],
+        text=user_name
+        + " logged in to the Ramp onboarding form, but isn't eligible for a Ramp account.",
+        blocks=[
+            SectionBlock(
+                text=user_mention
+                + " logged in to the Ramp onboarding form, but isn't eligible for a Ramp account."
+            ),
+            actions,
+        ],
+    )
+
+    cache.set("slack_ineligible_message_" + keycloak_user_id, slack_response["ts"])
+
+
+@shared_task
+def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> None:
+    """
+    Send Slack notifications to the central notifications channel, manager, and new member, when
+    someone joins Ramp.
+    """
+    ramp_access_token = get_ramp_access_token()
+
+    new_ramp_user_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
+        headers={
+            "Authorization": "Bearer " + ramp_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if new_ramp_user_response.status_code != 200:
+        print("Ramp returned status code:", new_ramp_user_response.status_code)
+        print("Response body:", new_ramp_user_response.text)
+        raise InternalServerError("Failed to retrieve user from Ramp")
+
+    if new_ramp_user_response.json()["manager_id"] is None:
+        ramp_manager_user_response = None
+        manager_slack_user_id = None
+    else:
+        ramp_manager_user_response = get(
+            url=app.config["RAMP_API_URL"]
+            + "/developer/v1/users/"
+            + new_ramp_user_response.json()["manager_id"],
+            headers={
+                "Authorization": "Bearer " + ramp_access_token,
+            },
+            timeout=(5, 5),
+        )
+
+        if ramp_manager_user_response.status_code != 200:
+            print("Ramp returned status code:", ramp_manager_user_response.status_code)
+            print("Response body:", ramp_manager_user_response.text)
+            raise InternalServerError("Failed to retrieve user from Ramp")
+
+        manager_slack_user_id = get_slack_user_id(
+            ramp_user_id=new_ramp_user_response.json()["manager_id"]
+        )
+
+    new_user_slack_user_id = get_slack_user_id(
+        ramp_user_id=ramp_user_id, keycloak_user_id=keycloak_user_id
+    )
+
+    slack = WebClient(token=app.config["SLACK_API_TOKEN"])
+
+    new_user_name = (
+        new_ramp_user_response.json()["first_name"]
+        + " "
+        + new_ramp_user_response.json()["last_name"]
+    )
+
+    if new_user_slack_user_id is None:
+        new_user_mention = new_user_name
+    else:
+        new_user_mention = f"<@{new_user_slack_user_id}>"
+
+    if ramp_manager_user_response is None:
+        manager_mention = "—"
+    elif manager_slack_user_id is None:
+        manager_mention = (
+            ramp_manager_user_response.json()["first_name"]
+            + " "
+            + ramp_manager_user_response.json()["last_name"]
+        )
+    else:
+        manager_mention = f"<@{manager_slack_user_id}>"
+
+    slack.chat_postMessage(
+        channel=app.config["SLACK_NOTIFY_CHANNEL"],
+        thread_ts=cache.get("slack_ineligible_message_" + keycloak_user_id),
+        reply_broadcast=True,
+        text=new_user_name + " joined Ramp!",
+        blocks=[
+            SectionBlock(
+                text=new_user_mention + " joined Ramp!",
+                fields=[
+                    MarkdownTextObject(text="*Role*"),
+                    MarkdownTextObject(text="*Department*"),
+                    PlainTextObject(text=ROLE_LABELS[new_ramp_user_response.json()["role"]]),
+                    PlainTextObject(
+                        text=get_ramp_departments()[new_ramp_user_response.json()["department_id"]][
+                            "label"
+                        ]
+                    ),
+                    MarkdownTextObject(text="*Location*"),
+                    MarkdownTextObject(text="*Manager*"),
+                    PlainTextObject(
+                        text=get_ramp_locations()[new_ramp_user_response.json()["location_id"]][
+                            "label"
+                        ]
+                    ),
+                    MarkdownTextObject(text=manager_mention),
+                ],
+            ),
+            ActionsBlock(
+                elements=[
+                    ButtonElement(
+                        text="View in Ramp",
+                        action_id="view_in_ramp",
+                        url=urlunparse(
+                            (
+                                "https",
+                                app.config["RAMP_UI_HOSTNAME"],
+                                "/people/all/" + new_ramp_user_response.json()["id"],
+                                "",
+                                "",
+                                "",
+                            )
+                        ),
+                    )
+                ]
+            ),
+        ],
+    )
+
+    possessive_pronoun = "their"
+
+    keycloak_access_token = get_keycloak_access_token()
+
+    if keycloak_access_token is None:
+        raise Exception("Failed to retrieve access token for Keycloak")
+
+    get_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users/"
+        + keycloak_user_id,
+        headers={
+            "Authorization": "Bearer " + keycloak_access_token,
+        },
+        timeout=(5, 5),
+    )
+
+    if get_keycloak_user_response.status_code != 200:
+        print("Keycloak returned status code:", get_keycloak_user_response.status_code)
+        print("Response body:", get_keycloak_user_response.text)
+        raise Exception("Failed to retrieve user from Keycloak")
+
+    apiary_user_response = get(
+        url=app.config["APIARY_URL"]
+        + "/api/v1/users/"
+        + get_keycloak_user_response.json()["username"],
+        headers={
+            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
+            "Accept": "application/json",
+        },
+        timeout=(5, 5),
+    )
+
+    if apiary_user_response.status_code == 200:
+        if (
+            "gender" in apiary_user_response.json()["user"]
+            and apiary_user_response.json()["user"]["gender"] is not None
+        ):
+            if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
+                possessive_pronoun = "his"
+            elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
+                possessive_pronoun = "her"
+    else:
+        raise Exception("Failed to retrieve user from Apiary")
+
+    if manager_slack_user_id is not None:
+        manager_slack_profile = slack.users_profile_get(user=manager_slack_user_id)
+
+        link_email_hint = []
+
+        if (
+            manager_slack_profile.data["profile"]["email"]  # type: ignore
+            != ramp_manager_user_response.json()["email"]  # type: ignore
+        ):
+            link_email_hint = [
+                ContextBlock(
+                    elements=[
+                        MarkdownTextObject(
+                            text="If you'd like to get alerts from <@"
+                            + app.config["SLACK_RAMP_BOT_USER_ID"]
+                            + "> in Slack, you can add your Slack email address (*"
+                            + manager_slack_profile.data["email"]  # type: ignore
+                            + "*) to <"
+                            + urlunparse(
+                                (
+                                    "https",
+                                    app.config["RAMP_UI_HOSTNAME"],
+                                    "/settings/personal-settings/profile/edit",
+                                    "",
+                                    "",
+                                    "",
+                                )
+                            )
+                            + "|your Ramp profile>, under the *Integrations* tab. "
+                        ),
+                    ]
+                )
+            ]
+
+        slack.chat_postMessage(
+            channel=manager_slack_user_id,
+            text=new_user_name
+            + " joined Ramp! As "
+            + possessive_pronoun
+            + " manager, you'll be able to view "
+            + possessive_pronoun
+            + " activity, and request funds on "
+            + possessive_pronoun
+            + " behalf.",
+            blocks=[
+                SectionBlock(
+                    text=new_user_mention
+                    + " joined Ramp! As "
+                    + possessive_pronoun
+                    + " manager, you'll be able to view "
+                    + possessive_pronoun
+                    + " activity, and request funds on "
+                    + possessive_pronoun
+                    + " behalf."
+                ),
+                ActionsBlock(
+                    elements=[
+                        ButtonElement(
+                            text="View in Ramp",
+                            action_id="view_in_ramp",
+                            url=urlunparse(
+                                (
+                                    "https",
+                                    app.config["RAMP_UI_HOSTNAME"],
+                                    "/people/all/" + new_ramp_user_response.json()["id"],
+                                    "",
+                                    "",
+                                    "",
+                                )
+                            ),
+                        )
+                    ]
+                ),
+                SectionBlock(
+                    text="If you believe this is an error, please post in <#"
+                    + app.config["SLACK_SUPPORT_CHANNEL"]
+                    + ">."
+                ),
+                *link_email_hint,
+            ],
+        )
+
+    if new_user_slack_user_id is not None:
+        new_user_slack_profile = slack.users_profile_get(user=new_user_slack_user_id)
+
+        link_email_tip = []
+        activate_physical_card_tip = []
+
+        if (
+            new_user_slack_profile.data["profile"]["email"]  # type: ignore
+            != new_ramp_user_response.json()["email"]
+        ):
+            link_email_tip = [
+                RichTextSectionElement(
+                    elements=[
+                        RichTextElementParts.Text(text="Add your Slack email ("),
+                        RichTextElementParts.Text(
+                            text=new_user_slack_profile.data["profile"]["email"],  # type: ignore
+                            style=RichTextElementParts.TextStyle(bold=True),
+                        ),
+                        RichTextElementParts.Text(text=") to "),
+                        RichTextElementParts.Link(
+                            url=urlunparse(
+                                (
+                                    "https",
+                                    app.config["RAMP_UI_HOSTNAME"],
+                                    "/settings/personal-settings/profile/edit",
+                                    "",
+                                    "",
+                                    "",
+                                )
+                            ),
+                            text="your Ramp profile",
+                        ),
+                        RichTextElementParts.Text(text=", under the "),
+                        RichTextElementParts.Text(
+                            text="Integrations", style=RichTextElementParts.TextStyle(bold=True)
+                        ),
+                        RichTextElementParts.Text(text=" tab, to get notifications from "),
+                        RichTextElementParts.User(user_id=app.config["SLACK_RAMP_BOT_USER_ID"]),
+                        RichTextElementParts.Text(text=" in Slack"),
+                    ]
+                )
+            ]
+
+        cards_response = get(
+            url=app.config["RAMP_API_URL"] + "/developer/v1/cards",
+            headers={
+                "Authorization": "Bearer " + ramp_access_token,
+            },
+            params={"user_id": ramp_user_id},
+            timeout=(5, 5),
+        )
+
+        if cards_response.status_code != 200:
+            print("Ramp returned status code:", cards_response.status_code)
+            print("Response body:", cards_response.text)
+            raise InternalServerError("Failed to retrieve cards from Ramp")
+
+        if len(cards_response.json()["data"]) > 0:
+            activate_physical_card_tip = [
+                RichTextSectionElement(
+                    elements=[
+                        RichTextElementParts.Link(
+                            url="https://support.ramp.com/hc/en-us/articles/360042582834-Activating-a-physical-card",  # noqa
+                            text="Activate your physical card",
+                        ),
+                        RichTextElementParts.Text(text=" when it arrives"),
+                    ]
+                )
+            ]
+
+        slack.chat_postMessage(
+            channel=new_user_slack_user_id,
+            text="Welcome to Ramp! Here are some tips to help you get started.",
+            blocks=[
+                SectionBlock(text="Welcome to Ramp! Here are some tips to help you get started."),
+                RichTextBlock(
+                    elements=[
+                        RichTextListElement(
+                            style="ordered",
+                            elements=[
+                                RichTextSectionElement(
+                                    elements=[
+                                        RichTextElementParts.Text(
+                                            text="Finish setting up your account at "
+                                        ),
+                                        RichTextElementParts.Link(
+                                            url=urlunparse(
+                                                (
+                                                    "https",
+                                                    app.config["RAMP_UI_HOSTNAME"],
+                                                    "/sign-in/saml/" + get_ramp_business_id(),
+                                                    "",
+                                                    "",
+                                                    "",
+                                                )
+                                            ),
+                                            text=app.config["RAMP_UI_HOSTNAME"],
+                                        ),
+                                    ]
+                                ),
+                                *link_email_tip,
+                                RichTextSectionElement(
+                                    elements=[
+                                        RichTextElementParts.Text(
+                                            text="Download the Ramp app for "
+                                        ),
+                                        RichTextElementParts.Link(
+                                            url="https://apps.apple.com/us/app/ramp/id1628197245",
+                                            text="iOS",
+                                        ),
+                                        RichTextElementParts.Text(text=" or "),
+                                        RichTextElementParts.Link(
+                                            url="https://play.google.com/store/apps/details?id=com.ramp.android.app",  # noqa
+                                            text="Android",
+                                        ),
+                                    ]
+                                ),
+                                *activate_physical_card_tip,
+                            ],
+                        )
+                    ]
+                ),
+                SectionBlock(
+                    text="You can also review the onboarding guide in the <https://support.ramp.com/hc/en-us/sections/4601540746387-Employees|Ramp help center>, <https://ramp.com/training/employee-manager-training-webinar|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa
+                ),
+                SectionBlock(
+                    text="If you have questions, or need help with anything, please post in <#"
+                    + app.config["SLACK_SUPPORT_CHANNEL"]
+                    + ">."
+                ),
+            ],
         )
 
 
 @app.get("/")
-def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+def index() -> Any:
     """
     Generates the main form or messaging if the user shouldn't fill it out
     """
@@ -650,7 +1407,7 @@ def index() -> Any:  # pylint: disable=too-many-branches,too-many-locals,too-man
 
 
 @app.get("/login")
-def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+def login() -> Any:
     """
     Handles the return from Keycloak and collects default values for the form
     """
@@ -759,6 +1516,9 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
             if "is_student" in apiary_user and apiary_user["is_student"] is False:
                 session["can_request_business_admin"] = True
                 session["is_student"] = False
+
+        elif apiary_user_response.status_code == 404:
+            pass
 
         else:
             print("Apiary returned status code:", apiary_user_response.status_code)
@@ -900,6 +1660,9 @@ def login() -> Any:  # pylint: disable=too-many-branches,too-many-statements,too
                     + address_validation_response.text
                 )
 
+    if session["user_state"] == "ineligible":
+        notify_slack_ineligible.delay(session["sub"])
+
     return redirect(url_for("index"))
 
 
@@ -923,14 +1686,14 @@ def verify_email() -> Any:
     if session["user_state"] != "eligible":
         raise Unauthorized("Not eligible")
 
-    if app.debug and "force" in request.args and request.args["force"] == "true":
-        session["email_address"] = request.args["emailAddress"]
-        session["email_verified"] = True
-        return redirect(url_for("index"))
-
     email_address_domain = Address(addr_spec=request.args["emailAddress"]).domain.split(".")[-2:]
 
     if email_address_domain == ["robojackets", "org"]:
+        if app.debug and "+" in Address(addr_spec=request.args["emailAddress"]).username:
+            session["email_address"] = request.args["emailAddress"]
+            session["email_verified"] = True
+            return redirect(url_for("index"))
+
         return oauth.google.authorize_redirect(
             url_for("verify_google_complete", _external=True),
             login_hint=request.args["emailAddress"],
@@ -1031,10 +1794,8 @@ def verify_microsoft_complete() -> Response:
 
 
 @app.get("/get-ramp-user/<apiary_id>")
-@cache.cached(timeout=0, response_filter=only_cache_if_ramp_id_present)
-def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branches
-    apiary_id: str,
-) -> Dict[str, str]:
+@cache.cached(response_filter=only_cache_if_ramp_id_present)
+def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     """
     Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account.
     """
@@ -1153,7 +1914,7 @@ def get_ramp_user(  # pylint: disable=too-many-return-statements,too-many-branch
 
 
 @app.post("/create-ramp-account")
-def create_ramp_account() -> Dict[str, str]:  # pylint: disable=too-many-branches
+def create_ramp_account() -> Dict[str, str]:
     """
     Creates a new Ramp account and returns the task status for the browser to poll.
     """
@@ -1303,6 +2064,7 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
         store_ramp_user_id_in_keycloak.delay(session["sub"], session["ramp_user_id"])
         remove_eligible_role.delay(session["sub"])
         import_user_to_org_chart.delay(session["ramp_user_id"])
+        notify_slack_account_created.delay(session["sub"], session["ramp_user_id"])
 
     return {
         "taskStatus": ramp_task_status.json()["status"],
@@ -1408,6 +2170,75 @@ def get_physical_card_status(task_id: str) -> Dict[str, str]:
     }
 
 
+@app.post("/slack")
+def handle_slack_event() -> Dict[str, str]:
+    """
+    Handle an interaction event from Slack.
+
+    https://docs.slack.dev/interactivity/handling-user-interaction#payloads
+    """
+    verifier = SignatureVerifier(app.config["SLACK_SIGNING_SECRET"])
+
+    if not verifier.is_valid_request(request.get_data(), request.headers):  # type: ignore
+        raise Unauthorized("signature verification failed")
+
+    payload = loads(request.form.get("payload"))  # type: ignore
+
+    if payload["actions"][0]["action_id"] == "view_in_apiary":
+        return {"status": "ok"}
+
+    if payload["actions"][0]["action_id"] == "view_in_ramp":
+        return {"status": "ok"}
+
+    if payload["actions"][0]["action_id"] == "view_in_keycloak":
+        return {"status": "ok"}
+
+    if payload["actions"][0]["action_id"] == "grant_eligibility_in_keycloak":
+        add_eligible_role_response = post(
+            url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users/"
+            + payload["actions"][0]["value"]
+            + "/role-mappings/clients/"
+            + app.config["KEYCLOAK_CLIENT_UUID"],
+            headers={
+                "Authorization": "Bearer " + get_keycloak_access_token(),
+            },
+            timeout=(5, 5),
+            json=[{"id": app.config["KEYCLOAK_CLIENT_ROLE_ELIGIBLE"], "name": "eligible"}],
+        )
+
+        if add_eligible_role_response.status_code != 204:
+            print("Keycloak returned status code:", add_eligible_role_response.status_code)
+            print("Response body:", add_eligible_role_response.text)
+            raise InternalServerError("Failed to add role in Keycloak")
+
+        slack = WebhookClient(url=payload["response_url"])
+        slack.send(
+            text=payload["message"]["text"],
+            blocks=[
+                payload["message"]["blocks"][0],
+                ActionsBlock(
+                    elements=[
+                        payload["message"]["blocks"][1]["elements"][0],
+                        payload["message"]["blocks"][1]["elements"][1],
+                    ]
+                ),
+                SectionBlock(
+                    text=":white_check_mark: *<@"
+                    + payload["user"]["id"]
+                    + "> granted eligibility in Keycloak*"
+                ),
+            ],
+            replace_original=True,
+        )
+
+        return {"status": "ok"}
+
+    raise BadRequest("unrecognized action_id")
+
+
 @app.get("/ping")
 def ping() -> Dict[str, str]:
     """
@@ -1423,6 +2254,9 @@ def clear_cache() -> Dict[str, str]:
     """
     if "user_state" not in session:
         raise Unauthorized("Not logged in")
+
+    if session["user_state"] != "provisioned":
+        raise Unauthorized("Ramp account is not provisioned")
 
     cache.clear()
     return {"status": "ok"}
