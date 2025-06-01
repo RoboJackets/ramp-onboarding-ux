@@ -12,7 +12,7 @@ from json import loads
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import urlparse, urlunparse
-from uuid import uuid4, UUID
+from uuid import UUID, uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
 
