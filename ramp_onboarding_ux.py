@@ -146,13 +146,6 @@ cache = Cache(app)
 cache.clear()
 
 
-def dont_cache_none(response: Union[str, None]) -> bool:
-    """
-    Don't cache None results from access token functions
-    """
-    return response is not None
-
-
 def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
     """
     Don't cache Ramp user lookup calls if the user doesn't have an active Ramp account
@@ -173,7 +166,7 @@ def generate_subresource_integrity_hash(file: str) -> str:
 app.jinja_env.globals["calculate_integrity"] = generate_subresource_integrity_hash
 
 
-@cache.cached(timeout=55, key_prefix="keycloak_access_token", response_filter=dont_cache_none)
+@cache.cached(timeout=55, key_prefix="keycloak_access_token")
 def get_keycloak_access_token() -> str:
     """
     Get an access token for Keycloak.
@@ -191,7 +184,7 @@ def get_keycloak_access_token() -> str:
     return keycloak_access_token_response.json()["access_token"]  # type: ignore
 
 
-@cache.cached(timeout=863995, key_prefix="ramp_access_token", response_filter=dont_cache_none)
+@cache.cached(timeout=863995, key_prefix="ramp_access_token")
 def get_ramp_access_token() -> str:
     """
     Get an access token for Ramp.
