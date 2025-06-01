@@ -2,7 +2,7 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
-import base64
+from base64 import b64encode
 from collections import defaultdict
 from csv import DictReader
 from datetime import datetime, timezone
@@ -160,7 +160,7 @@ def generate_subresource_integrity_hash(file: str) -> str:
     with open(file[1:], "rb") as f:
         d = file_digest(f, "sha512")
 
-    return "sha512-" + base64.b64encode(d.digest()).decode("utf-8")
+    return "sha512-" + b64encode(d.digest()).decode("utf-8")
 
 
 app.jinja_env.globals["calculate_integrity"] = generate_subresource_integrity_hash
