@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
 {% block body %}
-    <p class="mt-4">You already have a Ramp account — sign in at <a href="https://{{ ramp_single_sign_on_uri }}">{{ ramp_login_hostname }}</a> with <a href="mailto:{{ ramp_login_email }}">{{ ramp_login_email }}</a>.</p>
+    <p class="mt-4">You already have a Ramp account — sign in at <a href="{{ ramp_single_sign_on_uri }}">{{ ramp_login_hostname }}</a> with <a href="mailto:{{ ramp_login_email }}">{{ ramp_login_email }}</a>.</p>
     <p>Please ask in <a href="slack://channel?team=T033JPZLT&id=C64F32R50">#treasury-helpdesk</a> if you have any questions or need assistance.</p>
 {% endblock %}
