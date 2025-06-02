@@ -1142,6 +1142,16 @@ def index() -> Any:
         if ramp_user_response.json()["status"] == "USER_ACTIVE":
             return render_template(
                 "provisioned.html",
+                ramp_single_sign_on_uri=urlunparse(
+                    (
+                        "https",
+                        app.config["RAMP_UI_HOSTNAME"],
+                        "/sign-in/saml/" + get_ramp_business_id(),
+                        "",
+                        "",
+                        "",
+                    )
+                ),
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
                 ramp_login_email=ramp_user_response.json()["email"],
             )
