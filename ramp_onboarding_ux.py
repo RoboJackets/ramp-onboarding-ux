@@ -2018,7 +2018,7 @@ def clear_cache() -> Dict[str, str]:
         raise Unauthorized("Not logged in")
 
     if session["user_state"] != "provisioned":
-        raise Unauthorized("Ramp account is not provisioned")
+        raise Unauthorized("Not provisioned")
 
     cache.clear()
     return {"status": "ok"}
