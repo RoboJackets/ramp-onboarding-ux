@@ -1523,7 +1523,9 @@ def verify_email() -> Any:
     if session["user_state"] != "eligible":
         raise Unauthorized("Not eligible")
 
-    email_address_domain = Address(addr_spec=request.args["emailAddress"].strip()).domain.split(".")[-2:]
+    email_address_domain = Address(addr_spec=request.args["emailAddress"].strip()).domain.split(
+        "."
+    )[-2:]
 
     if email_address_domain == ["robojackets", "org"]:
         if app.debug and "+" in Address(addr_spec=request.args["emailAddress"].strip()).username:
