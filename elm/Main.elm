@@ -34,7 +34,7 @@ import W3.Html.Attributes exposing (inputmode, numeric)
 
 nameRegex : Regex.Regex
 nameRegex =
-    Maybe.withDefault Regex.never (Regex.fromString "^[a-zA-Z ]+$")
+    Maybe.withDefault Regex.never (Regex.fromString "^[a-zA-Z-'\\. ]+$")
 
 
 studentCenterMailboxRegex : Regex.Regex
@@ -1367,7 +1367,7 @@ renderForm model =
                     [ text (feedbackText lastNameValidationResult) ]
                 ]
             , div [ class "form-text", class "mb-3" ]
-                [ text "Your name must match your government-issued identification, only contain letters and spaces, and be a maximum of 80 characters." ]
+                [ text "Your name must match your government-issued identification and be a maximum of 80 characters." ]
             , div [ class "col-12" ]
                 [ label [ for "email_address", class "form-label" ]
                     [ text "Email Address" ]
@@ -1925,7 +1925,7 @@ validateName whichName nameValue =
         Invalid ("Your " ++ whichName ++ " name may be a maximum of 40 characters")
 
     else if not (Regex.contains nameRegex nameValue) then
-        Invalid ("Your " ++ whichName ++ " name may only contain letters and spaces")
+        Invalid ("Your " ++ whichName ++ " name may only contain letters, spaces, dashes, apostrophes, and periods")
 
     else
         Valid
