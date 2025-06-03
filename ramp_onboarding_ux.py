@@ -1523,11 +1523,11 @@ def verify_email() -> Any:
     if session["user_state"] != "eligible":
         raise Unauthorized("Not eligible")
 
-    email_address_domain = Address(addr_spec=request.args["emailAddress"]).domain.split(".")[-2:]
+    email_address_domain = Address(addr_spec=request.args["emailAddress"].strip()).domain.split(".")[-2:]
 
     if email_address_domain == ["robojackets", "org"]:
-        if app.debug and "+" in Address(addr_spec=request.args["emailAddress"]).username:
-            session["email_address"] = request.args["emailAddress"]
+        if app.debug and "+" in Address(addr_spec=request.args["emailAddress"].strip()).username:
+            session["email_address"] = request.args["emailAddress"].strip()
             session["email_verified"] = True
             return redirect(url_for("index"))
 
@@ -1782,8 +1782,8 @@ def create_ramp_account() -> Dict[str, str]:
     else:
         new_user["attributes"]["googleWorkspaceAccount"] = [session["email_address"]]
 
-    new_user["firstName"] = request.json["firstName"]  # type: ignore
-    new_user["lastName"] = request.json["lastName"]  # type: ignore
+    new_user["firstName"] = request.json["firstName"].strip()  # type: ignore
+    new_user["lastName"] = request.json["lastName"].strip()  # type: ignore
 
     keycloak_user_response = put(
         url=app.config["KEYCLOAK_SERVER"]
@@ -1800,18 +1800,18 @@ def create_ramp_account() -> Dict[str, str]:
     keycloak_user_response.raise_for_status()
 
     request_body = {
-        "department_id": request.json["departmentId"],  # type: ignore
+        "department_id": request.json["departmentId"].strip(),  # type: ignore
         "email": session["email_address"],
-        "first_name": request.json["firstName"],  # type: ignore
+        "first_name": request.json["firstName"].strip(),  # type: ignore
         "idempotency_key": uuid4().hex,
-        "last_name": request.json["lastName"],  # type: ignore
-        "location_id": request.json["locationId"],  # type: ignore
-        "role": request.json["role"],  # type: ignore
+        "last_name": request.json["lastName"].strip(),  # type: ignore
+        "location_id": request.json["locationId"].strip(),  # type: ignore
+        "role": request.json["role"].strip(),  # type: ignore
     }
 
     # Ramp doesn't allow setting a manager for admins via API
     if request.json["role"] != "BUSINESS_ADMIN":  # type: ignore
-        request_body["direct_manager_id"] = request.json["directManagerId"]  # type: ignore
+        request_body["direct_manager_id"] = request.json["directManagerId"].strip()  # type: ignore
 
     ramp_invite_user_response = post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
@@ -1885,18 +1885,18 @@ def order_physical_card() -> Dict[str, str]:
             "fulfillment": {
                 "shipping": {
                     "recipient_address": {
-                        "address1": request.json["addressLineOne"],  # type: ignore
+                        "address1": request.json["addressLineOne"].strip(),  # type: ignore
                         "address2": (
-                            request.json["addressLineTwo"]  # type: ignore
-                            if request.json["addressLineTwo"] != ""  # type: ignore
+                            request.json["addressLineTwo"].strip()  # type: ignore
+                            if request.json["addressLineTwo"].strip() != ""  # type: ignore
                             else None
                         ),
-                        "city": request.json["city"],  # type: ignore
+                        "city": request.json["city"].strip(),  # type: ignore
                         "country": "US",
-                        "first_name": request.json["firstName"],  # type: ignore
-                        "last_name": request.json["lastName"],  # type: ignore
-                        "postal_code": request.json["zip"],  # type: ignore
-                        "state": request.json["state"],  # type: ignore
+                        "first_name": request.json["firstName"].strip(),  # type: ignore
+                        "last_name": request.json["lastName"].strip(),  # type: ignore
+                        "postal_code": request.json["zip"].strip(),  # type: ignore
+                        "state": request.json["state"].strip(),  # type: ignore
                     }
                 }
             },
