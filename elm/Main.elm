@@ -1878,6 +1878,32 @@ renderLoadingIndicators model =
                     spinner
 
                 CreatingRampAccount ->
+                    case model.createRampAccountTaskId of
+                        Just _ ->
+                            checkCircleIcon
+
+                        Nothing ->
+                            spinner
+
+                OrderingPhysicalCard ->
+                    checkCircleIcon
+
+                ProvisioningComplete ->
+                    checkCircleIcon
+            , div [ class "ms-2", style "display" "inline-block" ] [ text "Configuring single sign-on" ]
+            ]
+        , div [ class "d-flex", class "align-items-center", class "mt-2" ]
+            [ case model.formState of
+                Editing ->
+                    spinner
+
+                Validating ->
+                    spinner
+
+                Error ->
+                    spinner
+
+                CreatingRampAccount ->
                     spinner
 
                 OrderingPhysicalCard ->
@@ -1920,6 +1946,9 @@ validateName : String -> String -> ValidationResult
 validateName whichName nameValue =
     if blankString nameValue then
         Invalid ("Please enter your " ++ whichName ++ " name")
+
+    else if String.length (String.trim nameValue) < 2 then
+        Invalid ("Your " ++ whichName ++ " name must be at least 2 characters")
 
     else if String.length (String.trim nameValue) > 40 then
         Invalid ("Your " ++ whichName ++ " name may be a maximum of 40 characters")
