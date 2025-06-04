@@ -2,6 +2,7 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
+import logging
 from base64 import b64encode
 from collections import defaultdict
 from csv import DictReader
@@ -96,6 +97,13 @@ def init_celery(flask: Flask) -> Celery:
     new_celery_app.set_default()
     flask.extensions["celery"] = new_celery_app
     return new_celery_app
+
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+req_log = logging.getLogger("requests.packages.urllib3")
+req_log.setLevel(logging.DEBUG)
+req_log.propagate = True
 
 
 sentry_sdk.init(
