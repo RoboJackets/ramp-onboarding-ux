@@ -321,19 +321,19 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
 
 
 @cache.cached(key_prefix="ramp_business")
-def get_ramp_business_id() -> str:
+def get_ramp_business() -> Dict[str, str]:
     """
-    Get the business ID from Ramp
+    Get the business information from Ramp
     """
-    ramp_business_id_response = get(
+    ramp_business_response = get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/business",
         headers={
             "Authorization": "Bearer " + get_ramp_access_token(),
         },
         timeout=(5, 5),
     )
-    ramp_business_id_response.raise_for_status()
-    return ramp_business_id_response.json()["id"]  # type: ignore
+    ramp_business_response.raise_for_status()
+    return ramp_business_response.json()  # type: ignore
 
 
 @cache.memoize()
@@ -1052,7 +1052,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                                 (
                                                     "https",
                                                     app.config["RAMP_UI_HOSTNAME"],
-                                                    "/sign-in/saml/" + get_ramp_business_id(),
+                                                    "/sign-in/saml/" + get_ramp_business()["id"],
                                                     "",
                                                     "",
                                                     "",
@@ -1154,7 +1154,7 @@ def index() -> Any:
                     (
                         "https",
                         app.config["RAMP_UI_HOSTNAME"],
-                        "/sign-in/saml/" + get_ramp_business_id(),
+                        "/sign-in/saml/" + get_ramp_business()["id"],
                         "",
                         "",
                         "",
@@ -1204,6 +1204,7 @@ def index() -> Any:
 
     return render_template(
         "form.html",
+        business_legal_name=get_ramp_business()["business_name_legal"],
         elm_model={
             "firstName": session["first_name"],
             "lastName": session["last_name"],
@@ -1254,12 +1255,13 @@ def index() -> Any:
                 (
                     "https",
                     app.config["RAMP_UI_HOSTNAME"],
-                    "/sign-in/saml/" + get_ramp_business_id(),
+                    "/sign-in/saml/" + get_ramp_business()["id"],
                     "",
                     "",
                     "",
                 )
             ),
+            "businessLegalName": get_ramp_business()["business_name_legal"],
         },
     )
 

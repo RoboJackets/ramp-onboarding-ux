@@ -355,6 +355,7 @@ type alias Model =
     , nonStudentDefaultLocationId : String
     , managerRampOptions : Dict String RampObject
     , rampSingleSignOnUri : String
+    , businessLegalName : String
     }
 
 
@@ -1302,7 +1303,7 @@ renderForm model =
             [ text "Ramp Onboarding"
             ]
         , p [ class "mt-4", class "mb-4" ]
-            [ text "RoboJackets, Inc. uses "
+            [ text (model.businessLegalName ++ " uses ")
             , a [ href "https://ramp.com", target "_blank" ]
                 [ text "Ramp"
                 ]
@@ -1826,7 +1827,7 @@ renderForm model =
             ]
         , div [ class "mb-4", class "mb-md-5", class "col-12", class "form-text" ]
             [ text "By creating an account, you confirm that you have read and agree to the "
-            , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text "RoboJackets, Inc. Expense Policy" ]
+            , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text (model.businessLegalName ++ " Expense Policy") ]
             , text ", "
             , a [ href "https://ramp.com/legal/cookie-policy", class "text-secondary", target "_blank" ] [ text "Ramp Cookie Policy" ]
             , text ", "
@@ -2783,6 +2784,7 @@ buildInitialModel value =
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
         rampManagerOptions
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSingleSignOnUri" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "businessLegalName" ] string) value)))
 
 
 stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )
