@@ -521,7 +521,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     return None
 
 
-@cache.cached()
+@cache.cached(key_prefix="slack_team_id")
 def get_slack_team_id() -> str:
     """
     Get the team ID for the bot user, used for generating deep links
