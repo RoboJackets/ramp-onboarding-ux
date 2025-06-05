@@ -356,6 +356,8 @@ type alias Model =
     , managerRampOptions : Dict String RampObject
     , rampSingleSignOnUri : String
     , businessLegalName : String
+    , slackSupportChannelDeepLink : String
+    , slackSupportChannelName : String
     }
 
 
@@ -1213,8 +1215,8 @@ view model =
                         ]
                     , p [ class "mt-4", class "mb-4" ]
                         [ text "There was an error creating your Ramp account. Please post in "
-                        , a [ href "slack://channel?team=T033JPZLT&id=C64F32R50" ]
-                            [ text "#treasury-helpdesk"
+                        , a [ href model.slackSupportChannelDeepLink ]
+                            [ text ("#" ++ model.slackSupportChannelName)
                             ]
                         , text " for further assistance."
                         ]
@@ -2785,6 +2787,8 @@ buildInitialModel value =
         rampManagerOptions
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSingleSignOnUri" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "businessLegalName" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelDeepLink" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelName" ] string) value)))
 
 
 stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )

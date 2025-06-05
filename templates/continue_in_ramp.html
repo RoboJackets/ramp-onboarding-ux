@@ -6,5 +6,5 @@
         <li>Enter <a href="mailto:{{ ramp_login_email }}">{{ ramp_login_email }}</a> as your email address.</li>
         <li>Click <strong>Continue</strong>.</li>
     </ol>
-    <p>Please ask in <a href="slack://channel?team=T033JPZLT&id=C64F32R50">#treasury-helpdesk</a> if you have any questions or need assistance.</p>
+    <p>Please ask in <a href="slack://channel?team={{ slack_team_id }}&id={{ slack_support_channel_id }}">#{{ slack_support_channel_name }}</a> if you have any questions or need assistance.</p>
 {% endblock %}

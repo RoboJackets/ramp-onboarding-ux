@@ -12,7 +12,7 @@ from hashlib import file_digest
 from json import loads
 from re import fullmatch
 from typing import Any, Dict, List, Tuple, Union
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
@@ -519,6 +519,32 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             raise Exception("Received more than one matching user from Keycloak")
 
     return None
+
+
+@cache.cached()
+def get_slack_team_id() -> str:
+    """
+    Get the team ID for the bot user, used for generating deep links
+
+    https://api.slack.com/reference/deep-linking#open_a_channel
+    """
+    slack = WebClient(token=app.config["SLACK_API_TOKEN"])
+
+    slack_response = slack.team_info()
+
+    return slack_response["team"]["id"]  # type: ignore
+
+
+@cache.memoize()
+def get_slack_channel_name(channel_id: str) -> str:
+    """
+    Get the channel name for the given channel ID
+    """
+    slack = WebClient(token=app.config["SLACK_API_TOKEN"])
+
+    slack_response = slack.conversations_info(channel=channel_id)
+
+    return slack_response["channel"]["name"]  # type: ignore
 
 
 @shared_task
@@ -1162,6 +1188,11 @@ def index() -> Any:
                 ),
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
                 ramp_login_email=ramp_user_response.json()["email"],
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_SUPPORT_CHANNEL"]
+                ),
             )
 
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
@@ -1169,6 +1200,11 @@ def index() -> Any:
                 "continue_in_ramp.html",
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
                 ramp_login_email=ramp_user_response.json()["email"],
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_SUPPORT_CHANNEL"]
+                ),
             )
 
         raise InternalServerError(
@@ -1177,7 +1213,12 @@ def index() -> Any:
 
     if session["user_state"] == "ineligible":
         session.clear()
-        return render_template("ineligible.html")
+        return render_template(
+            "ineligible.html",
+            slack_team_id=get_slack_team_id(),
+            slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+            slack_support_channel_name=get_slack_channel_name(app.config["SLACK_SUPPORT_CHANNEL"]),
+        )
 
     if session["is_student"]:
         default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
@@ -1262,6 +1303,19 @@ def index() -> Any:
                 )
             ),
             "businessLegalName": get_ramp_business()["business_name_legal"],
+            "slackSupportChannelDeepLink": urlunparse(
+                (
+                    "slack",
+                    "channel",
+                    "",
+                    "",
+                    urlencode(
+                        {"team": get_slack_team_id(), "id": app.config["SLACK_SUPPORT_CHANNEL"]}
+                    ),
+                    "",
+                )
+            ),
+            "slackSupportChannelName": get_slack_channel_name(app.config["SLACK_SUPPORT_CHANNEL"]),
         },
     )
 
