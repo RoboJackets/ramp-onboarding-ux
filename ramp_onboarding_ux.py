@@ -101,7 +101,7 @@ def init_celery(flask: Flask) -> Celery:
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
-req_log = logging.getLogger("requests.packages.urllib3")
+req_log = logging.getLogger("urllib3")
 req_log.setLevel(logging.DEBUG)
 req_log.propagate = True
 
