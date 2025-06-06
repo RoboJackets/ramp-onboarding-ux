@@ -526,7 +526,7 @@ def get_slack_team_id() -> str:
     """
     Get the team ID for the bot user, used for generating deep links
 
-    https://api.slack.com/reference/deep-linking#open_a_channel
+    https://docs.slack.dev/interactivity/deep-linking#open_a_channel
     """
     slack = WebClient(token=app.config["SLACK_API_TOKEN"])
 
