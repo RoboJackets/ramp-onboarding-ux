@@ -1831,6 +1831,8 @@ renderForm model =
             [ text "By creating an account, you confirm that you have read and agree to the "
             , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text (model.businessLegalName ++ " Expense Policy") ]
             , text ", "
+            , a [ href "https://ramp.com/legal/platform-agreement", class "text-secondary", target "_blank" ] [ text "Ramp Platform Agreement" ]
+            , text ", "
             , a [ href "https://ramp.com/legal/cookie-policy", class "text-secondary", target "_blank" ] [ text "Ramp Cookie Policy" ]
             , text ", "
             , a [ href "https://ramp.com/legal/privacy-policy", class "text-secondary", target "_blank" ] [ text "Ramp Privacy Policy" ]
