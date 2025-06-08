@@ -1195,6 +1195,16 @@ def index() -> Any:
                 ),
             )
 
+        if ramp_user_response.json()["status"] == "USER_INACTIVE":
+            return render_template(
+                "deactivated.html",
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_SUPPORT_CHANNEL"]
+                ),
+            )
+
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
             return render_template(
                 "continue_in_ramp.html",
