@@ -926,7 +926,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                             text="If you'd like to get alerts from <@"
                             + app.config["SLACK_RAMP_BOT_USER_ID"]
                             + "> in Slack, you can add your Slack email address (*"
-                            + manager_slack_profile.data["email"]  # type: ignore
+                            + manager_slack_profile.data["profile"]["email"]  # type: ignore
                             + "*) to <"
                             + urlunparse(
                                 (
