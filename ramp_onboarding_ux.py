@@ -2099,6 +2099,7 @@ def clear_cache() -> Dict[str, str]:
     cache.clear()
     return {"status": "ok"}
 
+
 @app.get("/send-slack-messages/<ramp_user_id>")
 def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
     """
@@ -2112,9 +2113,9 @@ def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
 
     search_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users",
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
         headers={
             "Authorization": "Bearer " + get_keycloak_access_token(),
         },
