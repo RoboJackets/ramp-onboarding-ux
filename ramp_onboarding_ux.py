@@ -2098,3 +2098,38 @@ def clear_cache() -> Dict[str, str]:
 
     cache.clear()
     return {"status": "ok"}
+
+@app.get("/send-slack-messages/<ramp_user_id>")
+def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
+    """
+    Manually send Slack welcome messages for a given user
+    """
+    if "user_state" not in session:
+        raise Unauthorized("Not logged in")
+
+    if session["user_state"] != "provisioned":
+        raise Unauthorized("Not provisioned")
+
+    search_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users",
+        headers={
+            "Authorization": "Bearer " + get_keycloak_access_token(),
+        },
+        params={
+            "q": "rampUserId:" + ramp_user_id,
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 1:
+        keycloak_user_id = search_keycloak_user_response.json()[0]["id"]
+    else:
+        raise Exception("Did not find exactly one match in Keycloak")
+
+    notify_slack_account_created(keycloak_user_id, ramp_user_id)
+
+    return {"status": "ok"}
