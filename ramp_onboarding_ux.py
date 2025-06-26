@@ -378,6 +378,20 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         if (
             "attributes" in keycloak_user
             and keycloak_user["attributes"] is not None
+            and "rampLoginEmailAddress" in keycloak_user["attributes"]
+            and keycloak_user["attributes"]["rampLoginEmailAddress"] is not None
+            and len(keycloak_user["attributes"]["rampLoginEmailAddress"]) > 0
+        ):
+            slack_user_id = get_slack_user_id_by_email(
+                keycloak_user["attributes"]["rampLoginEmailAddress"][0]
+            )
+
+            if slack_user_id is not None:
+                return slack_user_id  # type: ignore
+
+        if (
+            "attributes" in keycloak_user
+            and keycloak_user["attributes"] is not None
             and "googleWorkspaceAccount" in keycloak_user["attributes"]
             and keycloak_user["attributes"]["googleWorkspaceAccount"] is not None
             and len(keycloak_user["attributes"]["googleWorkspaceAccount"]) > 0
@@ -501,7 +515,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                     "Authorization": "Bearer " + get_keycloak_access_token(),
                 },
                 params={
-                    "q": "googleWorkspaceAccount:" + ramp_user_response.json()["email"],
+                    "q": "rampLoginEmailAddress:" + ramp_user_response.json()["email"],
                 },
                 timeout=(5, 5),
             )
@@ -513,7 +527,28 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                 )
 
             if len(search_keycloak_user_response.json()) == 0:
-                return None
+                search_keycloak_user_response = get(
+                    url=app.config["KEYCLOAK_SERVER"]
+                    + "/admin/realms/"
+                    + app.config["KEYCLOAK_REALM"]
+                    + "/users",
+                    headers={
+                        "Authorization": "Bearer " + get_keycloak_access_token(),
+                    },
+                    params={
+                        "q": "googleWorkspaceAccount:" + ramp_user_response.json()["email"],
+                    },
+                    timeout=(5, 5),
+                )
+                search_keycloak_user_response.raise_for_status()
+
+                if len(search_keycloak_user_response.json()) == 1:
+                    return get_slack_user_id(  # type: ignore
+                        keycloak_user_id=search_keycloak_user_response.json()[0]["id"]
+                    )
+
+                if len(search_keycloak_user_response.json()) == 0:
+                    return None
 
         if len(search_keycloak_user_response.json()) > 1:
             raise Exception("Received more than one matching user from Keycloak")
@@ -1854,9 +1889,9 @@ def create_ramp_account() -> Dict[str, str]:
         del new_user["username"]
 
     if "attributes" not in new_user:
-        new_user["attributes"] = {"googleWorkspaceAccount": [session["email_address"]]}
+        new_user["attributes"] = {"rampLoginEmailAddress": [session["email_address"]]}
     else:
-        new_user["attributes"]["googleWorkspaceAccount"] = [session["email_address"]]
+        new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
 
     new_user["firstName"] = request.json["firstName"].strip()  # type: ignore
     new_user["lastName"] = request.json["lastName"].strip()  # type: ignore
