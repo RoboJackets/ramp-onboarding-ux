@@ -491,14 +491,14 @@ click = ">=7"
 
 [[package]]
 name = "click-plugins"
-version = "1.1.1"
+version = "1.1.1.2"
 description = "An extension module for click to enable registering CLI commands via setuptools entry-points."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "click-plugins-1.1.1.tar.gz", hash = "sha256:46ab999744a9d831159c3411bb0c79346d94a444df9a3a3742e9ed63645f264b"},
-    {file = "click_plugins-1.1.1-py2.py3-none-any.whl", hash = "sha256:5d262006d3222f5057fd81e1623d4443e41dcda5dc815c06b442aa3c02889fc8"},
+    {file = "click_plugins-1.1.1.2-py2.py3-none-any.whl", hash = "sha256:008d65743833ffc1f5417bf0e78e8d2c23aab04d9745ba817bd3e71b0feb6aa6"},
+    {file = "click_plugins-1.1.1.2.tar.gz", hash = "sha256:d7af3984a99d243c131aa1a828331e7630f4a88a9741fd05c927b204bcf92261"},
 ]
 
 [package.dependencies]
@@ -1436,14 +1436,14 @@ files = [
 
 [[package]]
 name = "types-ldap3"
-version = "2.9.13.20250516"
+version = "2.9.13.20250622"
 description = "Typing stubs for ldap3"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "types_ldap3-2.9.13.20250516-py3-none-any.whl", hash = "sha256:b70214af9c398feb5b105a9bc4614321d8763c4a1b40b5613cb2e400899fc5f8"},
-    {file = "types_ldap3-2.9.13.20250516.tar.gz", hash = "sha256:c39aaef8b3f0f228ea60553b829c70aea40cb29158afb35292a968d81252a2d0"},
+    {file = "types_ldap3-2.9.13.20250622-py3-none-any.whl", hash = "sha256:c18d0320327fa0017eb3d95acdf38921542d80939255e4ba130ca2d13ca3375f"},
+    {file = "types_ldap3-2.9.13.20250622.tar.gz", hash = "sha256:4770a8701daddf1ee936d46414205a329211b6f6e655c2764f6b70c89b023c47"},
 ]
 
 [package.dependencies]
