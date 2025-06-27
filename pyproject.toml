@@ -13,7 +13,7 @@ Authlib = "1.6.0"
 requests = "2.32.4"
 ldap3 = "2.9.1"
 uwsgi = "2.0.30"
-sentry-sdk = {extras = ["pure-eval", "flask"], version = "2.31.0"}
+sentry-sdk = {extras = ["pure-eval", "flask"], version = "2.32.0"}
 google-auth = "2.40.3"
 flask-caching = "2.3.1"
 celery = {extras = ["redis"], version = "5.5.3"}
