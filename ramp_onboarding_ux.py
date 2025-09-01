@@ -1209,6 +1209,38 @@ def index() -> Any:
         ramp_user_response.raise_for_status()
 
         if ramp_user_response.json()["status"] == "USER_ACTIVE":
+            # check if the login email address in keycloak matches ramp
+
+            get_keycloak_user_response = get(
+                url=app.config["KEYCLOAK_SERVER"]
+                + "/admin/realms/"
+                + app.config["KEYCLOAK_REALM"]
+                + "/users/"
+                + session["sub"],
+                headers={
+                    "Authorization": "Bearer " + get_keycloak_access_token(),
+                },
+                timeout=(5, 5),
+            )
+            get_keycloak_user_response.raise_for_status()
+
+            if (
+                "attributes" not in get_keycloak_user_response.json()
+                or "rampLoginEmailAddress" not in get_keycloak_user_response.json()["attributes"]
+                or len(get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"])
+                != 1
+                or get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"][0]
+                != ramp_user_response.json()["email"]
+            ):
+                return render_template(
+                    "sso_mismatch.html",
+                    slack_team_id=get_slack_team_id(),
+                    slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                    slack_support_channel_name=get_slack_channel_name(
+                        app.config["SLACK_SUPPORT_CHANNEL"]
+                    ),
+                )
+
             return render_template(
                 "provisioned.html",
                 ramp_single_sign_on_uri=urlunparse(
