@@ -1409,8 +1409,16 @@ def login() -> Any:
     username = userinfo["preferred_username"]
     session["user_id"] = None
     session["username"] = username
-    session["first_name"] = userinfo["given_name"] if "given_name" in userinfo else ""
-    session["last_name"] = userinfo["family_name"] if "family_name" in userinfo else ""
+    session["first_name"] = (
+        userinfo["given_name"]
+        if "given_name" in userinfo and userinfo["given_name"] != "Confidential"
+        else ""
+    )
+    session["last_name"] = (
+        userinfo["family_name"]
+        if "family_name" in userinfo and userinfo["family_name"] != "Confidential"
+        else ""
+    )
     session["address_line_one"] = ""
     session["address_line_two"] = ""
     session["city"] = ""
