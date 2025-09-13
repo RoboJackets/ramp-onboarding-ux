@@ -1275,6 +1275,16 @@ def index() -> Any:
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
             return render_template(
                 "continue_in_ramp.html",
+                ramp_single_sign_on_uri=urlunparse(
+                    (
+                        "https",
+                        app.config["RAMP_UI_HOSTNAME"],
+                        "/sign-in/saml/" + get_ramp_business()["id"],
+                        "",
+                        "",
+                        "",
+                    )
+                ),
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
                 ramp_login_email=ramp_user_response.json()["email"],
                 slack_team_id=get_slack_team_id(),
