@@ -1470,6 +1470,7 @@ def login() -> Any:
             headers={
                 "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
                 "Accept": "application/json",
+                "x-cache-bypass": "bypass",
             },
             params={"include": "roles,teams,assignments.travel"},
             timeout=(5, 5),
