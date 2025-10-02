@@ -1273,6 +1273,81 @@ def index() -> Any:
             )
 
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
+            if session["email_verified"]:
+                get_keycloak_user_response = get(
+                    url=app.config["KEYCLOAK_SERVER"]
+                    + "/admin/realms/"
+                    + app.config["KEYCLOAK_REALM"]
+                    + "/users/"
+                    + session["sub"],
+                    headers={
+                        "Authorization": "Bearer " + get_keycloak_access_token(),
+                    },
+                    timeout=(5, 5),
+                )
+                get_keycloak_user_response.raise_for_status()
+
+                new_user = get_keycloak_user_response.json()
+                if "id" in new_user:
+                    del new_user["id"]
+
+                if "username" in new_user:
+                    del new_user["username"]
+
+                if "attributes" not in new_user:
+                    new_user["attributes"] = {
+                        "rampLoginEmailAddress": [session["email_address"]],
+                        "rampUserId": [ramp_user_id],
+                    }
+                else:
+                    new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
+                    new_user["attributes"]["rampUserId"] = [ramp_user_id]
+
+                keycloak_user_response = put(
+                    url=app.config["KEYCLOAK_SERVER"]
+                    + "/admin/realms/"
+                    + app.config["KEYCLOAK_REALM"]
+                    + "/users/"
+                    + session["sub"],
+                    json=new_user,
+                    headers={
+                        "Authorization": "Bearer " + get_keycloak_access_token(),
+                    },
+                    timeout=(5, 5),
+                )
+                keycloak_user_response.raise_for_status()
+            else:
+                get_keycloak_user_response = get(
+                    url=app.config["KEYCLOAK_SERVER"]
+                    + "/admin/realms/"
+                    + app.config["KEYCLOAK_REALM"]
+                    + "/users/"
+                    + session["sub"],
+                    headers={
+                        "Authorization": "Bearer " + get_keycloak_access_token(),
+                    },
+                    timeout=(5, 5),
+                )
+                get_keycloak_user_response.raise_for_status()
+
+                if (
+                    "attributes" not in get_keycloak_user_response.json()
+                    or "rampLoginEmailAddress"
+                    not in get_keycloak_user_response.json()["attributes"]
+                    or len(get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"])
+                    != 1
+                    or get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"][0]
+                    != ramp_user_response.json()["email"]
+                ):
+                    return render_template(
+                        "sso_mismatch.html",
+                        slack_team_id=get_slack_team_id(),
+                        slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                        slack_support_channel_name=get_slack_channel_name(
+                            app.config["SLACK_SUPPORT_CHANNEL"]
+                        ),
+                    )
+
             return render_template(
                 "continue_in_ramp.html",
                 ramp_single_sign_on_uri=urlunparse(
@@ -1441,7 +1516,7 @@ def login() -> Any:
     session["can_request_business_admin"] = False
     session["can_request_it_admin"] = False
 
-    if "googleWorkspaceAccount" in userinfo:
+    if "googleWorkspaceAccount" in userinfo and userinfo["googleWorkspaceAccount"] is not None:
         session["email_address"] = userinfo["googleWorkspaceAccount"]
         session["email_verified"] = False
     else:
@@ -1534,6 +1609,67 @@ def login() -> Any:
             apiary_user_response.raise_for_status()
 
     if session["user_state"] == "eligible":  # pylint: disable=too-many-nested-blocks
+        if session["ramp_user_id"] is None:
+            # check ramp user api to see if they already have an invitation
+            # with one of the emails from keycloak
+            ramp_user = None
+
+            if (
+                "googleWorkspaceAccount" in userinfo
+                and userinfo["googleWorkspaceAccount"] is not None
+            ):
+                ramp_users_response = get(
+                    url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+                    headers={
+                        "Authorization": "Bearer " + get_ramp_access_token(),
+                    },
+                    params={
+                        "email": userinfo["googleWorkspaceAccount"],
+                        "page_size": 100,
+                    },
+                    timeout=(5, 5),
+                )
+                ramp_users_response.raise_for_status()
+
+                if len(ramp_users_response.json()["data"]) == 1:
+                    ramp_user = ramp_users_response.json()["data"][0]
+
+                if len(ramp_users_response.json()["data"]) > 1:
+                    raise InternalServerError("More than one Ramp user returned for email search")
+
+            if ramp_user is None and "email" in userinfo and userinfo["email"] is not None:
+                ramp_users_response = get(
+                    url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+                    headers={
+                        "Authorization": "Bearer " + get_ramp_access_token(),
+                    },
+                    params={
+                        "email": userinfo["email"],
+                        "page_size": 100,
+                    },
+                    timeout=(5, 5),
+                )
+                ramp_users_response.raise_for_status()
+
+                if len(ramp_users_response.json()["data"]) == 1:
+                    ramp_user = ramp_users_response.json()["data"][0]
+
+                if len(ramp_users_response.json()["data"]) > 1:
+                    raise InternalServerError("More than one Ramp user returned for email search")
+
+            if (
+                ramp_user is not None
+                and "id" in ramp_user
+                and ramp_user["id"] is not None
+                and "email" in ramp_user
+                and ramp_user["email"] is not None
+            ):
+                # user has an existing ramp invite but not loaded into keycloak
+                # verify email address then store in keycloak (handled in index)
+                session["ramp_user_id"] = ramp_user["id"]
+
+                return generate_redirect_for_verify_email(ramp_user["email"])
+
         with sentry_sdk.start_span(op="ldap.connect"):
             ldap = Connection(
                 Server("whitepages.gatech.edu", connect_timeout=1),
@@ -1683,26 +1819,31 @@ def verify_email() -> Any:
     if session["user_state"] != "eligible":
         raise Unauthorized("Not eligible")
 
-    email_address_domain = Address(addr_spec=request.args["emailAddress"].strip()).domain.split(
-        "."
-    )[-2:]
+    return generate_redirect_for_verify_email(request.args["emailAddress"].strip())
+
+
+def generate_redirect_for_verify_email(email_address: str) -> Any:
+    """
+    Generates redirect to mailbox provider for email address verification
+    """
+    email_address_domain = Address(addr_spec=email_address).domain.split(".")[-2:]
 
     if email_address_domain == ["robojackets", "org"]:
-        if app.debug and "+" in Address(addr_spec=request.args["emailAddress"].strip()).username:
-            session["email_address"] = request.args["emailAddress"].strip()
+        if app.debug and "+" in Address(addr_spec=email_address).username:
+            session["email_address"] = email_address
             session["email_verified"] = True
             return redirect(url_for("index"))
 
         return oauth.google.authorize_redirect(
             url_for("verify_google_complete", _external=True),
-            login_hint=request.args["emailAddress"],
+            login_hint=email_address,
             hd="robojackets.org",
         )
 
     if email_address_domain == ["gatech", "edu"]:
         return oauth.microsoft.authorize_redirect(
             url_for("verify_microsoft_complete", _external=True),
-            login_hint=request.args["emailAddress"],
+            login_hint=email_address,
             hd="gatech.edu",
         )
 
