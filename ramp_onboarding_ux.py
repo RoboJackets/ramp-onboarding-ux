@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from email.headerregistry import Address
 from hashlib import file_digest
 from json import loads
-from re import fullmatch
+from re import fullmatch, search
 from typing import Any, Dict, List, Tuple, Union
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
 from authlib.integrations.flask_client import OAuth  # type: ignore
@@ -626,6 +626,15 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     """
     Store the Ramp user ID in Keycloak
     """
+    ramp_user_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
+        headers={
+            "Authorization": "Bearer " + get_ramp_access_token(),
+        },
+        timeout=(5, 5),
+    )
+    ramp_user_response.raise_for_status()
+
     get_keycloak_user_response = get(
         url=app.config["KEYCLOAK_SERVER"]
         + "/admin/realms/"
@@ -647,8 +656,12 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
         del new_user["username"]
 
     if "attributes" not in new_user:
-        new_user["attributes"] = {"rampUserId": [ramp_user_id]}
+        new_user["attributes"] = {
+            "rampLoginEmailAddress": [ramp_user_response.json()["email"]],
+            "rampUserId": [ramp_user_id],
+        }
     else:
+        new_user["attributes"]["rampLoginEmailAddress"] = [ramp_user_response.json()["email"]]
         new_user["attributes"]["rampUserId"] = [ramp_user_id]
 
     update_keycloak_user_response = put(
@@ -860,6 +873,12 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         )
     else:
         manager_mention = f"<@{manager_slack_user_id}>"
+
+    # atomically increment a cache key to avoid sending messages more than once
+    cache_result = cache.cache.inc("slack_notifications_sent_" + ramp_user_id)
+    if cache_result is not None and cache_result > 1:
+        print("multiple tasks triggered, returning early")
+        return
 
     slack.chat_postMessage(
         channel=app.config["SLACK_NOTIFY_CHANNEL"],
@@ -2359,5 +2378,99 @@ def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
         raise Exception("Did not find exactly one match in Keycloak")
 
     notify_slack_account_created(keycloak_user_id, ramp_user_id)
+
+    return {"status": "ok"}
+
+
+@shared_task
+def handle_invitation_delivery(invitation_url: str) -> None:
+    """
+    Process an invitation URL delivered from Postmark
+    """
+    query_string = parse_qs(urlparse(invitation_url).query)
+
+    if query_string["business_id"][0] != get_ramp_business()["id"]:
+        print("Received invitation for a different businessId, ignoring")
+
+        return
+
+    ramp_users_response = get(
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+        headers={
+            "Authorization": "Bearer " + get_ramp_access_token(),
+        },
+        params={
+            "email": query_string["email"][0],  # type: ignore
+            "page_size": 100,
+        },
+        timeout=(5, 5),
+    )
+    ramp_users_response.raise_for_status()
+
+    if len(ramp_users_response.json()["data"]) == 0:
+        raise Exception("Could not locate Ramp user for invitation")
+
+    if len(ramp_users_response.json()["data"]) == 1:
+        ramp_user = ramp_users_response.json()["data"][0]
+
+    else:
+        raise Exception("More than one Ramp user returned for email search")
+
+    ramp_user_id = ramp_user["id"]
+
+    search_keycloak_user_response = get(
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
+        headers={
+            "Authorization": "Bearer " + get_keycloak_access_token(),
+        },
+        params={
+            "q": "googleWorkspaceAccount:" + ramp_user["email"],
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 0:
+        raise Exception("Could not locate Keycloak user for invitation")
+
+    if len(search_keycloak_user_response.json()) == 1:
+        keycloak_user_id = search_keycloak_user_response.json()[0]["id"]
+
+    else:
+        raise Exception("More than one Keycloak user returned for email search")
+
+    store_ramp_user_id_in_keycloak.delay(keycloak_user_id, ramp_user_id)
+    remove_eligible_role.delay(keycloak_user_id)
+    import_user_to_org_chart.delay(ramp_user_id)
+    notify_slack_account_created.delay(keycloak_user_id, ramp_user_id)
+
+
+@app.post("/postmark")
+def handle_postmark_inbound_event() -> Any:
+    """
+    Handle an inbound email from Postmark
+    """
+    if (
+        "Authorization" not in request.headers
+        or request.headers["Authorization"] is None
+        or request.headers["Authorization"] != app.config["POSTMARK_AUTHORIZATION"]
+    ):
+        raise Unauthorized("authorization does not match")
+
+    if "TextBody" not in request.json or request.json["TextBody"] is None:  # type: ignore
+        raise BadRequest("missing TextBody")
+
+    results = search(
+        r"\[(?P<invitation_url>https://[a-z]+\.ramp\.com/invite-sign-up.+)\]",
+        request.json["TextBody"],  # type: ignore
+    )
+
+    if results is None:
+        return {"status": "ok"}
+
+    handle_invitation_delivery.delay(results.group("invitation_url"))
 
     return {"status": "ok"}
