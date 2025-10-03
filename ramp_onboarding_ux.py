@@ -2382,56 +2382,6 @@ def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/invitation-deep-link")
-def invitation_deep_link() -> Dict[str, str]:
-    """
-    Returns a deep link into Ramp to claim an invitation, if available,
-    otherwise returns the normal SAML SSO link
-    """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    if session["email_verified"] is False:
-        raise BadRequest("Email must be verified")
-
-    business_id = get_ramp_business()["id"]
-
-    invitation_token = cache.get("invitation_token_" + business_id + "_" + session["email_address"])
-
-    if invitation_token is None:
-        return {
-            "deepLink": urlunparse(
-                (
-                    "https",
-                    app.config["RAMP_UI_HOSTNAME"],
-                    "/sign-in/saml/" + business_id,
-                    "",
-                    "",
-                    "",
-                )
-            )
-        }
-
-    return {
-        "deepLink": urlunparse(
-            (
-                "https",
-                app.config["RAMP_UI_HOSTNAME"],
-                "invite-sign-up",
-                "",
-                urlencode(
-                    {
-                        "business_id": business_id,
-                        "email": session["email_address"],
-                        "token": invitation_token,
-                    }
-                ),
-                "",
-            )
-        )
-    }
-
-
 @shared_task
 def handle_invitation_delivery(invitation_url: str) -> None:
     """
@@ -2521,15 +2471,6 @@ def handle_postmark_inbound_event() -> Any:
     if results is None:
         return {"status": "ok"}
 
-    invitation_url = results.group("invitation_url")
-
-    query_string = parse_qs(urlparse(results.group("invitation_url")).query)
-
-    cache.set(
-        "invitation_token_" + query_string["business_id"][0] + "_" + query_string["email"][0],
-        query_string["token"][0],
-    )
-
-    handle_invitation_delivery.delay(invitation_url)
+    handle_invitation_delivery.delay(results.group("invitation_url"))
 
     return {"status": "ok"}
