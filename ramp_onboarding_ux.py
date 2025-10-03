@@ -874,6 +874,12 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     else:
         manager_mention = f"<@{manager_slack_user_id}>"
 
+    # atomically increment a cache key to avoid sending messages more than once
+    cache_result = cache.cache.inc("slack_notifications_sent_" + ramp_user_id)
+    if cache_result is not None and cache_result > 1:
+        print("multiple tasks triggered, returning early")
+        return
+
     slack.chat_postMessage(
         channel=app.config["SLACK_NOTIFY_CHANNEL"],
         thread_ts=cache.get("slack_ineligible_message_" + keycloak_user_id),
