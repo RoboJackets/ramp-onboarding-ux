@@ -29,6 +29,29 @@ import W3.Html.Attributes exposing (inputmode, numeric)
 
 
 
+-- LEGAL
+
+
+termsOfService : List ( String, String )
+termsOfService =
+    [ ( "Ramp Platform Agreement", "https://ramp.com/legal/platform-agreement" )
+    , ( "Ramp Cookie Policy", "https://ramp.com/legal/cookie-policy" )
+    , ( "Ramp Privacy Policy", "https://ramp.com/legal/privacy-policy" )
+    , ( "Ramp Authorized User Agreement", "https://ramp.com/legal/authorized-user-terms" )
+    , ( "Ramp Authorized User Payment Card Addendum", "https://ramp.com/legal/authorized-user-card-addendum" )
+    , ( "Sutton Bank Cardholder Terms", "https://ramp.com/legal/sutton-bank-cardholder-terms" )
+    , ( "Sutton Bank Privacy Policy", "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf" )
+    , ( "Celtic Bank Accountholder Terms", "https://ramp.com/legal/celtic-bank-accountholder-terms" )
+    , ( "Celtic Bank Privacy Policy", "https://www.celticbank.com/privacy" )
+    , ( "Lead Bank Accountholder Terms", "https://ramp.com/legal/lead-bank-accountholder-terms" )
+    , ( "Lead Bank Privacy Policy", "https://www.lead.bank/privacy-and-terms" )
+    , ( "Georgia Institute of Technology Acceptable Use Policy", "https://policylibrary.gatech.edu/information-technology/acceptable-use-policy" )
+    , ( "Georgia Institute of Technology Cyber Security Policy", "https://policylibrary.gatech.edu/information-technology/cyber-security-policy" )
+    , ( "Georgia Institute of Technology Data Privacy Policy", "https://policylibrary.gatech.edu/information-technology/data-privacy-policy" )
+    ]
+
+
+
 -- REGEX
 
 
@@ -1828,22 +1851,13 @@ renderForm model =
                 ]
             ]
         , div [ class "mb-4", class "mb-md-5", class "col-12", class "form-text" ]
-            [ text "By creating an account, you confirm that you have read and agree to the "
-            , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text (model.businessLegalName ++ " Expense Policy") ]
-            , text ", "
-            , a [ href "https://ramp.com/legal/platform-agreement", class "text-secondary", target "_blank" ] [ text "Ramp Platform Agreement" ]
-            , text ", "
-            , a [ href "https://ramp.com/legal/cookie-policy", class "text-secondary", target "_blank" ] [ text "Ramp Cookie Policy" ]
-            , text ", "
-            , a [ href "https://ramp.com/legal/privacy-policy", class "text-secondary", target "_blank" ] [ text "Ramp Privacy Policy" ]
-            , text ", "
-            , a [ href "https://ramp.com/legal/authorized-user-terms", class "text-secondary", target "_blank" ] [ text "Ramp Authorized User Agreement" ]
-            , text ", "
-            , a [ href "https://ramp.com/legal/authorized-user-card-addendum", class "text-secondary", target "_blank" ] [ text "Ramp Authorized User Payment Card Addendum" ]
-            , text ", and "
-            , a [ href "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf", class "text-secondary", target "_blank" ] [ text "Sutton Privacy Policy" ]
-            , text "."
-            ]
+            ([ text "By creating an account, you confirm that you have read and agree to the "
+             , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text (model.businessLegalName ++ " Expense Policy") ]
+             , text ", "
+             ]
+                ++ List.intersperse (text ", ") (List.map termsOfServiceItemToLink (List.take (List.length termsOfService - 1) termsOfService))
+                ++ [ text ", and ", termsOfServiceItemToLink (Maybe.withDefault ( "", "" ) (List.head (List.reverse termsOfService))), text "." ]
+            )
         ]
     , div
         [ id "g_id_onload"
@@ -2934,6 +2948,16 @@ getManagerRampIdFromApiaryId model =
 
     else
         Nothing
+
+
+termsOfServiceItemToLink : ( String, String ) -> Html msg
+termsOfServiceItemToLink ( label, url ) =
+    a
+        [ href url
+        , class "text-secondary"
+        , target "_blank"
+        ]
+        [ text label ]
 
 
 
