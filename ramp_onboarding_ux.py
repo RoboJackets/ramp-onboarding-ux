@@ -1261,7 +1261,7 @@ def index() -> Any:
                 )
 
             return render_template(
-                "provisioned.html",
+                "user_active.html",
                 ramp_single_sign_on_uri=urlunparse(
                     (
                         "https",
@@ -1283,7 +1283,7 @@ def index() -> Any:
 
         if ramp_user_response.json()["status"] == "USER_INACTIVE":
             return render_template(
-                "deactivated.html",
+                "user_inactive.html",
                 slack_team_id=get_slack_team_id(),
                 slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
                 slack_support_channel_name=get_slack_channel_name(
@@ -1381,6 +1381,16 @@ def index() -> Any:
                 ),
                 ramp_login_hostname=app.config["RAMP_UI_HOSTNAME"],
                 ramp_login_email=ramp_user_response.json()["email"],
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_SUPPORT_CHANNEL"]
+                ),
+            )
+
+        if ramp_user_response.json()["status"] == "INVITE_EXPIRED":
+            return render_template(
+                "invite_expired.html",
                 slack_team_id=get_slack_team_id(),
                 slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
                 slack_support_channel_name=get_slack_channel_name(
