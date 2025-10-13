@@ -1790,6 +1790,13 @@ def login() -> Any:
 
             return generate_redirect_for_verify_email(ramp_user["email"])
 
+        # user does not have a ramp account but does appear to have a workspace account
+        # verify workspace account during login flow
+        if session["user_state"] == "eligible" and Address(
+            addr_spec=session["email_address"]
+        ).domain.split(".")[-2:] == ["robojackets", "org"]:
+            return generate_redirect_for_verify_email(session["email_address"])
+
     if session["user_state"] == "ineligible":
         notify_slack_ineligible.delay(session["sub"])
 
