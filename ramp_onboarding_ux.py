@@ -1193,6 +1193,8 @@ def index() -> Any:
         }
     )
 
+    keycloak_user_response = None
+
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         keycloak_user_response = get(
             url=app.config["KEYCLOAK_SERVER"]
@@ -1227,39 +1229,84 @@ def index() -> Any:
         )
         ramp_user_response.raise_for_status()
 
-        if ramp_user_response.json()["status"] == "USER_ACTIVE":
-            # check if the login email address in keycloak matches ramp
+        # store the ramp user id and verified email in keycloak
+        # only triggered if an invitation was found during login
+        if session["email_verified"]:
+            if keycloak_user_response is None:
+                keycloak_user_response = get(
+                    url=app.config["KEYCLOAK_SERVER"]
+                    + "/admin/realms/"
+                    + app.config["KEYCLOAK_REALM"]
+                    + "/users/"
+                    + session["sub"],
+                    headers={
+                        "Authorization": "Bearer " + get_keycloak_access_token(),
+                    },
+                    timeout=(5, 5),
+                )
+                keycloak_user_response.raise_for_status()
 
-            get_keycloak_user_response = get(
+            new_user = keycloak_user_response.json()
+            if "id" in new_user:
+                del new_user["id"]
+
+            if "username" in new_user:
+                del new_user["username"]
+
+            if "attributes" not in new_user:
+                new_user["attributes"] = {
+                    "rampLoginEmailAddress": [session["email_address"]],
+                    "rampUserId": [ramp_user_id],
+                }
+            else:
+                new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
+                new_user["attributes"]["rampUserId"] = [ramp_user_id]
+
+            keycloak_user_response = put(
                 url=app.config["KEYCLOAK_SERVER"]
                 + "/admin/realms/"
                 + app.config["KEYCLOAK_REALM"]
                 + "/users/"
                 + session["sub"],
+                json=new_user,
                 headers={
                     "Authorization": "Bearer " + get_keycloak_access_token(),
                 },
                 timeout=(5, 5),
             )
-            get_keycloak_user_response.raise_for_status()
+            keycloak_user_response.raise_for_status()
 
-            if (
-                "attributes" not in get_keycloak_user_response.json()
-                or "rampLoginEmailAddress" not in get_keycloak_user_response.json()["attributes"]
-                or len(get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"])
-                != 1
-                or get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"][0]
-                != ramp_user_response.json()["email"]
-            ):
-                return render_template(
-                    "sso_mismatch.html",
-                    slack_team_id=get_slack_team_id(),
-                    slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
-                    slack_support_channel_name=get_slack_channel_name(
-                        app.config["SLACK_SUPPORT_CHANNEL"]
-                    ),
-                )
+        # check if the login email address in keycloak matches ramp
+        keycloak_user_response = get(
+            url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users/"
+            + session["sub"],
+            headers={
+                "Authorization": "Bearer " + get_keycloak_access_token(),
+            },
+            timeout=(5, 5),
+        )
+        keycloak_user_response.raise_for_status()
 
+        if (
+            "attributes" not in keycloak_user_response.json()
+            or "rampLoginEmailAddress" not in keycloak_user_response.json()["attributes"]
+            or len(keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"]) != 1
+            or keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"][0]
+            != ramp_user_response.json()["email"]
+        ):
+            return render_template(
+                "sso_mismatch.html",
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_SUPPORT_CHANNEL"]
+                ),
+            )
+
+        if ramp_user_response.json()["status"] == "USER_ACTIVE":
             return render_template(
                 "user_active.html",
                 ramp_single_sign_on_uri=urlunparse(
@@ -1292,81 +1339,6 @@ def index() -> Any:
             )
 
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
-            if session["email_verified"]:
-                get_keycloak_user_response = get(
-                    url=app.config["KEYCLOAK_SERVER"]
-                    + "/admin/realms/"
-                    + app.config["KEYCLOAK_REALM"]
-                    + "/users/"
-                    + session["sub"],
-                    headers={
-                        "Authorization": "Bearer " + get_keycloak_access_token(),
-                    },
-                    timeout=(5, 5),
-                )
-                get_keycloak_user_response.raise_for_status()
-
-                new_user = get_keycloak_user_response.json()
-                if "id" in new_user:
-                    del new_user["id"]
-
-                if "username" in new_user:
-                    del new_user["username"]
-
-                if "attributes" not in new_user:
-                    new_user["attributes"] = {
-                        "rampLoginEmailAddress": [session["email_address"]],
-                        "rampUserId": [ramp_user_id],
-                    }
-                else:
-                    new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
-                    new_user["attributes"]["rampUserId"] = [ramp_user_id]
-
-                keycloak_user_response = put(
-                    url=app.config["KEYCLOAK_SERVER"]
-                    + "/admin/realms/"
-                    + app.config["KEYCLOAK_REALM"]
-                    + "/users/"
-                    + session["sub"],
-                    json=new_user,
-                    headers={
-                        "Authorization": "Bearer " + get_keycloak_access_token(),
-                    },
-                    timeout=(5, 5),
-                )
-                keycloak_user_response.raise_for_status()
-            else:
-                get_keycloak_user_response = get(
-                    url=app.config["KEYCLOAK_SERVER"]
-                    + "/admin/realms/"
-                    + app.config["KEYCLOAK_REALM"]
-                    + "/users/"
-                    + session["sub"],
-                    headers={
-                        "Authorization": "Bearer " + get_keycloak_access_token(),
-                    },
-                    timeout=(5, 5),
-                )
-                get_keycloak_user_response.raise_for_status()
-
-                if (
-                    "attributes" not in get_keycloak_user_response.json()
-                    or "rampLoginEmailAddress"
-                    not in get_keycloak_user_response.json()["attributes"]
-                    or len(get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"])
-                    != 1
-                    or get_keycloak_user_response.json()["attributes"]["rampLoginEmailAddress"][0]
-                    != ramp_user_response.json()["email"]
-                ):
-                    return render_template(
-                        "sso_mismatch.html",
-                        slack_team_id=get_slack_team_id(),
-                        slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
-                        slack_support_channel_name=get_slack_channel_name(
-                            app.config["SLACK_SUPPORT_CHANNEL"]
-                        ),
-                    )
-
             return render_template(
                 "continue_in_ramp.html",
                 ramp_single_sign_on_uri=urlunparse(
@@ -1637,68 +1609,7 @@ def login() -> Any:
         else:
             apiary_user_response.raise_for_status()
 
-    if session["user_state"] == "eligible":  # pylint: disable=too-many-nested-blocks
-        if session["ramp_user_id"] is None:
-            # check ramp user api to see if they already have an invitation
-            # with one of the emails from keycloak
-            ramp_user = None
-
-            if (
-                "googleWorkspaceAccount" in userinfo
-                and userinfo["googleWorkspaceAccount"] is not None
-            ):
-                ramp_users_response = get(
-                    url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-                    headers={
-                        "Authorization": "Bearer " + get_ramp_access_token(),
-                    },
-                    params={
-                        "email": userinfo["googleWorkspaceAccount"],
-                        "page_size": 100,
-                    },
-                    timeout=(5, 5),
-                )
-                ramp_users_response.raise_for_status()
-
-                if len(ramp_users_response.json()["data"]) == 1:
-                    ramp_user = ramp_users_response.json()["data"][0]
-
-                if len(ramp_users_response.json()["data"]) > 1:
-                    raise InternalServerError("More than one Ramp user returned for email search")
-
-            if ramp_user is None and "email" in userinfo and userinfo["email"] is not None:
-                ramp_users_response = get(
-                    url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-                    headers={
-                        "Authorization": "Bearer " + get_ramp_access_token(),
-                    },
-                    params={
-                        "email": userinfo["email"],
-                        "page_size": 100,
-                    },
-                    timeout=(5, 5),
-                )
-                ramp_users_response.raise_for_status()
-
-                if len(ramp_users_response.json()["data"]) == 1:
-                    ramp_user = ramp_users_response.json()["data"][0]
-
-                if len(ramp_users_response.json()["data"]) > 1:
-                    raise InternalServerError("More than one Ramp user returned for email search")
-
-            if (
-                ramp_user is not None
-                and "id" in ramp_user
-                and ramp_user["id"] is not None
-                and "email" in ramp_user
-                and ramp_user["email"] is not None
-            ):
-                # user has an existing ramp invite but not loaded into keycloak
-                # verify email address then store in keycloak (handled in index)
-                session["ramp_user_id"] = ramp_user["id"]
-
-                return generate_redirect_for_verify_email(ramp_user["email"])
-
+    if session["user_state"] == "eligible":
         with sentry_sdk.start_span(op="ldap.connect"):
             ldap = Connection(
                 Server("whitepages.gatech.edu", connect_timeout=1),
@@ -1821,6 +1732,63 @@ def login() -> Any:
                     session["address_line_two"] = address_validation_json["result"]["address"][
                         "postalAddress"
                     ]["addressLines"][1]
+
+    if session["ramp_user_id"] is None:
+        # check ramp to see if they already have an invitation with one of the emails from keycloak
+        ramp_user = None
+
+        if "googleWorkspaceAccount" in userinfo and userinfo["googleWorkspaceAccount"] is not None:
+            ramp_users_response = get(
+                url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+                headers={
+                    "Authorization": "Bearer " + get_ramp_access_token(),
+                },
+                params={
+                    "email": userinfo["googleWorkspaceAccount"],
+                    "page_size": 100,
+                },
+                timeout=(5, 5),
+            )
+            ramp_users_response.raise_for_status()
+
+            if len(ramp_users_response.json()["data"]) == 1:
+                ramp_user = ramp_users_response.json()["data"][0]
+
+            if len(ramp_users_response.json()["data"]) > 1:
+                raise InternalServerError("More than one Ramp user returned for email search")
+
+        if ramp_user is None and "email" in userinfo and userinfo["email"] is not None:
+            ramp_users_response = get(
+                url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+                headers={
+                    "Authorization": "Bearer " + get_ramp_access_token(),
+                },
+                params={
+                    "email": userinfo["email"],
+                    "page_size": 100,
+                },
+                timeout=(5, 5),
+            )
+            ramp_users_response.raise_for_status()
+
+            if len(ramp_users_response.json()["data"]) == 1:
+                ramp_user = ramp_users_response.json()["data"][0]
+
+            if len(ramp_users_response.json()["data"]) > 1:
+                raise InternalServerError("More than one Ramp user returned for email search")
+
+        if (
+            ramp_user is not None
+            and "id" in ramp_user
+            and ramp_user["id"] is not None
+            and "email" in ramp_user
+            and ramp_user["email"] is not None
+        ):
+            # user has an existing ramp invite but not loaded into keycloak
+            # verify email address then store in keycloak (handled in index)
+            session["ramp_user_id"] = ramp_user["id"]
+
+            return generate_redirect_for_verify_email(ramp_user["email"])
 
     if session["user_state"] == "ineligible":
         notify_slack_ineligible.delay(session["sub"])
