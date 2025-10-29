@@ -878,7 +878,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     # atomically increment a cache key to avoid sending messages more than once
     cache_result = cache.cache.inc("slack_notifications_sent_" + ramp_user_id)
     if cache_result is not None and cache_result > 1:
-        print("multiple tasks triggered, returning early")
+        logging.warning("multiple tasks triggered, returning early")
         return
 
     slack.chat_postMessage(
@@ -1673,7 +1673,7 @@ def login() -> Any:
             )
             address_validation_response.raise_for_status()
 
-            print(address_validation_response.text)
+            logging.debug(address_validation_response.text)
 
             address_validation_json = address_validation_response.json()
 
@@ -2376,7 +2376,7 @@ def handle_invitation_delivery(invitation_url: str) -> None:
     query_string = parse_qs(urlparse(invitation_url).query)
 
     if query_string["business_id"][0] != get_ramp_business()["id"]:
-        print("Received invitation for a different businessId, ignoring")
+        logging.warning("Received invitation for a different businessId, ignoring")
 
         return
 
