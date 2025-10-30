@@ -1391,12 +1391,12 @@ def index() -> Any:
         default_department = app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
 
     if (
-        session["is_student"]
+        session["is_student"]  # pylint: disable=too-many-boolean-expressions
         or session["zip_code"][:2] == "30"
         or ip_address(request.remote_addr).is_private  # type: ignore
-        or ip_address(request.remote_addr) in ip_network('128.61.0.0/16')  # type: ignore
-        or ip_address(request.remote_addr) in ip_network('130.207.0.0/16')  # type: ignore
-        or ip_address(request.remote_addr) in ip_network('143.215.0.0/16')  # type: ignore
+        or ip_address(request.remote_addr) in ip_network("128.61.0.0/16")  # type: ignore
+        or ip_address(request.remote_addr) in ip_network("130.207.0.0/16")  # type: ignore
+        or ip_address(request.remote_addr) in ip_network("143.215.0.0/16")  # type: ignore
     ):
         default_location = app.config["RAMP_DEFAULT_LOCATION_STUDENTS"]
     else:
