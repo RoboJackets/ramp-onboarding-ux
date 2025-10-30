@@ -9,7 +9,7 @@ from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
 from hashlib import file_digest
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 from json import loads
 from re import fullmatch, search
 from typing import Any, Dict, List, Tuple, Union
@@ -1394,6 +1394,9 @@ def index() -> Any:
         session["is_student"]
         or session["zip_code"][:2] == "30"
         or ip_address(request.remote_addr).is_private  # type: ignore
+        or ip_address(request.remote_addr) in ip_network('128.61.0.0/16')  # type: ignore
+        or ip_address(request.remote_addr) in ip_network('130.207.0.0/16')  # type: ignore
+        or ip_address(request.remote_addr) in ip_network('143.215.0.0/16')  # type: ignore
     ):
         default_location = app.config["RAMP_DEFAULT_LOCATION_STUDENTS"]
     else:
