@@ -1944,8 +1944,8 @@ renderLoadingIndicators model =
         , p [ class "mt-3" ]
             [ text "On the next screen, select "
             , strong []
-              [ text "Sign in with SAML SSO"
-              ]
+                [ text "Sign in with SAML SSO"
+                ]
             , text " to continue setting up your account within Ramp."
             ]
         ]

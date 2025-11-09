@@ -15,14 +15,11 @@ import Docs.ReviewAtDocs
 import NoConfusingPrefixOperator
 import NoDebug.Log
 import NoDebug.TodoOrToString
-import NoExposingEverything
-import NoImportingEverything
 import NoMissingTypeAnnotation
 import NoMissingTypeAnnotationInLetIn
 import NoMissingTypeExpose
 import NoPrematureLetComputation
 import NoSimpleLetBody
-import NoUnused.CustomTypeConstructorArgs
 import NoUnused.CustomTypeConstructors
 import NoUnused.Dependencies
 import NoUnused.Exports
