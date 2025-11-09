@@ -1941,6 +1941,13 @@ renderLoadingIndicators model =
                     checkCircleIcon
             , div [ class "ms-2", style "display" "inline-block" ] [ text "Ordering your physical card" ]
             ]
+        , p [ class "mt-3" ]
+            [ text "On the next screen, select "
+            , strong []
+              [ text "Sign in with SAML SSO"
+              ]
+            , text " to continue setting up your account within Ramp."
+            ]
         ]
     ]
 
