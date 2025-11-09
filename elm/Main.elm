@@ -435,7 +435,7 @@ main =
 
 
 init : Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
+init flags _ _ =
     ( buildInitialModel flags
     , Cmd.batch
         [ Task.perform SetTime Time.now
@@ -461,7 +461,7 @@ update msg model =
                 Browser.External href ->
                     ( model, Nav.load href )
 
-        UrlChanged url ->
+        UrlChanged _ ->
             ( model, Cmd.none )
 
         FormSubmitted ->
@@ -476,7 +476,7 @@ update msg model =
                             if model.managerRampId == Nothing then
                                 Validating
 
-                            else if model.orderPhysicalCard == True then
+                            else if model.orderPhysicalCard then
                                 Validating
 
                             else
@@ -490,7 +490,7 @@ update msg model =
                             if model.managerRampId == Nothing then
                                 ValidateForm
 
-                            else if model.orderPhysicalCard == True then
+                            else if model.orderPhysicalCard then
                                 ValidateForm
 
                             else
@@ -787,12 +787,8 @@ update msg model =
                 | nextAction = NoOpNextAction
                 , addressLineTwoRequired =
                     case result of
-                        Ok verdict ->
-                            if missingAddressLineTwo then
-                                True
-
-                            else
-                                False
+                        Ok _ ->
+                            missingAddressLineTwo
 
                         Err _ ->
                             False
@@ -816,7 +812,7 @@ update msg model =
                     case result of
                         Ok verdict ->
                             case verdict.addressComplete of
-                                Just addressComplete ->
+                                Just _ ->
                                     case model.managerRampId of
                                         Just _ ->
                                             CreatingRampAccount
@@ -825,11 +821,7 @@ update msg model =
                                             Validating
 
                                 Nothing ->
-                                    if missingAddressLineTwo then
-                                        Editing
-
-                                    else
-                                        Editing
+                                    Editing
 
                         Err _ ->
                             Editing
@@ -924,35 +916,36 @@ update msg model =
               }
             , case result of
                 Ok managerRampInfo ->
-                    let
-                        task : Cmd Msg
-                        task =
-                            createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
-                    in
                     if managerRampInfo.managerRampId == Nothing then
                         Cmd.none
 
-                    else if model.orderPhysicalCard then
-                        case model.addressIsValid of
-                            Just True ->
-                                if validateModel model == Valid then
-                                    task
-
-                                else
-                                    Cmd.none
-
-                            Just False ->
-                                Cmd.none
-
-                            Nothing ->
-                                if checkCampusAddress model /= NotCampusAddress then
-                                    task
-
-                                else
-                                    Cmd.none
-
                     else
-                        task
+                        let
+                            task : Cmd Msg
+                            task =
+                                createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
+                        in
+                        if model.orderPhysicalCard then
+                            case model.addressIsValid of
+                                Just True ->
+                                    if validateModel model == Valid then
+                                        task
+
+                                    else
+                                        Cmd.none
+
+                                Just False ->
+                                    Cmd.none
+
+                                Nothing ->
+                                    if checkCampusAddress model /= NotCampusAddress then
+                                        task
+
+                                    else
+                                        Cmd.none
+
+                        else
+                            task
 
                 Err _ ->
                     Cmd.none
@@ -1312,15 +1305,15 @@ renderForm model =
         physicalCardEstimatedDeliveryDate : String
         physicalCardEstimatedDeliveryDate =
             formatTime model.zone
-                (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))) of
+                (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24))) of
                     Sat ->
-                        millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24 * 1))
+                        millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24))
 
                     Sun ->
-                        millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24 * 1))
+                        millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24))
 
                     _ ->
-                        millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24 * 1))
+                        millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24))
                 )
     in
     [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
@@ -1483,7 +1476,7 @@ renderForm model =
                         , ( "is-invalid", model.showValidation && not (isValid managerValidationResult) )
                         ]
                     ]
-                    ([ option
+                    (option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
@@ -1506,8 +1499,7 @@ renderForm model =
                         , style "display" "none"
                         ]
                         [ text "Select your manager..." ]
-                     ]
-                        ++ (if model.showAdvancedOptions then
+                        :: (if model.showAdvancedOptions then
                                 List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
 
                             else
@@ -1534,12 +1526,12 @@ renderForm model =
                         , ( "is-invalid", model.showValidation && not (isValid departmentValidationResult) )
                         ]
                     ]
-                    ([ option
+                    (option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
                             (case model.rampDepartmentId of
-                                Just rampDepartmentId ->
+                                Just _ ->
                                     False
 
                                 Nothing ->
@@ -1548,8 +1540,7 @@ renderForm model =
                         , style "display" "none"
                         ]
                         [ text "Select your department..." ]
-                     ]
-                        ++ List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
+                        :: List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText departmentValidationResult) ]
@@ -1576,12 +1567,12 @@ renderForm model =
                         , ( "is-invalid", model.showValidation && not (isValid locationValidationResult) )
                         ]
                     ]
-                    ([ option
+                    (option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
                             (case model.rampLocationId of
-                                Just rampLocationId ->
+                                Just _ ->
                                     False
 
                                 Nothing ->
@@ -1590,8 +1581,7 @@ renderForm model =
                         , style "display" "none"
                         ]
                         [ text "Select your location..." ]
-                     ]
-                        ++ List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
+                        :: List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText locationValidationResult) ]
@@ -1618,12 +1608,12 @@ renderForm model =
                         , ( "is-invalid", model.showValidation && not (isValid roleValidationResult) )
                         ]
                     ]
-                    ([ option
+                    (option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
                             (case model.rampRoleId of
-                                Just rampRoleId ->
+                                Just _ ->
                                     False
 
                                 Nothing ->
@@ -1632,8 +1622,7 @@ renderForm model =
                         , style "display" "none"
                         ]
                         [ text "Select your role..." ]
-                     ]
-                        ++ List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
+                        :: List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText roleValidationResult) ]
@@ -1770,7 +1759,7 @@ renderForm model =
                         ]
                     , on "change" (Json.Decode.map StateInput targetValue)
                     ]
-                    ([ option
+                    (option
                         [ Html.Attributes.value ""
                         , disabled True
                         , selected
@@ -1784,8 +1773,7 @@ renderForm model =
                         , style "display" "none"
                         ]
                         [ text "Select..." ]
-                     ]
-                        ++ List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
+                        :: List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
                     )
                 , div [ class "invalid-feedback" ]
                     [ text (feedbackText stateValidationResult) ]
@@ -2006,7 +1994,7 @@ validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedMa
     if usingRampManagerOptions then
         case selectedManagerRampId of
             Just managerId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId managerRampOptions)).enabled == True then
+                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId managerRampOptions)).enabled then
                     Valid
 
                 else
@@ -2143,7 +2131,7 @@ validateRampObject : String -> Maybe String -> Dict String RampObject -> Validat
 validateRampObject objectName selectedObject objectOptions =
     case selectedObject of
         Just selectedObjectId ->
-            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled == True then
+            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled then
                 Valid
 
             else
@@ -2829,21 +2817,16 @@ blankString value =
 
 showOneTap : Model -> Bool
 showOneTap model =
-    case model.emailVerified of
-        True ->
-            False
+    if model.emailVerified then
+        False
 
-        False ->
-            case Dict.get (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName of
-                Just providerName ->
-                    if providerName == "Google" then
-                        True
+    else
+        case Dict.get (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName of
+            Just providerName ->
+                providerName == "Google"
 
-                    else
-                        False
-
-                Nothing ->
-                    False
+            Nothing ->
+                False
 
 
 formatTime : Zone -> Posix -> String
@@ -2923,7 +2906,7 @@ sortByRampRoleRankOrder first second =
 
 
 labelMatches : Maybe String -> String -> RampObject -> Bool
-labelMatches maybeGivenLabel rampId rampObject =
+labelMatches maybeGivenLabel _ rampObject =
     case maybeGivenLabel of
         Just givenLabel ->
             givenLabel == rampObject.label
