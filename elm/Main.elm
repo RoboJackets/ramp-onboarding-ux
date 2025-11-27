@@ -323,11 +323,11 @@ type alias GoogleAddressValidation =
 
 
 type alias TaskId =
-    { taskId : Maybe String }
+    { taskId : String }
 
 
 type alias TaskStatus =
-    { taskStatus : Maybe String }
+    { taskStatus : String }
 
 
 type alias RampObject =
@@ -956,18 +956,14 @@ update msg model =
                 | createRampAccountTaskId =
                     case result of
                         Ok createRampAccountTaskId ->
-                            createRampAccountTaskId.taskId
+                            Just createRampAccountTaskId.taskId
 
                         Err _ ->
                             Nothing
                 , formState =
                     case result of
-                        Ok createRampAccountTaskId ->
-                            if createRampAccountTaskId.taskId == Nothing then
-                                Error
-
-                            else
-                                CreatingRampAccount
+                        Ok _ ->
+                            CreatingRampAccount
 
                         Err _ ->
                             Error
@@ -975,12 +971,7 @@ update msg model =
               }
             , case result of
                 Ok createRampAccountTaskId ->
-                    case createRampAccountTaskId.taskId of
-                        Just taskId ->
-                            getRampAccountTaskStatus taskId
-
-                        Nothing ->
-                            Cmd.none
+                    getRampAccountTaskStatus createRampAccountTaskId.taskId
 
                 Err _ ->
                     Cmd.none
@@ -992,13 +983,13 @@ update msg model =
                     case result of
                         Ok createRampAccountTaskStatus ->
                             case createRampAccountTaskStatus.taskStatus of
-                                Just "SUCCESS" ->
+                                "SUCCESS" ->
                                     OrderingPhysicalCard
 
-                                Just "STARTED" ->
+                                "STARTED" ->
                                     CreatingRampAccount
 
-                                Just "IN_PROGRESS" ->
+                                "IN_PROGRESS" ->
                                     CreatingRampAccount
 
                                 _ ->
@@ -1011,7 +1002,7 @@ update msg model =
             , case result of
                 Ok createRampAccountTaskStatus ->
                     case createRampAccountTaskStatus.taskStatus of
-                        Just "SUCCESS" ->
+                        "SUCCESS" ->
                             if model.orderPhysicalCard then
                                 Http.post
                                     { url =
@@ -1043,10 +1034,10 @@ update msg model =
                             else
                                 Nav.load model.rampSingleSignOnUri
 
-                        Just "STARTED" ->
+                        "STARTED" ->
                             getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
 
-                        Just "IN_PROGRESS" ->
+                        "IN_PROGRESS" ->
                             getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
 
                         _ ->
@@ -1061,18 +1052,14 @@ update msg model =
                 | orderPhysicalCardTaskId =
                     case result of
                         Ok orderPhysicalCardTaskId ->
-                            orderPhysicalCardTaskId.taskId
+                            Just orderPhysicalCardTaskId.taskId
 
                         Err _ ->
                             Nothing
                 , formState =
                     case result of
-                        Ok orderPhysicalCardTaskId ->
-                            if orderPhysicalCardTaskId.taskId == Nothing then
-                                Error
-
-                            else
-                                OrderingPhysicalCard
+                        Ok _ ->
+                            OrderingPhysicalCard
 
                         Err _ ->
                             Error
@@ -1080,12 +1067,7 @@ update msg model =
               }
             , case result of
                 Ok orderPhysicalCardTaskId ->
-                    case orderPhysicalCardTaskId.taskId of
-                        Just taskId ->
-                            getPhysicalCardTaskStatus taskId
-
-                        Nothing ->
-                            Cmd.none
+                    getPhysicalCardTaskStatus orderPhysicalCardTaskId.taskId
 
                 Err _ ->
                     Cmd.none
@@ -1097,13 +1079,13 @@ update msg model =
                     case result of
                         Ok orderPhysicalCardTaskStatus ->
                             case orderPhysicalCardTaskStatus.taskStatus of
-                                Just "SUCCESS" ->
+                                "SUCCESS" ->
                                     ProvisioningComplete
 
-                                Just "STARTED" ->
+                                "STARTED" ->
                                     OrderingPhysicalCard
 
-                                Just "IN_PROGRESS" ->
+                                "IN_PROGRESS" ->
                                     OrderingPhysicalCard
 
                                 _ ->
@@ -1116,13 +1098,13 @@ update msg model =
             , case result of
                 Ok orderPhysicalCardTaskStatus ->
                     case orderPhysicalCardTaskStatus.taskStatus of
-                        Just "SUCCESS" ->
+                        "SUCCESS" ->
                             Nav.load model.rampSingleSignOnUri
 
-                        Just "STARTED" ->
+                        "STARTED" ->
                             getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
 
-                        Just "IN_PROGRESS" ->
+                        "IN_PROGRESS" ->
                             getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
 
                         _ ->
@@ -2457,13 +2439,13 @@ rampObjectDecoder =
 createTaskResponseDecoder : Decoder TaskId
 createTaskResponseDecoder =
     Json.Decode.map TaskId
-        (maybe (at [ "taskId" ] Json.Decode.string))
+        (at [ "taskId" ] Json.Decode.string)
 
 
 getTaskResponseDecoder : Decoder TaskStatus
 getTaskResponseDecoder =
     Json.Decode.map TaskStatus
-        (maybe (at [ "taskStatus" ] Json.Decode.string))
+        (at [ "taskStatus" ] Json.Decode.string)
 
 
 createRampAccountTask : Model -> Cmd Msg
