@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
-from authlib.integrations.flask_client import OAuth
+from authlib.integrations.flask_client import OAuth  # type: ignore
 from authlib.integrations.requests_client import OAuth2Session
 
 from celery import Celery, Task, shared_task
@@ -2263,7 +2263,7 @@ def handle_invitation_delivery(invitation_url: str) -> None:
     ramp_users_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users",
         params={
-            "email": query_string["email"][0],  # type: ignore
+            "email": query_string["email"][0],
             "page_size": 100,
         },
         timeout=(5, 5),
