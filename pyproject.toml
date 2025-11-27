@@ -29,6 +29,7 @@ pylint = "4.0.3"
 types-requests = "^2.28.11.7"
 types-ldap3 = "^2.9.13.3"
 celery-types = "0.23.0"
+types-authlib = "^1.6.5.20251005"
 
 [build-system]
 requires = ["poetry-core"]
