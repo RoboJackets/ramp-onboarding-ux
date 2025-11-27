@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
-from authlib.integrations.flask_client import OAuth  # type: ignore
+from authlib.integrations.flask_client import OAuth
 from authlib.integrations.requests_client import OAuth2Session
 
 from celery import Celery, Task, shared_task
@@ -128,18 +128,18 @@ app.config.from_prefixed_env()
 
 celery_app = init_celery(app)
 
-oauth = OAuth(app)
-oauth.register(
+oauth = OAuth(app)  # type: ignore
+oauth.register(  # type: ignore
     name="keycloak",
     server_metadata_url=app.config["KEYCLOAK_METADATA_URL"],
     client_kwargs={"scope": "openid email profile"},
 )
-oauth.register(
+oauth.register(  # type: ignore
     name="google",
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email"},
 )
-oauth.register(
+oauth.register(  # type: ignore
     name="microsoft",
     server_metadata_url=app.config["MICROSOFT_METADATA_URL"],
     client_kwargs={"scope": "openid email"},
