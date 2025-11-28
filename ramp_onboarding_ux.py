@@ -1214,7 +1214,7 @@ def index() -> Any:
                 slack_support_channel_name=get_slack_channel_name(
                     app.config["SLACK_SUPPORT_CHANNEL"]
                 ),
-            )
+            ), 424
 
         if ramp_user_response.json()["status"] == "USER_ACTIVE":
             return render_template(
@@ -1246,7 +1246,7 @@ def index() -> Any:
                 slack_support_channel_name=get_slack_channel_name(
                     app.config["SLACK_SUPPORT_CHANNEL"]
                 ),
-            )
+            ), 423
 
         if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
             return render_template(
@@ -1278,7 +1278,7 @@ def index() -> Any:
                 slack_support_channel_name=get_slack_channel_name(
                     app.config["SLACK_SUPPORT_CHANNEL"]
                 ),
-            )
+            ), 423
 
         raise InternalServerError(
             "Unrecognized user status " + ramp_user_response.json()["status"] + " in Ramp"
@@ -1291,7 +1291,7 @@ def index() -> Any:
             slack_team_id=get_slack_team_id(),
             slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
             slack_support_channel_name=get_slack_channel_name(app.config["SLACK_SUPPORT_CHANNEL"]),
-        )
+        ), 424
 
     if session["is_student"]:
         default_department = app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
@@ -1941,7 +1941,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
 
 
 @app.post("/create-ramp-account")
-def create_ramp_account() -> Dict[str, str]:
+def create_ramp_account() -> tuple[dict[str, Any], int]:
     """
     Creates a new Ramp account and returns the task status for the browser to poll
     """
@@ -2028,7 +2028,7 @@ def create_ramp_account() -> Dict[str, str]:
 
     return {
         "taskId": ramp_invite_user_response.json()["id"],
-    }
+    }, 202
 
 
 @app.get("/create-ramp-account/<task_id>")
@@ -2056,7 +2056,7 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
 
 
 @app.post("/order-physical-card")
-def order_physical_card() -> Dict[str, str]:
+def order_physical_card() -> tuple[dict[str, Any], int]:
     """
     Order a physical card for the logged-in user
     """
@@ -2111,7 +2111,7 @@ def order_physical_card() -> Dict[str, str]:
 
     return {
         "taskId": ramp_order_physical_card_response.json()["id"],
-    }
+    }, 202
 
 
 @app.get("/order-physical-card/<task_id>")
