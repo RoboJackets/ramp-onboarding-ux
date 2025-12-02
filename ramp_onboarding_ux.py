@@ -154,7 +154,7 @@ for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
 ramp = OAuth2Session(
     client_id=app.config["RAMP_CLIENT_ID"],
     client_secret=app.config["RAMP_CLIENT_SECRET"],
-    scope="users:read users:write cards:read cards:write departments:read locations:read business:read",  # noqa
+    scope="users:read users:write cards:read cards:write departments:read locations:read business:read",  # noqa: E501
     token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
 )
 ramp.fetch_token()
@@ -461,7 +461,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         search_keycloak_user_response.raise_for_status()
 
         if len(search_keycloak_user_response.json()) == 1:
-            return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])  # type: ignore  # noqa
+            return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])  # type: ignore  # noqa: E501
 
         if len(search_keycloak_user_response.json()) == 0:
             search_keycloak_user_response = keycloak.get(
@@ -701,7 +701,7 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
                         + get_keycloak_user_response.json()["firstName"]
                         + " eligibility for a Ramp account in Keycloak? If "
                         + personal_pronoun_is
-                        + " in a leadership role, an admin should likely assign a role within Apiary instead.",  # noqa
+                        + " in a leadership role, an admin should likely assign a role within Apiary instead.",  # noqa: E501
                         confirm="Grant Eligibility",
                         deny="Cancel",
                     ),
@@ -1029,7 +1029,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                 RichTextSectionElement(
                     elements=[
                         RichTextElementParts.Link(
-                            url="https://support.ramp.com/hc/en-us/articles/360042582834-Activating-a-physical-card",  # noqa
+                            url="https://support.ramp.com/hc/en-us/articles/360042582834-Activating-a-physical-card",  # noqa: E501
                             text="Activate your physical card",
                         ),
                         RichTextElementParts.Text(text=" when it arrives"),
@@ -1079,7 +1079,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                         ),
                                         RichTextElementParts.Text(text=" or "),
                                         RichTextElementParts.Link(
-                                            url="https://play.google.com/store/apps/details?id=com.ramp.android.app",  # noqa
+                                            url="https://play.google.com/store/apps/details?id=com.ramp.android.app",  # noqa: E501
                                             text="Android",
                                         ),
                                     ]
@@ -1090,7 +1090,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                     ]
                 ),
                 SectionBlock(
-                    text="You can also review the onboarding guide in the <https://support.ramp.com/hc/en-us/sections/4601540746387-Employees|Ramp help center>, <https://ramp.com/training/employee-manager-training-webinar|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa
+                    text="You can also review the onboarding guide in the <https://support.ramp.com/hc/en-us/sections/4601540746387-Employees|Ramp help center>, <https://ramp.com/training/employee-manager-training-webinar|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa: E501
                 ),
                 SectionBlock(
                     text="If you have questions, or need help with anything, please post in <#"
@@ -1919,7 +1919,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
 
     manager_needs_ramp_account = (
         apiary_user_response.json()["user"]["first_name"]
-        + f" doesn't have a Ramp account yet. Ask {object_pronoun} to set up {possessive_pronoun} own account first."  # noqa
+        + f" doesn't have a Ramp account yet. Ask {object_pronoun} to set up {possessive_pronoun} own account first."  # noqa: E501
     )
 
     if len(keycloak_user_response.json()) == 0:
@@ -1948,7 +1948,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
         return {
             "error": apiary_user_response.json()["user"]["first_name"]
-            + f" hasn't finished setting up {possessive_pronoun} Ramp account yet. Ask {object_pronoun} to finish setting up {possessive_pronoun} own account first."  # noqa
+            + f" hasn't finished setting up {possessive_pronoun} Ramp account yet. Ask {object_pronoun} to finish setting up {possessive_pronoun} own account first."  # noqa: E501
         }
 
     return {"error": "Unrecognized manager account status in Ramp"}
@@ -1974,13 +1974,21 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     if not session["email_verified"]:
         raise BadRequest("Email address must be verified")
 
-    if request.json["role"] not in ["BUSINESS_USER", "BUSINESS_BOOKKEEPER", "IT_ADMIN", "BUSINESS_ADMIN"]:  # type: ignore  # noqa
+    if request.json["role"] not in [
+        "BUSINESS_USER",
+        "BUSINESS_BOOKKEEPER",
+        "IT_ADMIN",
+        "BUSINESS_ADMIN",
+    ]:
         raise BadRequest("Invalid role")
 
-    if request.json["role"] == "BUSINESS_ADMIN" and session["can_request_business_admin"] is not True:  # type: ignore  # noqa
+    if (
+        request.json["role"] == "BUSINESS_ADMIN"
+        and session["can_request_business_admin"] is not True
+    ):
         raise Unauthorized("Invalid role")
 
-    if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:  # type: ignore  # noqa
+    if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:
         raise Unauthorized("Invalid role")
 
     get_keycloak_user_response = keycloak.get(
@@ -2005,8 +2013,8 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     else:
         new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
 
-    new_user["firstName"] = request.json["firstName"].strip()  # type: ignore
-    new_user["lastName"] = request.json["lastName"].strip()  # type: ignore
+    new_user["firstName"] = request.json["firstName"].strip()
+    new_user["lastName"] = request.json["lastName"].strip()
 
     keycloak_user_response = keycloak.put(
         url=app.config["KEYCLOAK_SERVER"]
@@ -2020,18 +2028,18 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     keycloak_user_response.raise_for_status()
 
     request_body = {
-        "department_id": request.json["departmentId"].strip(),  # type: ignore
+        "department_id": request.json["departmentId"].strip(),
         "email": session["email_address"],
-        "first_name": request.json["firstName"].strip(),  # type: ignore
+        "first_name": request.json["firstName"].strip(),
         "idempotency_key": uuid4().hex,
-        "last_name": request.json["lastName"].strip(),  # type: ignore
-        "location_id": request.json["locationId"].strip(),  # type: ignore
-        "role": request.json["role"].strip(),  # type: ignore
+        "last_name": request.json["lastName"].strip(),
+        "location_id": request.json["locationId"].strip(),
+        "role": request.json["role"].strip(),
     }
 
     # Ramp doesn't allow setting a manager for admins via API
-    if request.json["role"] != "BUSINESS_ADMIN":  # type: ignore
-        request_body["direct_manager_id"] = request.json["directManagerId"].strip()  # type: ignore
+    if request.json["role"] != "BUSINESS_ADMIN":
+        request_body["direct_manager_id"] = request.json["directManagerId"].strip()
 
     ramp_invite_user_response = ramp.post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
@@ -2096,18 +2104,18 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
             "fulfillment": {
                 "shipping": {
                     "recipient_address": {
-                        "address1": request.json["addressLineOne"].strip(),  # type: ignore
+                        "address1": request.json["addressLineOne"].strip(),
                         "address2": (
-                            request.json["addressLineTwo"].strip()  # type: ignore
-                            if request.json["addressLineTwo"].strip() != ""  # type: ignore
+                            request.json["addressLineTwo"].strip()
+                            if request.json["addressLineTwo"].strip() != ""
                             else None
                         ),
-                        "city": request.json["city"].strip(),  # type: ignore
+                        "city": request.json["city"].strip(),
                         "country": "US",
-                        "first_name": request.json["firstName"].strip(),  # type: ignore
-                        "last_name": request.json["lastName"].strip(),  # type: ignore
-                        "postal_code": request.json["zip"].strip(),  # type: ignore
-                        "state": request.json["state"].strip(),  # type: ignore
+                        "first_name": request.json["firstName"].strip(),
+                        "last_name": request.json["lastName"].strip(),
+                        "postal_code": request.json["zip"].strip(),
+                        "state": request.json["state"].strip(),
                     }
                 }
             },
@@ -2334,12 +2342,12 @@ def handle_postmark_inbound_event() -> Any:
     ):
         raise Unauthorized("authorization does not match")
 
-    if "TextBody" not in request.json or request.json["TextBody"] is None:  # type: ignore
+    if "TextBody" not in request.json or request.json["TextBody"] is None:
         raise BadRequest("missing TextBody")
 
     results = search(
         r"\[(?P<invitation_url>https://[a-z]+\.ramp\.com/invite-sign-up.+)\]",
-        request.json["TextBody"],  # type: ignore
+        request.json["TextBody"],
     )
 
     if results is None:
