@@ -847,10 +847,10 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                             (
                                 "https",
                                 app.config["RAMP_UI_HOSTNAME"],
-                                "/people/all/" + new_ramp_user_response.json()["id"],
+                                "/people/all",
                                 "",
                                 "",
-                                "",
+                                "/d/user/" + new_ramp_user_response.json()["id"],
                             )
                         ),
                     )
@@ -956,10 +956,10 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                 (
                                     "https",
                                     app.config["RAMP_UI_HOSTNAME"],
-                                    "/people/all/" + new_ramp_user_response.json()["id"],
+                                    "/people/all",
                                     "",
                                     "",
-                                    "",
+                                    "/d/user/" + new_ramp_user_response.json()["id"],
                                 )
                             ),
                         )
