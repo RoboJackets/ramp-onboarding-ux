@@ -251,6 +251,8 @@ job "ramp-onboarding-ux" {
           "worker",
           "--loglevel",
           "DEBUG",
+          "--pool",
+          "solo",
         ]
       }
 
