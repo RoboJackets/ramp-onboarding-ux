@@ -31,7 +31,7 @@ from google.oauth2 import id_token
 
 from ldap3 import Connection, Server
 
-from requests import get, post
+from requests import post
 
 import sentry_sdk
 from sentry_sdk import set_user
@@ -167,6 +167,13 @@ keycloak = OAuth2Session(
 )
 keycloak.fetch_token()
 
+apiary = OAuth2Session(
+    client_id=app.config["APIARY_CLIENT_ID"],
+    client_secret=app.config["APIARY_CLIENT_SECRET"],
+    token_endpoint=app.config["APIARY_URL"] + "/oauth/token",
+)
+apiary.fetch_token()
+
 cache = Cache(app)
 cache.clear()
 
@@ -196,10 +203,9 @@ def get_apiary_managers() -> Dict[int, str]:
     """
     Get the list of managers from Apiary
     """
-    apiary_managers_response = get(
+    apiary_managers_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"] + "/api/v1/users/managers",
         headers={
-            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
             "Accept": "application/json",
         },
         timeout=(5, 5),
@@ -380,10 +386,9 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                 return slack_user_id  # type: ignore
 
         if "username" in keycloak_user and keycloak_user["username"] is not None:
-            apiary_user_response = get(
+            apiary_user_response = apiary.get(  # type: ignore
                 url=app.config["APIARY_URL"] + "/api/v1/users/" + keycloak_user["username"],
                 headers={
-                    "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
                     "Accept": "application/json",
                 },
                 timeout=(5, 5),
@@ -657,12 +662,11 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
         ),
     )
 
-    apiary_user_response = get(
+    apiary_user_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"]
         + "/api/v1/users/"
         + get_keycloak_user_response.json()["username"],
         headers={
-            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
             "Accept": "application/json",
         },
         timeout=(5, 5),
@@ -871,12 +875,11 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     )
     get_keycloak_user_response.raise_for_status()
 
-    apiary_user_response = get(
+    apiary_user_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"]
         + "/api/v1/users/"
         + get_keycloak_user_response.json()["username"],
         headers={
-            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
             "Accept": "application/json",
         },
         timeout=(5, 5),
@@ -1472,10 +1475,9 @@ def login() -> Any:
         session["user_state"] = "ineligible"
 
     if session["user_state"] == "ineligible" or session["user_state"] == "eligible":
-        apiary_user_response = get(
+        apiary_user_response = apiary.get(  # type: ignore
             url=app.config["APIARY_URL"] + "/api/v1/users/" + username,
             headers={
-                "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
                 "Accept": "application/json",
                 "x-cache-bypass": "bypass",
             },
@@ -1880,10 +1882,9 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
         }
     )
 
-    apiary_user_response = get(
+    apiary_user_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"] + "/api/v1/users/" + apiary_id,
         headers={
-            "Authorization": "Bearer " + app.config["APIARY_TOKEN"],
             "Accept": "application/json",
         },
         timeout=(5, 5),
