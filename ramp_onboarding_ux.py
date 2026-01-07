@@ -1826,7 +1826,7 @@ def verify_google_onetap() -> Response:
     )
 
     userinfo = id_token.verify_oauth2_token(  # type: ignore
-        request.form["credential"], requests.Request(), app.config["GOOGLE_CLIENT_ID"]  # type: ignore  # noqa: E501
+        request.form["credential"], requests.Request(), app.config["GOOGLE_CLIENT_ID"]
     )
 
     if userinfo["hd"] != "robojackets.org":
