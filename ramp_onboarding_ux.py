@@ -3,6 +3,7 @@ Overengineered web form to facilitate onboarding users to Ramp
 """
 
 import logging
+import os
 from base64 import b64encode
 from collections import defaultdict
 from csv import DictReader
@@ -56,6 +57,9 @@ from slack_sdk.models.blocks.block_elements import RichTextElementParts
 from slack_sdk.signature import SignatureVerifier
 
 from werkzeug.exceptions import BadRequest, InternalServerError, Unauthorized
+
+
+USER_AGENT = "RampOnboarding/" + os.environ.get("NOMAD_SHORT_ALLOC_ID", "local")
 
 
 ROLE_LABELS = {
@@ -157,6 +161,7 @@ ramp = OAuth2Session(
     scope="users:read users:write cards:read cards:write departments:read locations:read business:read",  # noqa: E501
     token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
 )
+ramp.headers["User-Agent"] = USER_AGENT  # type: ignore
 ramp.fetch_token()
 
 keycloak = OAuth2Session(
@@ -165,6 +170,7 @@ keycloak = OAuth2Session(
     token_endpoint=app.config["KEYCLOAK_SERVER"] + "/realms/master/protocol/openid-connect/token",
     leeway=5,
 )
+keycloak.headers["User-Agent"] = USER_AGENT  # type: ignore
 keycloak.fetch_token()
 
 apiary = OAuth2Session(
@@ -172,6 +178,7 @@ apiary = OAuth2Session(
     client_secret=app.config["APIARY_CLIENT_SECRET"],
     token_endpoint=app.config["APIARY_URL"] + "/oauth/token",
 )
+apiary.headers["User-Agent"] = USER_AGENT  # type: ignore
 apiary.fetch_token()
 
 cache = Cache(app)
@@ -568,6 +575,7 @@ def import_user_to_org_chart(ramp_user_id: str) -> None:
         headers={
             "Accept": "application/json",
             "Authorization": "Token " + app.config["ORG_CHART_TOKEN"],
+            "User-Agent": USER_AGENT,
         },
         timeout=(5, 5),
         json={"ramp_user_id": ramp_user_id},
@@ -1594,6 +1602,9 @@ def login() -> Any:
             address_validation_response = post(
                 url="https://addressvalidation.googleapis.com/v1:validateAddress",
                 params={"key": app.config["GOOGLE_MAPS_BACKEND_API_KEY"]},
+                headers={
+                    "User-Agent": USER_AGENT,
+                },
                 json={
                     "address": {
                         "regionCode": "US",
