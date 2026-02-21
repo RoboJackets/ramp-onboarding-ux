@@ -8,6 +8,11 @@ variable "hostname" {
   description = "The hostname for this instance of the service"
 }
 
+variable "priority" {
+  type = number
+  description = "The priority for this job"
+}
+
 locals {
   # compressed in this context refers to the config string itself, not the assets
   compressed_nginx_configuration = trimspace(

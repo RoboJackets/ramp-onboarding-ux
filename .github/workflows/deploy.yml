@@ -56,4 +56,4 @@ jobs:
           NOMAD_ADDR: https://nomad.bcdc.robojackets.net
         working-directory: ./.nomad/
         run: |
-          nomad run -var image=registry.bcdc.robojackets.net/ramp-onboarding-ux@${{ inputs.image-digest }} -var hostname=${{ inputs.environment == 'test' && 'ramp-onboarding-ux-test.bcdc.robojackets.net' || (inputs.environment == 'production' && 'ramp.robojackets.org' || 'https://robojackets.org') }} ramp-onboarding-ux.nomad
+          nomad run -var image=registry.bcdc.robojackets.net/ramp-onboarding-ux@${{ inputs.image-digest }} -var hostname=${{ inputs.environment == 'test' && 'ramp-onboarding-ux-test.bcdc.robojackets.net' || (inputs.environment == 'production' && 'ramp.robojackets.org' || 'https://robojackets.org') }} -var priority=${{ inputs.environment == 'test' && '10' || (inputs.environment == 'production' && '40' || '1') }} ramp-onboarding-ux.nomad
