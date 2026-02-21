@@ -66,6 +66,8 @@ job "ramp-onboarding-ux" {
 
   type = "service"
 
+  priority = var.priority
+
   group "ramp-onboarding-ux" {
     network {
       port "http" {}
