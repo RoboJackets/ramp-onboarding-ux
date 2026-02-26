@@ -27,6 +27,8 @@ from flask.helpers import get_debug_flag
 
 from flask_caching import Cache
 
+from flask_minify import Minify  # type: ignore
+
 from google.auth.transport import requests
 from google.oauth2 import id_token
 
@@ -127,6 +129,9 @@ sentry_sdk.init(
 )
 
 app = Flask(__name__)
+
+Minify(app=app, caching_limit=0, go=False)
+
 app.config.from_prefixed_env()
 
 celery_app = init_celery(app)
