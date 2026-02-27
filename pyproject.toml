@@ -18,7 +18,7 @@ google-auth = "2.48.0"
 flask-caching = "2.3.1"
 celery = {extras = ["redis"], version = "5.6.2"}
 slack-sdk = "3.40.1"
-flask-minify = "^0.50"
+flask-minify = "0.50"
 
 [tool.poetry.group.dev.dependencies]
 black = "26.1.0"
