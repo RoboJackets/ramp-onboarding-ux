@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
+from authlib.integrations.base_client import OAuthError
 from authlib.integrations.flask_client import OAuth
 from authlib.integrations.requests_client import OAuth2Session
 
@@ -1854,7 +1855,7 @@ def verify_google_onetap() -> Response:
 
 
 @app.get("/verify-email/microsoft/complete")
-def verify_microsoft_complete() -> Response:
+def verify_microsoft_complete() -> Any:
     """
     Handles the return from Microsoft and updates session appropriately
     """
@@ -1869,14 +1870,29 @@ def verify_microsoft_complete() -> Response:
             "ip_address": request.remote_addr,
         }
     )
-    token = oauth.microsoft.authorize_access_token()
 
-    userinfo = token["userinfo"]
+    try:
+        token = oauth.microsoft.authorize_access_token()
 
-    session["email_address"] = userinfo["email"]
-    session["email_verified"] = True
+        userinfo = token["userinfo"]
 
-    return redirect(url_for("index"))  # type: ignore
+        session["email_address"] = userinfo["email"]
+        session["email_verified"] = True
+
+        return redirect(url_for("index"))
+
+    except OAuthError:
+        return (
+            render_template(
+                "email_verification_unavailable.html",
+                slack_team_id=get_slack_team_id(),
+                slack_support_channel_id=app.config["SLACK_TECHNICAL_SUPPORT_CHANNEL"],
+                slack_support_channel_name=get_slack_channel_name(
+                    app.config["SLACK_TECHNICAL_SUPPORT_CHANNEL"]
+                ),
+            ),
+            500,
+        )
 
 
 @app.get("/get-ramp-user/<apiary_id>")
