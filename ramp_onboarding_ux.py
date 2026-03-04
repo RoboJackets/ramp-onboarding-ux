@@ -1227,9 +1227,9 @@ def index() -> Any:
                 render_template(
                     "sso_mismatch.html",
                     slack_team_id=get_slack_team_id(),
-                    slack_support_channel_id=app.config["SLACK_SUPPORT_CHANNEL"],
+                    slack_support_channel_id=app.config["SLACK_TECHNICAL_SUPPORT_CHANNEL"],
                     slack_support_channel_name=get_slack_channel_name(
-                        app.config["SLACK_SUPPORT_CHANNEL"]
+                        app.config["SLACK_TECHNICAL_SUPPORT_CHANNEL"]
                     ),
                 ),
                 424,
