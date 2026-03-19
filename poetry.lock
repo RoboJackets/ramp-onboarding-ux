@@ -1859,14 +1859,14 @@ cryptography = "*"
 
 [[package]]
 name = "types-ldap3"
-version = "2.9.13.20251121"
+version = "2.9.13.20260319"
 description = "Typing stubs for ldap3"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "types_ldap3-2.9.13.20251121-py3-none-any.whl", hash = "sha256:20356bf413cb178898f5b171463b44b82044b8b69f9331e09950009cfef05e48"},
-    {file = "types_ldap3-2.9.13.20251121.tar.gz", hash = "sha256:58f1a63ab56c6e47102035682ec1acf1b127467ae2f52a916f40a6aca852e5a5"},
+    {file = "types_ldap3-2.9.13.20260319-py3-none-any.whl", hash = "sha256:0bf76f060a8f84b2d305115e3d2e9db2b44005770ec9bd3a3f7995b8840c1566"},
+    {file = "types_ldap3-2.9.13.20260319.tar.gz", hash = "sha256:21750db87cb0c91803fb7831be714ab6961a493206cf360640182e28bb84947b"},
 ]
 
 [package.dependencies]
@@ -1874,14 +1874,14 @@ types-pyasn1 = "*"
 
 [[package]]
 name = "types-pyasn1"
-version = "0.6.0.20250914"
+version = "0.6.0.20260319"
 description = "Typing stubs for pyasn1"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["dev"]
 files = [
-    {file = "types_pyasn1-0.6.0.20250914-py3-none-any.whl", hash = "sha256:68ffeef3c28e1ed120b8b81a242f238f137543e68d466d84a97edcf3e4203b5b"},
-    {file = "types_pyasn1-0.6.0.20250914.tar.gz", hash = "sha256:236102553b76c938953037b7ae93d11d395d9413b7f2f8083d3b19d740f7eda6"},
+    {file = "types_pyasn1-0.6.0.20260319-py3-none-any.whl", hash = "sha256:aed73fcb43befd7d376e8bd82ecb825444a954e8458dd097b51bf52b14c4de27"},
+    {file = "types_pyasn1-0.6.0.20260319.tar.gz", hash = "sha256:77050bd44a143ffe90aa406dcb683d0cc4a43d83d2b11a94fac8e7937070ef89"},
 ]
 
 [[package]]
