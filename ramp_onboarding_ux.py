@@ -246,9 +246,16 @@ def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     departments = {}
 
     for department in ramp_departments_response.json()["data"]:
+        label = department["label"]
+        enabled = department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"]
+
+        if department["name"].startswith("[Advisor Console] "):
+            label = department["name"].replace("[Advisor Console] ", "")
+            enabled = False
+
         departments[department["id"]] = {
-            "label": department["name"],
-            "enabled": department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+            "label": label,
+            "enabled": enabled,
         }
 
     return departments
