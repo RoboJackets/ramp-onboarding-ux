@@ -66,7 +66,7 @@ USER_AGENT = "RampOnboarding/" + os.environ.get("NOMAD_SHORT_ALLOC_ID", "local")
 
 ROLE_LABELS = {
     "BUSINESS_USER": "Employee",
-    "BUSINESS_BOOKKEEPER": "Bookkeeper",
+    "BUSINESS_BOOKKEEPER": "Accounting",
     "BUSINESS_ADMIN": "Admin",
     "IT_ADMIN": "IT admin",
 }
@@ -1392,7 +1392,7 @@ def index() -> Any:
                     "enabled": True,
                 },
                 "BUSINESS_BOOKKEEPER": {
-                    "label": "Bookkeeper",
+                    "label": "Accounting",
                     "enabled": True,
                 },
                 "BUSINESS_ADMIN": {

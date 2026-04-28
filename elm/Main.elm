@@ -1621,7 +1621,7 @@ renderForm model =
                      , text ". Technology staff that need to manage users within Ramp should select "
                      , strong [] [ text "IT admin" ]
                      , text ". Members that need to view all activity within Ramp should select "
-                     , strong [] [ text "Bookkeeper" ]
+                     , strong [] [ text "Accounting" ]
                      , text ". All other members should select "
                      , strong [] [ text "Employee" ]
                      , text ". Read more about roles in the "
