@@ -773,7 +773,13 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
     cache.set("slack_ineligible_message_" + keycloak_user_id, slack_response["ts"])
 
 
-@shared_task
+@shared_task(
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
 def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> None:
     """
     Send Slack notifications to the central notifications channel, manager, and new member, when
