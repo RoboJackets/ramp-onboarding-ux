@@ -1505,7 +1505,6 @@ def login() -> Any:
             url=app.config["APIARY_URL"] + "/api/v1/users/" + username,
             headers={
                 "Accept": "application/json",
-                "x-cache-bypass": "bypass",
             },
             params={"include": "roles,teams,assignments.travel"},
             timeout=(5, 5),
