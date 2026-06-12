@@ -859,14 +859,14 @@ go = ["tdewolff-minify (>=2.20.34) ; platform_system == \"Linux\""]
 
 [[package]]
 name = "google-auth"
-version = "2.53.0"
+version = "2.54.0"
 description = "Google Authentication Library"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "google_auth-2.53.0-py3-none-any.whl", hash = "sha256:6e7449917c599b35126a99ec268ec6880301f2fea41dce198fe8fd83ff642b68"},
-    {file = "google_auth-2.53.0.tar.gz", hash = "sha256:e7e6aa16f6bee7b2b264830fd04f08087a1d5a836df516251a5d15327b246c9c"},
+    {file = "google_auth-2.54.0-py3-none-any.whl", hash = "sha256:784e9837f92244141250470d47c893df50cbab485ce491aca5e9deb558ad2b48"},
+    {file = "google_auth-2.54.0.tar.gz", hash = "sha256:130f6fd5e3f497fdad897a23ed9489973437edf561238c4b92a4d02c435f8af9"},
 ]
 
 [package.dependencies]
@@ -2263,4 +2263,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "7dcb94337159059bd57910f506a23fcc3085bc49c3cefd7c354eb809d7d89127"
+content-hash = "95d24db47c62aec3ca96b87114be813b287513c4fe50cd2fd0b99aff1457be27"
