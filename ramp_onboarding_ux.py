@@ -1366,6 +1366,13 @@ def index() -> Any:
     ):
         ramp_manager_id = name_map[apiary_managers[session["manager_id"]]][0]
 
+    if session["can_request_it_admin"]:
+        default_role_id = "IT_ADMIN"
+    elif session.get("is_finance_team_member"):
+        default_role_id = "BUSINESS_BOOKKEEPER"
+    else:
+        default_role_id = "BUSINESS_USER"
+
     return render_template(
         "form.html",
         business_legal_name=get_ramp_business()["business_name_legal"],
@@ -1387,7 +1394,7 @@ def index() -> Any:
             "googleMapsApiKey": app.config["GOOGLE_MAPS_FRONTEND_API_KEY"],
             "googleClientId": app.config["GOOGLE_CLIENT_ID"],
             "googleOneTapLoginUri": url_for("verify_google_onetap", _external=True),
-            "showAdvancedOptions": not session["is_student"],
+            "showAdvancedOptions": not session["is_student"] or default_role_id != "BUSINESS_USER",
             "departmentOptions": get_ramp_departments(),
             "departmentId": default_department,
             "locationOptions": get_ramp_locations(),
@@ -1410,7 +1417,7 @@ def index() -> Any:
                     "enabled": session["can_request_it_admin"],
                 },
             },
-            "roleId": "BUSINESS_USER",
+            "roleId": default_role_id,
             "defaultDepartmentForStudents": app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"],
             "defaultDepartmentForNonStudents": app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"],
             "defaultLocationForStudents": app.config["RAMP_DEFAULT_LOCATION_STUDENTS"],
@@ -1476,6 +1483,7 @@ def login() -> Any:
     session["is_student"] = True
     session["can_request_business_admin"] = False
     session["can_request_it_admin"] = False
+    session["is_finance_team_member"] = False
 
     if "googleWorkspaceAccount" in userinfo and userinfo["googleWorkspaceAccount"] is not None:
         session["email_address"] = userinfo["googleWorkspaceAccount"]
@@ -1533,6 +1541,11 @@ def login() -> Any:
 
                     if role["name"] == "admin":
                         session["can_request_it_admin"] = True
+
+            if "teams" in apiary_user and apiary_user["teams"] is not None:
+                for team in apiary_user["teams"]:
+                    if team.get("name") == "Finance":
+                        session["is_finance_team_member"] = True
 
             travel_check = False
 
