@@ -187,7 +187,6 @@ apiary.headers["User-Agent"] = USER_AGENT  # type: ignore
 apiary.fetch_token()
 
 cache = Cache(app)
-cache.clear()
 
 
 def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
