@@ -133,9 +133,10 @@ sentry_sdk.init(
 
 app = Flask(__name__)
 
-Minify(app=app, caching_limit=0, go=False)
-
 app.config.from_prefixed_env()
+
+if not get_debug_flag():
+    Minify(app=app, caching_limit=0, go=False)
 
 celery_app = init_celery(app)
 
