@@ -34,16 +34,16 @@ import W3.Html.Attributes exposing (inputmode, numeric)
 
 termsOfService : List ( String, String )
 termsOfService =
-    [ ( "Ramp Platform Agreement", "https://ramp.com/legal/platform-agreement" )
-    , ( "Ramp Cookie Policy", "https://ramp.com/legal/cookie-policy" )
-    , ( "Ramp Privacy Policy", "https://ramp.com/legal/privacy-policy" )
-    , ( "Ramp Authorized User Agreement", "https://ramp.com/legal/authorized-user-terms" )
-    , ( "Ramp Authorized User Payment Card Addendum", "https://ramp.com/legal/authorized-user-card-addendum" )
-    , ( "Sutton Bank Cardholder Terms", "https://ramp.com/legal/sutton-bank-cardholder-terms" )
+    [ ( "Ramp Platform Agreement", "https://ramp.com/legal/customer-terms/platform-agreement/platform-agreement" )
+    , ( "Ramp Cookie Policy", "https://ramp.com/legal/privacy-terms/privacy-terms/cookie-policy" )
+    , ( "Ramp Privacy Policy", "https://ramp.com/legal/privacy-terms/privacy-terms/privacy-policy" )
+    , ( "Ramp Authorized User Agreement", "https://ramp.com/legal/customer-terms/additional-customer-terms/authorized-user-terms" )
+    , ( "Ramp Authorized User Payment Card Addendum", "https://ramp.com/legal/customer-terms/additional-customer-terms/authorized-user-card-addendum" )
+    , ( "Sutton Bank Cardholder Terms", "https://ramp.com/legal/customer-terms/financial-institution-partner-agreements/sutton-bank-cardholder-terms" )
     , ( "Sutton Bank Privacy Policy", "https://www.suttonbank.com/_/kcms-doc/85/49033/WK-Privacy-Disclosure-1218.pdf" )
-    , ( "Celtic Bank Accountholder Terms", "https://ramp.com/legal/celtic-bank-accountholder-terms" )
+    , ( "Celtic Bank Accountholder Terms", "https://ramp.com/legal/customer-terms/financial-institution-partner-agreements/celtic-bank-accountholder-terms" )
     , ( "Celtic Bank Privacy Policy", "https://www.celticbank.com/privacy" )
-    , ( "Lead Bank Accountholder Terms", "https://ramp.com/legal/lead-bank-accountholder-terms" )
+    , ( "Lead Bank Accountholder Terms", "https://ramp.com/legal/customer-terms/financial-institution-partner-agreements/lead-bank-accountholder-terms" )
     , ( "Lead Bank Privacy Policy", "https://www.lead.bank/privacy-and-terms" )
     , ( "Georgia Institute of Technology Acceptable Use Policy", "https://policylibrary.gatech.edu/information-technology/acceptable-use-policy" )
     , ( "Georgia Institute of Technology Cyber Security Policy", "https://policylibrary.gatech.edu/information-technology/cyber-security-policy" )
@@ -1208,7 +1208,7 @@ renderForm model =
 
         userRolesRampHelpCenterLink : List (Html Msg)
         userRolesRampHelpCenterLink =
-            [ a [ href "https://support.ramp.com/hc/en-us/articles/360042579734-User-roles-overview", target "_blank", class "text-secondary" ] [ text "Ramp help center" ]
+            [ a [ href "https://support.ramp.com/user-roles-overview/", target "_blank", class "text-secondary" ] [ text "Ramp help center" ]
             , text "."
             ]
 

@@ -1052,19 +1052,19 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                 (
                                     "https",
                                     app.config["RAMP_UI_HOSTNAME"],
-                                    "/settings/personal-settings/profile/edit",
+                                    "/settings/all/profile",
                                     "",
                                     "",
-                                    "",
+                                    "#:~:text=receipt%20forwarding%20email-,Slack%20email%20address,-If%20your%20Slack",
                                 )
                             ),
                             text="your Ramp profile",
                         ),
                         RichTextElementParts.Text(text=", under the "),
                         RichTextElementParts.Text(
-                            text="Integrations", style=RichTextElementParts.TextStyle(bold=True)
+                            text="Slack email address", style=RichTextElementParts.TextStyle(bold=True)
                         ),
-                        RichTextElementParts.Text(text=" tab, to get notifications from "),
+                        RichTextElementParts.Text(text=" section, to get notifications from "),
                         RichTextElementParts.User(user_id=app.config["SLACK_RAMP_BOT_USER_ID"]),
                         RichTextElementParts.Text(text=" in Slack"),
                     ]
@@ -1083,7 +1083,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                 RichTextSectionElement(
                     elements=[
                         RichTextElementParts.Link(
-                            url="https://support.ramp.com/hc/en-us/articles/360042582834-Activating-a-physical-card",  # noqa: E501
+                            url="https://support.ramp.com/activating-a-physical-card/",  # noqa: E501
                             text="Activate your physical card",
                         ),
                         RichTextElementParts.Text(text=" when it arrives"),
@@ -1144,7 +1144,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                     ]
                 ),
                 SectionBlock(
-                    text="You can also review the onboarding guide in the <https://support.ramp.com/hc/en-us/sections/4601540746387-Employees|Ramp help center>, <https://ramp.com/training/employee-manager-training-webinar|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa: E501
+                    text="You can also review the onboarding guide in the <https://support.ramp.com/getting-started-as-a-user|Ramp help center>, <https://ramp.com/training/employee-manager|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa: E501
                 ),
                 SectionBlock(
                     text="If you have questions, or need help with anything, please post in <#"
