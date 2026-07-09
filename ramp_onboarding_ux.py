@@ -71,6 +71,8 @@ ROLE_LABELS = {
     "IT_ADMIN": "IT admin",
 }
 
+ADVISOR_CONSOLE_PREFIX = "[Advisor Console] "
+
 
 def traces_sampler(sampling_context: Dict[str, Dict[str, str]]) -> bool:
     """
@@ -231,6 +233,19 @@ def get_apiary_managers() -> Dict[int, str]:
     return managers
 
 
+def get_ramp_object_label(
+    ramp_objects: Dict[str, Dict[str, Union[str, bool]]], ramp_object_id: str
+) -> str:
+    """
+    Get the label for a Ramp object, falling back to "Unknown" if hidden or missing
+    """
+    ramp_object = ramp_objects.get(ramp_object_id)
+    if ramp_object is None:
+        return "Unknown"
+
+    return str(ramp_object["label"])
+
+
 @cache.cached(key_prefix="ramp_departments")
 def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
@@ -245,16 +260,15 @@ def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     departments = {}
 
     for department in ramp_departments_response.json()["data"]:
-        name = department["name"]
-        enabled = department["id"] != app.config["RAMP_DISABLED_DEPARTMENT"]
+        if department["id"] == app.config["RAMP_DISABLED_DEPARTMENT"]:
+            continue
 
-        if name.startswith("[Advisor Console] "):
-            name = name.replace("[Advisor Console] ", "")
-            enabled = False
+        if department["name"].startswith(ADVISOR_CONSOLE_PREFIX):
+            continue
 
         departments[department["id"]] = {
-            "label": name,
-            "enabled": enabled,
+            "label": department["name"],
+            "enabled": True,
         }
 
     return departments
@@ -273,7 +287,15 @@ def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
 
     locations = {}
 
+    disabled_location = app.config.get("RAMP_DISABLED_LOCATION")
+
     for location in ramp_locations_response.json()["data"]:
+        if disabled_location is not None and location["id"] == disabled_location:
+            continue
+
+        if location["name"].startswith(ADVISOR_CONSOLE_PREFIX):
+            continue
+
         locations[location["id"]] = {
             "label": location["name"],
             "enabled": True,
@@ -301,11 +323,13 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
     name_map = defaultdict(list)
 
     for user in ramp_users_response.json()["data"]:
+        if user["department_id"] == app.config["RAMP_DISABLED_DEPARTMENT"]:
+            continue
+
         users[user["id"]] = {
             "label": user["first_name"] + " " + user["last_name"],
             "enabled": user["status"] == "USER_ACTIVE"
-            and user["is_manager"] is True
-            and user["department_id"] != app.config["RAMP_DISABLED_DEPARTMENT"],
+            and user["is_manager"] is True,
         }
 
         name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
@@ -853,16 +877,18 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                     MarkdownTextObject(text="*Department*"),
                     PlainTextObject(text=ROLE_LABELS[new_ramp_user_response.json()["role"]]),
                     PlainTextObject(
-                        text=get_ramp_departments()[new_ramp_user_response.json()["department_id"]][
-                            "label"
-                        ]
+                        text=get_ramp_object_label(
+                            get_ramp_departments(),
+                            new_ramp_user_response.json()["department_id"],
+                        )
                     ),
                     MarkdownTextObject(text="*Location*"),
                     MarkdownTextObject(text="*Manager*"),
                     PlainTextObject(
-                        text=get_ramp_locations()[new_ramp_user_response.json()["location_id"]][
-                            "label"
-                        ]
+                        text=get_ramp_object_label(
+                            get_ramp_locations(),
+                            new_ramp_user_response.json()["location_id"],
+                        )
                     ),
                     MarkdownTextObject(text=manager_mention),
                 ],
