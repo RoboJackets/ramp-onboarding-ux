@@ -1055,7 +1055,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                     "/settings/all/profile",
                                     "",
                                     "",
-                                    "#:~:text=receipt%20forwarding%20email-,Slack%20email%20address,-If%20your%20Slack",
+                                    "#:~:text=receipt%20forwarding%20email-,Slack%20email%20address,-If%20your%20Slack",  # noqa: E501
                                 )
                             ),
                             text="your Ramp profile",
