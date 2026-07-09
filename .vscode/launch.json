@@ -12,7 +12,8 @@
             "env": {
                 "FLASK_APP": "ramp_onboarding_ux.py",
                 "FLASK_DEBUG": "1",
-                "FLASK_CACHE_TYPE": "SimpleCache"
+                "FLASK_CACHE_TYPE": "RedisCache",
+                "FLASK_CACHE_REDIS_URL": "redis://127.0.0.1:6379/2"
             },
             "envFile": "${workspaceFolder}/.env",
             "args": [
@@ -29,7 +30,8 @@
             "module": "celery",
             "env": {
                 "FLASK_DEBUG": "1",
-                "FLASK_CACHE_TYPE": "SimpleCache"
+                "FLASK_CACHE_TYPE": "RedisCache",
+                "FLASK_CACHE_REDIS_URL": "redis://127.0.0.1:6379/2"
             },
             "envFile": "${workspaceFolder}/.env",
             "args": [
