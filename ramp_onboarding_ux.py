@@ -2398,7 +2398,7 @@ def handle_postmark_inbound_event() -> Any:
         raise BadRequest("missing TextBody")
 
     results = search(
-        r"\[(?P<invitation_url>https://[a-z]+\.ramp\.com/invite-sign-up.+)\]",
+        r"\[(?P<invitation_url>https://[a-z]+\.ramp\.com/s/app/invite-sign-up.+)\]",
         request.json["TextBody"],
     )
 
