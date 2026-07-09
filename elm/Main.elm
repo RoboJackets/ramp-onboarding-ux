@@ -2412,6 +2412,7 @@ createRampAccountTask model =
                     , ( "departmentId", Json.Encode.string (Maybe.withDefault "" model.rampDepartmentId) )
                     , ( "locationId", Json.Encode.string (Maybe.withDefault "" model.rampLocationId) )
                     , ( "role", Json.Encode.string (Maybe.withDefault "" model.rampRoleId) )
+                    , ( orderPhysicalCardFieldName, Json.Encode.bool model.orderPhysicalCard )
                     ]
                 )
         , expect = expectJson CreateRampAccountTaskIdReceived createTaskResponseDecoder

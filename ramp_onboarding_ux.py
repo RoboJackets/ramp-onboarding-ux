@@ -166,7 +166,7 @@ for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
 ramp = OAuth2Session(
     client_id=app.config["RAMP_CLIENT_ID"],
     client_secret=app.config["RAMP_CLIENT_SECRET"],
-    scope="users:read users:write cards:read cards:write departments:read locations:read business:read",  # noqa: E501
+    scope="users:read users:write cards:write departments:read locations:read business:read",  # noqa: E501
     token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
 )
 ramp.headers["User-Agent"] = USER_AGENT  # type: ignore
@@ -1071,14 +1071,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                 )
             ]
 
-        cards_response = ramp.get(  # type: ignore
-            url=app.config["RAMP_API_URL"] + "/developer/v1/cards",
-            params={"user_id": ramp_user_id},
-            timeout=(5, 5),
-        )
-        cards_response.raise_for_status()
-
-        if len(cards_response.json()["data"]) > 0:
+        if cache.get("physical_card_ordered_" + keycloak_user_id):
             activate_physical_card_tip = [
                 RichTextSectionElement(
                     elements=[
@@ -2123,6 +2116,12 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     if request.json["role"] != "BUSINESS_ADMIN":
         request_body["direct_manager_id"] = request.json["directManagerId"].strip()
 
+    cache.set(
+        "physical_card_ordered_" + session["sub"],
+        bool(request.json.get("orderPhysicalCard", False)),
+        timeout=0,
+    )
+
     ramp_invite_user_response = ramp.post(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
         json=request_body,
@@ -2178,6 +2177,8 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
 
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         raise InternalServerError("No Ramp user ID in session")
+
+    cache.set("physical_card_ordered_" + session["sub"], True, timeout=0)
 
     ramp_order_physical_card_response = ramp.post(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/cards/physical",
