@@ -1105,9 +1105,9 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                                 (
                                                     "https",
                                                     app.config["RAMP_UI_HOSTNAME"],
-                                                    "/sign-in/saml/" + get_ramp_business()["id"],
+                                                    "/sign-in",
                                                     "",
-                                                    "",
+                                                    urlencode({"email": new_ramp_user_response.json()["email"]}),
                                                     "",
                                                 )
                                             ),
@@ -1274,9 +1274,9 @@ def index() -> Any:
                     (
                         "https",
                         app.config["RAMP_UI_HOSTNAME"],
-                        "/sign-in/saml/" + get_ramp_business()["id"],
+                        "/sign-in",
                         "",
-                        "",
+                        urlencode({"email": ramp_user_response.json()["email"]}),
                         "",
                     )
                 ),
@@ -1309,9 +1309,9 @@ def index() -> Any:
                     (
                         "https",
                         app.config["RAMP_UI_HOSTNAME"],
-                        "/sign-in/saml/" + get_ramp_business()["id"],
+                        "/sign-in",
                         "",
-                        "",
+                        urlencode({"email": ramp_user_response.json()["email"]}),
                         "",
                     )
                 ),
@@ -1445,9 +1445,9 @@ def index() -> Any:
                 (
                     "https",
                     app.config["RAMP_UI_HOSTNAME"],
-                    "/sign-in/saml/" + get_ramp_business()["id"],
+                    "/sign-in",
                     "",
-                    "",
+                    urlencode({"email": session["email_address"]}),
                     "",
                 )
             ),
