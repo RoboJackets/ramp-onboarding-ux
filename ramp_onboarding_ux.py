@@ -1062,7 +1062,8 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                         ),
                         RichTextElementParts.Text(text=", under the "),
                         RichTextElementParts.Text(
-                            text="Slack email address", style=RichTextElementParts.TextStyle(bold=True)
+                            text="Slack email address",
+                            style=RichTextElementParts.TextStyle(bold=True),
                         ),
                         RichTextElementParts.Text(text=" section, to get notifications from "),
                         RichTextElementParts.User(user_id=app.config["SLACK_RAMP_BOT_USER_ID"]),
