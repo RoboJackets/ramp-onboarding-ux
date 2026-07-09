@@ -1107,7 +1107,13 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                                     app.config["RAMP_UI_HOSTNAME"],
                                                     "/sign-in",
                                                     "",
-                                                    urlencode({"email": new_ramp_user_response.json()["email"]}),
+                                                    urlencode(
+                                                        {
+                                                            "email": new_ramp_user_response.json()[
+                                                                "email"
+                                                            ]
+                                                        }
+                                                    ),
                                                     "",
                                                 )
                                             ),
