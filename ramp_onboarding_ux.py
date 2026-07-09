@@ -2179,32 +2179,19 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
         raise InternalServerError("No Ramp user ID in session")
 
     ramp_order_physical_card_response = ramp.post(  # type: ignore
-        url=app.config["RAMP_API_URL"] + "/developer/v1/cards/deferred/physical",
+        url=app.config["RAMP_API_URL"] + "/developer/v1/cards/physical",
         json={
-            "display_name": "Physical Card",
-            "fulfillment": {
-                "shipping": {
-                    "recipient_address": {
-                        "address1": request.json["addressLineOne"].strip(),
-                        "address2": (
-                            request.json["addressLineTwo"].strip()
-                            if request.json["addressLineTwo"].strip() != ""
-                            else None
-                        ),
-                        "city": request.json["city"].strip(),
-                        "country": "US",
-                        "first_name": request.json["firstName"].strip(),
-                        "last_name": request.json["lastName"].strip(),
-                        "postal_code": request.json["zip"].strip(),
-                        "state": request.json["state"].strip(),
-                    }
-                }
-            },
-            "idempotency_key": uuid4().hex,
-            "spending_restrictions": {
-                "amount": 1,
-                "currency": "USD",
-                "interval": "TOTAL",
+            "shipping_address": {
+                "address1": request.json["addressLineOne"].strip(),
+                "address2": (
+                    request.json["addressLineTwo"].strip()
+                    if request.json["addressLineTwo"].strip() != ""
+                    else None
+                ),
+                "city": request.json["city"].strip(),
+                "country": "US",
+                "postal_code": request.json["zip"].strip(),
+                "state": request.json["state"].strip(),
             },
             "user_id": session["ramp_user_id"],
         },
@@ -2213,24 +2200,8 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
     ramp_order_physical_card_response.raise_for_status()
 
     return {
-        "taskId": ramp_order_physical_card_response.json()["id"],
-    }, 202
-
-
-@app.get("/order-physical-card/<task_id>")
-def get_physical_card_status(task_id: str) -> Dict[str, str]:
-    """
-    Get the task status for a previous request to order a physical card
-    """
-    ramp_task_status = ramp.get(  # type: ignore
-        url=app.config["RAMP_API_URL"] + "/developer/v1/cards/deferred/status/" + task_id,
-        timeout=(5, 5),
-    )
-    ramp_task_status.raise_for_status()
-
-    return {
-        "taskStatus": ramp_task_status.json()["status"],
-    }
+        "cardId": ramp_order_physical_card_response.json()["id"],
+    }, 201
 
 
 @app.post("/slack")

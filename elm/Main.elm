@@ -364,7 +364,6 @@ type alias Model =
     , formState : FormState
     , nextAction : NextAction
     , createRampAccountTaskId : Maybe String
-    , orderPhysicalCardTaskId : Maybe String
     , showAdvancedOptions : Bool
     , rampDepartmentOptions : Dict String RampObject
     , rampLocationOptions : Dict String RampObject
@@ -408,8 +407,7 @@ type Msg
     | GoogleAddressValidationResultReceived (Result Http.Error GoogleAddressValidation)
     | CreateRampAccountTaskIdReceived (Result Http.Error TaskId)
     | CreateRampAccountTaskStatusReceived (Result Http.Error TaskStatus)
-    | OrderPhysicalCardTaskIdReceived (Result Http.Error TaskId)
-    | OrderPhysicalCardTaskStatusReceived (Result Http.Error TaskStatus)
+    | OrderPhysicalCardResponseReceived (Result Http.Error ())
     | SetTime Time.Posix
     | SetZone Time.Zone
     | ShowAdvancedOptionsButtonClicked
@@ -1012,9 +1010,7 @@ update msg model =
                                     , body =
                                         jsonBody
                                             (Json.Encode.object
-                                                [ ( firstNameFieldName, Json.Encode.string (String.trim model.firstName) )
-                                                , ( lastNameFieldName, Json.Encode.string (String.trim model.lastName) )
-                                                , ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
+                                                [ ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
                                                 , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
                                                 , ( cityFieldName, Json.Encode.string (String.trim model.city) )
                                                 , ( stateFieldName
@@ -1028,7 +1024,7 @@ update msg model =
                                                 , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
                                                 ]
                                             )
-                                    , expect = expectJson OrderPhysicalCardTaskIdReceived createTaskResponseDecoder
+                                    , expect = expectWhatever OrderPhysicalCardResponseReceived
                                     }
 
                             else
@@ -1047,68 +1043,20 @@ update msg model =
                     Cmd.none
             )
 
-        OrderPhysicalCardTaskIdReceived result ->
-            ( { model
-                | orderPhysicalCardTaskId =
-                    case result of
-                        Ok orderPhysicalCardTaskId ->
-                            Just orderPhysicalCardTaskId.taskId
-
-                        Err _ ->
-                            Nothing
-                , formState =
-                    case result of
-                        Ok _ ->
-                            OrderingPhysicalCard
-
-                        Err _ ->
-                            Error
-                , nextAction = NoOpNextAction
-              }
-            , case result of
-                Ok orderPhysicalCardTaskId ->
-                    getPhysicalCardTaskStatus orderPhysicalCardTaskId.taskId
-
-                Err _ ->
-                    Cmd.none
-            )
-
-        OrderPhysicalCardTaskStatusReceived result ->
+        OrderPhysicalCardResponseReceived result ->
             ( { model
                 | formState =
                     case result of
-                        Ok orderPhysicalCardTaskStatus ->
-                            case orderPhysicalCardTaskStatus.taskStatus of
-                                "SUCCESS" ->
-                                    ProvisioningComplete
-
-                                "STARTED" ->
-                                    OrderingPhysicalCard
-
-                                "IN_PROGRESS" ->
-                                    OrderingPhysicalCard
-
-                                _ ->
-                                    Error
+                        Ok _ ->
+                            ProvisioningComplete
 
                         Err _ ->
                             Error
                 , nextAction = NoOpNextAction
               }
             , case result of
-                Ok orderPhysicalCardTaskStatus ->
-                    case orderPhysicalCardTaskStatus.taskStatus of
-                        "SUCCESS" ->
-                            Nav.load model.rampSingleSignOnUri
-
-                        "STARTED" ->
-                            getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
-
-                        "IN_PROGRESS" ->
-                            getPhysicalCardTaskStatus (Maybe.withDefault "" model.orderPhysicalCardTaskId)
-
-                        _ ->
-                            Cmd.none
+                Ok _ ->
+                    Nav.load model.rampSingleSignOnUri
 
                 Err _ ->
                     Cmd.none
@@ -2481,17 +2429,6 @@ getRampAccountTaskStatus taskId =
         }
 
 
-getPhysicalCardTaskStatus : String -> Cmd Msg
-getPhysicalCardTaskStatus taskId =
-    Http.get
-        { url =
-            Url.Builder.absolute
-                [ "order-physical-card", taskId ]
-                []
-        , expect = expectJson OrderPhysicalCardTaskStatusReceived getTaskResponseDecoder
-        }
-
-
 checkCampusAddress : Model -> CampusAddress
 checkCampusAddress model =
     if
@@ -2704,7 +2641,6 @@ buildInitialModel value =
         Time.utc
         Editing
         NoOpNextAction
-        Nothing
         Nothing
         (Result.withDefault
             (Result.withDefault False (decodeValue (at [ serverDataFieldName, showAdvancedOptionsFieldName ] bool) value))
