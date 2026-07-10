@@ -24,6 +24,8 @@ from authlib.integrations.requests_client import OAuth2Session
 
 from celery import Celery, Task, shared_task
 
+import click
+
 from flask import Flask, Response, redirect, render_template, request, session, url_for
 from flask.helpers import get_debug_flag
 
@@ -2288,39 +2290,6 @@ def ping() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/send-slack-messages/<ramp_user_id>")
-def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
-    """
-    Manually send Slack welcome messages for a given user
-    """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    if session["user_state"] != "provisioned":
-        raise Unauthorized("Not provisioned")
-
-    search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
-        params={
-            "q": "rampUserId:" + ramp_user_id,
-        },
-        timeout=(5, 5),
-    )
-    search_keycloak_user_response.raise_for_status()
-
-    if len(search_keycloak_user_response.json()) == 1:
-        keycloak_user_id = search_keycloak_user_response.json()[0]["id"]
-    else:
-        raise Exception("Did not find exactly one match in Keycloak")
-
-    notify_slack_account_created(keycloak_user_id, ramp_user_id)
-
-    return {"status": "ok"}
-
-
 @shared_task
 def handle_invitation_delivery(invitation_url: str) -> None:
     """
@@ -2594,6 +2563,34 @@ def clear_cache() -> None:
     """
     cache.clear()
     print("Cache cleared.")
+
+
+@app.cli.command("send-slack-messages")
+@click.argument("ramp_user_id")
+def send_slack_messages(ramp_user_id: str) -> None:
+    """
+    Manually send Slack welcome messages for a given user
+    """
+    search_keycloak_user_response = keycloak.get(  # type: ignore
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
+        params={
+            "q": "rampUserId:" + ramp_user_id,
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 1:
+        keycloak_user_id = search_keycloak_user_response.json()[0]["id"]
+    else:
+        raise Exception("Did not find exactly one match in Keycloak")
+
+    notify_slack_account_created(keycloak_user_id, ramp_user_id)
+
+    print("Slack messages sent.")
 
 
 @app.cli.command("create-webhook-subscription")
