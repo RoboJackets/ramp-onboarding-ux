@@ -200,6 +200,21 @@ job "ramp-onboarding-ux" {
         ATTR_CPU_NUMCORES = "${attr.cpu.numcores}"
       }
 
+      action "clear-cache" {
+        command = "/usr/local/bin/flask"
+        args    = ["clear-cache"]
+      }
+
+      action "create-webhook-subscription" {
+        command = "/usr/local/bin/flask"
+        args    = ["create-webhook-subscription"]
+      }
+
+      action "send-mock-webhook-event" {
+        command = "/usr/local/bin/flask"
+        args    = ["send-mock-webhook-event"]
+      }
+
       service {
         name = "${NOMAD_JOB_NAME}"
 
