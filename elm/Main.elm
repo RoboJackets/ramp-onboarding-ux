@@ -446,12 +446,17 @@ main =
 
 init : Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags _ _ =
-    ( buildInitialModel flags
+    let
+        model : Model
+        model =
+            buildInitialModel flags
+    in
+    ( model
     , Cmd.batch
         [ Task.perform SetTime Time.now
         , Task.perform SetZone Time.here
-        , initializeAutocomplete (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, googleMapsApiKeyFieldName ] string) flags)))
-        , if showOneTap (buildInitialModel flags) then
+        , initializeAutocomplete model.googleMapsApiKey
+        , if showOneTap model then
             initializeOneTap True
 
           else
@@ -2538,250 +2543,131 @@ checkCampusAddress model =
 
 
 buildInitialModel : Value -> Model
-buildInitialModel value =
+buildInitialModel flags =
     let
-        serverDataEmailAddress : String
-        serverDataEmailAddress =
-            Result.withDefault "" (decodeValue (at [ serverDataFieldName, emailAddressFieldName ] string) value)
+        serverData : Value
+        serverData =
+            Result.withDefault Json.Encode.null (decodeValue (field serverDataFieldName Json.Decode.value) flags)
+
+        localData : Value
+        localData =
+            flags
+                |> decodeValue (field localDataFieldName string)
+                |> Result.andThen (decodeString Json.Decode.value)
+                |> Result.withDefault Json.Encode.null
 
         emailAddressVerified : Bool
         emailAddressVerified =
-            Result.withDefault False (decodeValue (at [ serverDataFieldName, emailVerifiedFieldName ] bool) value)
+            Result.withDefault False (decodeValue (field emailVerifiedFieldName bool) serverData)
 
         apiaryManagerOptions : Dict Int String
         apiaryManagerOptions =
-            Dict.fromList (List.filterMap stringStringTupleToMaybeIntStringTuple (Result.withDefault [] (decodeValue (at [ serverDataFieldName, apiaryManagerOptionsFieldName ] (keyValuePairs string)) value)))
+            Dict.fromList (List.filterMap (\( key, managerName ) -> Maybe.map (\managerId -> ( managerId, managerName )) (String.toInt key)) (Result.withDefault [] (decodeValue (field apiaryManagerOptionsFieldName (keyValuePairs string)) serverData)))
 
         apiarySelfId : Int
         apiarySelfId =
-            Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value)
+            Result.withDefault -1 (decodeValue (field selfIdFieldName int) serverData)
 
         rampManagerOptions : Dict String RampUser
         rampManagerOptions =
-            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampUserDecoder)) value)
+            Result.withDefault Dict.empty (decodeValue (field rampManagerOptionsFieldName (dict rampUserDecoder)) serverData)
 
         rampDepartmentOptions : Dict String RampObject
         rampDepartmentOptions =
-            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, departmentOptionsFieldName ] (dict rampObjectDecoder)) value)
+            Result.withDefault Dict.empty (decodeValue (field departmentOptionsFieldName (dict rampObjectDecoder)) serverData)
 
         rampLocationOptions : Dict String RampObject
         rampLocationOptions =
-            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, locationOptionsFieldName ] (dict rampObjectDecoder)) value)
+            Result.withDefault Dict.empty (decodeValue (field locationOptionsFieldName (dict rampObjectDecoder)) serverData)
 
         rampRoleOptions : Dict String RampObject
         rampRoleOptions =
-            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, roleOptionsFieldName ] (dict rampObjectDecoder)) value)
+            Result.withDefault Dict.empty (decodeValue (field roleOptionsFieldName (dict rampObjectDecoder)) serverData)
     in
-    Model
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, firstNameFieldName ] string) value))
-                (decodeString (field firstNameFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, lastNameFieldName ] string) value))
-                (decodeString (field lastNameFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        (if emailAddressVerified then
-            String.trim serverDataEmailAddress
+    { firstName = trimmedLocalThenServer firstNameFieldName localData serverData
+    , lastName = trimmedLocalThenServer lastNameFieldName localData serverData
+    , emailAddress =
+        if emailAddressVerified then
+            trimmedServerString emailAddressFieldName serverData
 
-         else
-            String.trim
-                (Result.withDefault
-                    serverDataEmailAddress
-                    (decodeString (field emailAddressFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-                )
-        )
-        emailAddressVerified
-        apiaryManagerOptions
-        (case decodeString (field managerApiaryIdFieldName int) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok managerId ->
-                if apiarySelfId == managerId || not (Dict.member managerId apiaryManagerOptions) then
-                    Nothing
-
-                else
-                    Just managerId
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, managerApiaryIdFieldName ] int) value of
-                    Ok managerId ->
-                        if apiarySelfId == managerId || not (Dict.member managerId apiaryManagerOptions) then
-                            Nothing
-
-                        else
-                            Just managerId
-
-                    Err _ ->
-                        Nothing
-        )
-        (case decodeString (field managerRampIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok managerId ->
-                if (Maybe.withDefault { label = "", enabled = False, departmentId = "" } (Dict.get managerId rampManagerOptions)).enabled then
-                    Just managerId
-
-                else
-                    Nothing
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, managerRampIdFieldName ] string) value of
-                    Ok managerId ->
-                        if (Maybe.withDefault { label = "", enabled = False, departmentId = "" } (Dict.get managerId rampManagerOptions)).enabled then
-                            Just managerId
-
-                        else
-                            Nothing
-
-                    Err _ ->
-                        Nothing
-        )
-        Nothing
-        ""
-        apiarySelfId
-        (Result.withDefault True (decodeString (field orderPhysicalCardFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value))))
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, addressLineOneFieldName ] string) value))
-                (decodeString (field addressLineOneFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, addressLineTwoFieldName ] string) value))
-                (decodeString (field addressLineTwoFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, cityFieldName ] string) value))
-                (decodeString (field cityFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        (case decodeString (field stateFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok state ->
-                if Dict.member state statesMap then
-                    Just state
-
-                else
-                    Nothing
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, stateFieldName ] string) value of
-                    Ok state ->
-                        if Dict.member state statesMap then
-                            Just state
-
-                        else
-                            Nothing
-
-                    Err _ ->
-                        Nothing
-        )
-        (String.trim
-            (Result.withDefault
-                (Result.withDefault "" (decodeValue (at [ serverDataFieldName, zipCodeFieldName ] string) value))
-                (decodeString (field zipCodeFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-            )
-        )
-        False
-        Nothing
-        False
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, googleMapsApiKeyFieldName ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "googleClientId" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "googleOneTapLoginUri" ] string) value)))
-        (Time.millisToPosix 0)
-        Time.utc
-        Editing
-        NoOpNextAction
-        Nothing
-        (Result.withDefault
-            (Result.withDefault False (decodeValue (at [ serverDataFieldName, showAdvancedOptionsFieldName ] bool) value))
-            (decodeString (field showAdvancedOptionsFieldName bool) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)))
-        )
-        rampDepartmentOptions
-        rampLocationOptions
-        rampRoleOptions
-        (case decodeString (field departmentIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok departmentId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId rampDepartmentOptions)).enabled then
-                    Just departmentId
-
-                else
-                    Nothing
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, departmentIdFieldName ] string) value of
-                    Ok departmentId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get departmentId rampDepartmentOptions)).enabled then
-                            Just departmentId
-
-                        else
-                            Nothing
-
-                    Err _ ->
-                        Nothing
-        )
-        (case decodeString (field locationIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok locationId ->
-                if Dict.member locationId rampLocationOptions then
-                    Just locationId
-
-                else
-                    Nothing
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, locationIdFieldName ] string) value of
-                    Ok locationId ->
-                        if Dict.member locationId rampLocationOptions then
-                            Just locationId
-
-                        else
-                            Nothing
-
-                    Err _ ->
-                        Nothing
-        )
-        (case decodeString (field roleIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
-            Ok roleId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId rampRoleOptions)).enabled then
-                    Just roleId
-
-                else
-                    Nothing
-
-            Err _ ->
-                case decodeValue (at [ serverDataFieldName, roleIdFieldName ] string) value of
-                    Ok roleId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get roleId rampRoleOptions)).enabled then
-                            Just roleId
-
-                        else
-                            Nothing
-
-                    Err _ ->
-                        Nothing
-        )
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultDepartmentForStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultDepartmentForNonStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForStudents" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
-        rampManagerOptions
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSignInUri" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "businessLegalName" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelDeepLink" ] string) value)))
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelName" ] string) value)))
+        else
+            trimmedLocalThenServer emailAddressFieldName localData serverData
+    , emailVerified = emailAddressVerified
+    , managerApiaryOptions = apiaryManagerOptions
+    , managerApiaryId = validatedIdFromLocalThenServer managerApiaryIdFieldName int (\managerId -> managerId /= apiarySelfId && Dict.member managerId apiaryManagerOptions) localData serverData
+    , managerRampId = validatedIdFromLocalThenServer managerRampIdFieldName string (isEnabledOption rampManagerOptions) localData serverData
+    , managerIsValid = Nothing
+    , managerFeedbackText = ""
+    , selfApiaryId = apiarySelfId
+    , orderPhysicalCard = localThenServer orderPhysicalCardFieldName bool True localData serverData
+    , addressLineOne = trimmedLocalThenServer addressLineOneFieldName localData serverData
+    , addressLineTwo = trimmedLocalThenServer addressLineTwoFieldName localData serverData
+    , city = trimmedLocalThenServer cityFieldName localData serverData
+    , state = validatedIdFromLocalThenServer stateFieldName string (\stateCode -> Dict.member stateCode statesMap) localData serverData
+    , zip = trimmedLocalThenServer zipCodeFieldName localData serverData
+    , addressLineTwoRequired = False
+    , addressIsValid = Nothing
+    , showValidation = False
+    , googleMapsApiKey = trimmedServerString googleMapsApiKeyFieldName serverData
+    , googleClientId = trimmedServerString "googleClientId" serverData
+    , googleOneTapLoginUri = trimmedServerString "googleOneTapLoginUri" serverData
+    , time = Time.millisToPosix 0
+    , zone = Time.utc
+    , formState = Editing
+    , nextAction = NoOpNextAction
+    , createRampAccountTaskId = Nothing
+    , showAdvancedOptions = localThenServer showAdvancedOptionsFieldName bool False localData serverData
+    , rampDepartmentOptions = rampDepartmentOptions
+    , rampLocationOptions = rampLocationOptions
+    , rampRoleOptions = rampRoleOptions
+    , rampDepartmentId = validatedIdFromLocalThenServer departmentIdFieldName string (isEnabledOption rampDepartmentOptions) localData serverData
+    , rampLocationId = validatedIdFromLocalThenServer locationIdFieldName string (isEnabledOption rampLocationOptions) localData serverData
+    , rampRoleId = validatedIdFromLocalThenServer roleIdFieldName string (isEnabledOption rampRoleOptions) localData serverData
+    , studentDefaultDepartmentId = trimmedServerString "defaultDepartmentForStudents" serverData
+    , nonStudentDefaultDepartmentId = trimmedServerString "defaultDepartmentForNonStudents" serverData
+    , studentDefaultLocationId = trimmedServerString "defaultLocationForStudents" serverData
+    , nonStudentDefaultLocationId = trimmedServerString "defaultLocationForNonStudents" serverData
+    , managerRampOptions = rampManagerOptions
+    , rampSignInUri = trimmedServerString "rampSignInUri" serverData
+    , businessLegalName = trimmedServerString "businessLegalName" serverData
+    , slackSupportChannelDeepLink = trimmedServerString "slackSupportChannelDeepLink" serverData
+    , slackSupportChannelName = trimmedServerString "slackSupportChannelName" serverData
+    }
 
 
-stringStringTupleToMaybeIntStringTuple : ( String, String ) -> Maybe ( Int, String )
-stringStringTupleToMaybeIntStringTuple ( first, second ) =
-    case String.toInt first of
-        Just intVal ->
-            Just ( intVal, second )
+localThenServer : String -> Decoder a -> a -> Value -> Value -> a
+localThenServer fieldName decoder fallback localData serverData =
+    case decodeValue (field fieldName decoder) localData of
+        Ok localValue ->
+            localValue
 
-        Nothing ->
-            Nothing
+        Err _ ->
+            Result.withDefault fallback (decodeValue (field fieldName decoder) serverData)
+
+
+trimmedLocalThenServer : String -> Value -> Value -> String
+trimmedLocalThenServer fieldName localData serverData =
+    String.trim (localThenServer fieldName string "" localData serverData)
+
+
+trimmedServerString : String -> Value -> String
+trimmedServerString fieldName serverData =
+    String.trim (Result.withDefault "" (decodeValue (field fieldName string) serverData))
+
+
+validatedIdFromLocalThenServer : String -> Decoder a -> (a -> Bool) -> Value -> Value -> Maybe a
+validatedIdFromLocalThenServer fieldName decoder isValidId localData serverData =
+    [ localData, serverData ]
+        |> List.filterMap (\source -> Result.toMaybe (decodeValue (field fieldName decoder) source))
+        |> List.filter isValidId
+        |> List.head
+
+
+isEnabledOption : Dict String { a | enabled : Bool } -> String -> Bool
+isEnabledOption options optionId =
+    Dict.get optionId options
+        |> Maybe.map .enabled
+        |> Maybe.withDefault False
 
 
 nonBlankString : String -> Bool
