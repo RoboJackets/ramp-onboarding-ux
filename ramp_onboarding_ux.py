@@ -2575,6 +2575,8 @@ def handle_ramp_webhook_event() -> Any:
             raw_body, signature, webhook_secret
         ):
             raise Unauthorized("signature verification failed")
+
+        logging.info("Ramp webhook signature verified")
     else:
         logging.warning("RAMP_WEBHOOK_SECRET is not set, skipping signature verification")
 
