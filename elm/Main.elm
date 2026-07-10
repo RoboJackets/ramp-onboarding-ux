@@ -283,8 +283,7 @@ rampRoleRankOrder =
 
 type NextAction
     = RedirectToEmailVerification
-    | ValidateForm
-    | CreateRampAccount
+    | ContinueSubmission
     | NoOpNextAction
 
 
@@ -480,44 +479,29 @@ update msg model =
             ( model, Cmd.none )
 
         FormSubmitted ->
-            ( { model
-                | showValidation = True
-                , formState =
-                    case validateModel model of
-                        Invalid _ ->
-                            Editing
+            case validateModel model of
+                Invalid fieldId ->
+                    ( { model
+                        | showValidation = True
+                        , formState = Editing
+                        , nextAction = NoOpNextAction
+                      }
+                    , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
+                    )
 
-                        Valid ->
-                            if model.managerRampId == Nothing then
-                                Validating
-
-                            else if model.orderPhysicalCard then
+                Valid ->
+                    ( { model
+                        | showValidation = True
+                        , formState =
+                            if needsManagerValidation model || needsAddressValidation model then
                                 Validating
 
                             else
                                 CreatingRampAccount
-                , nextAction =
-                    case validateModel model of
-                        Invalid _ ->
-                            NoOpNextAction
-
-                        Valid ->
-                            if model.managerRampId == Nothing then
-                                ValidateForm
-
-                            else if model.orderPhysicalCard then
-                                ValidateForm
-
-                            else
-                                CreateRampAccount
-              }
-            , case validateModel model of
-                Invalid fieldId ->
-                    Task.attempt (\_ -> NoOpMsg) (focus fieldId)
-
-                Valid ->
-                    saveFormStateToLocalStorage model
-            )
+                        , nextAction = ContinueSubmission
+                      }
+                    , saveFormStateToLocalStorage model
+                    )
 
         FormChanged ->
             updateAndSaveToLocalStorage { model | nextAction = NoOpNextAction }
@@ -622,27 +606,7 @@ update msg model =
             ( { model | nextAction = NoOpNextAction }, Cmd.none )
 
         LocalStorageSaved _ ->
-            let
-                needGoogleAddressValidation : Bool
-                needGoogleAddressValidation =
-                    model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
-            in
-            ( { model
-                | nextAction = NoOpNextAction
-                , formState =
-                    if model.nextAction == ValidateForm then
-                        if model.managerRampId == Nothing then
-                            Validating
-
-                        else if needGoogleAddressValidation then
-                            Validating
-
-                        else
-                            CreatingRampAccount
-
-                    else
-                        model.formState
-              }
+            ( { model | nextAction = NoOpNextAction }
             , case model.nextAction of
                 RedirectToEmailVerification ->
                     Nav.load
@@ -651,62 +615,23 @@ update msg model =
                             [ Url.Builder.string emailAddressFieldName model.emailAddress ]
                         )
 
-                ValidateForm ->
-                    Cmd.batch
-                        [ if model.managerRampId == Nothing then
-                            Http.get
-                                { url =
-                                    Url.Builder.absolute
-                                        [ "get-ramp-user", String.fromInt (Maybe.withDefault 0 model.managerApiaryId) ]
-                                        []
-                                , expect = expectJson ManagerValidationResultReceived managerValidationResponseDecoder
-                                }
+                ContinueSubmission ->
+                    if needsManagerValidation model || needsAddressValidation model then
+                        Cmd.batch
+                            [ if needsManagerValidation model then
+                                requestManagerValidation model
 
-                          else
-                            Cmd.none
-                        , if needGoogleAddressValidation then
-                            Http.post
-                                { url =
-                                    Url.Builder.crossOrigin
-                                        "https://addressvalidation.googleapis.com/v1:validateAddress"
-                                        []
-                                        [ Url.Builder.string "key" model.googleMapsApiKey ]
-                                , body =
-                                    jsonBody
-                                        (Json.Encode.object
-                                            [ ( "enableUspsCass", Json.Encode.bool True )
-                                            , ( "address"
-                                              , Json.Encode.object
-                                                    [ ( "regionCode", Json.Encode.string "US" )
-                                                    , ( "postalCode", Json.Encode.string (String.trim model.zip) )
-                                                    , ( "administrativeArea", Json.Encode.string (Maybe.withDefault "" model.state) )
-                                                    , ( "locality", Json.Encode.string (String.trim model.city) )
-                                                    , ( "addressLines"
-                                                      , Json.Encode.list Json.Encode.string
-                                                            (List.filter nonBlankString
-                                                                (List.map String.trim
-                                                                    [ model.addressLineOne
-                                                                    , model.addressLineTwo
-                                                                    ]
-                                                                )
-                                                            )
-                                                      )
-                                                    ]
-                                              )
-                                            ]
-                                        )
-                                , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
-                                }
+                              else
+                                Cmd.none
+                            , if needsAddressValidation model then
+                                requestGoogleAddressValidation model
 
-                          else if model.managerRampId /= Nothing then
-                            createRampAccountTask model
+                              else
+                                Cmd.none
+                            ]
 
-                          else
-                            Cmd.none
-                        ]
-
-                CreateRampAccount ->
-                    createRampAccountTask model
+                    else
+                        createRampAccountTask model
 
                 NoOpNextAction ->
                     Cmd.none
@@ -2396,6 +2321,63 @@ getTaskResponseDecoder : Decoder TaskStatus
 getTaskResponseDecoder =
     Json.Decode.map TaskStatus
         (at [ "taskStatus" ] Json.Decode.string)
+
+
+needsManagerValidation : Model -> Bool
+needsManagerValidation model =
+    model.managerRampId == Nothing
+
+
+needsAddressValidation : Model -> Bool
+needsAddressValidation model =
+    model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
+
+
+requestManagerValidation : Model -> Cmd Msg
+requestManagerValidation model =
+    Http.get
+        { url =
+            Url.Builder.absolute
+                [ "get-ramp-user", String.fromInt (Maybe.withDefault 0 model.managerApiaryId) ]
+                []
+        , expect = expectJson ManagerValidationResultReceived managerValidationResponseDecoder
+        }
+
+
+requestGoogleAddressValidation : Model -> Cmd Msg
+requestGoogleAddressValidation model =
+    Http.post
+        { url =
+            Url.Builder.crossOrigin
+                "https://addressvalidation.googleapis.com/v1:validateAddress"
+                []
+                [ Url.Builder.string "key" model.googleMapsApiKey ]
+        , body =
+            jsonBody
+                (Json.Encode.object
+                    [ ( "enableUspsCass", Json.Encode.bool True )
+                    , ( "address"
+                      , Json.Encode.object
+                            [ ( "regionCode", Json.Encode.string "US" )
+                            , ( "postalCode", Json.Encode.string (String.trim model.zip) )
+                            , ( "administrativeArea", Json.Encode.string (Maybe.withDefault "" model.state) )
+                            , ( "locality", Json.Encode.string (String.trim model.city) )
+                            , ( "addressLines"
+                              , Json.Encode.list Json.Encode.string
+                                    (List.filter nonBlankString
+                                        (List.map String.trim
+                                            [ model.addressLineOne
+                                            , model.addressLineTwo
+                                            ]
+                                        )
+                                    )
+                              )
+                            ]
+                      )
+                    ]
+                )
+        , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
+        }
 
 
 createRampAccountTask : Model -> Cmd Msg
