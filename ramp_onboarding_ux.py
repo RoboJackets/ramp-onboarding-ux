@@ -1452,7 +1452,7 @@ def index() -> Any:
             "defaultDepartmentForNonStudents": app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"],
             "defaultLocationForStudents": app.config["RAMP_DEFAULT_LOCATION_STUDENTS"],
             "defaultLocationForNonStudents": app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"],
-            "rampSingleSignOnUri": urlunparse(
+            "rampSignInUri": urlunparse(
                 (
                     "https",
                     app.config["RAMP_UI_HOSTNAME"],

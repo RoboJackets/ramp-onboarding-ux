@@ -388,7 +388,7 @@ type alias Model =
     , studentDefaultLocationId : String
     , nonStudentDefaultLocationId : String
     , managerRampOptions : Dict String RampUser
-    , rampSingleSignOnUri : String
+    , rampSignInUri : String
     , businessLegalName : String
     , slackSupportChannelDeepLink : String
     , slackSupportChannelName : String
@@ -1040,7 +1040,7 @@ update msg model =
                                     }
 
                             else
-                                Nav.load model.rampSingleSignOnUri
+                                Nav.load model.rampSignInUri
 
                         "STARTED" ->
                             getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
@@ -1068,7 +1068,7 @@ update msg model =
               }
             , case result of
                 Ok _ ->
-                    Nav.load model.rampSingleSignOnUri
+                    Nav.load model.rampSignInUri
 
                 Err _ ->
                     Cmd.none
