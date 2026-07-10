@@ -516,11 +516,11 @@ update msg model =
                     Task.attempt (\_ -> NoOpMsg) (focus fieldId)
 
                 Valid ->
-                    saveToLocalStorage (stringifyModel model)
+                    saveFormStateToLocalStorage model
             )
 
         FormChanged ->
-            ( { model | nextAction = NoOpNextAction }, saveToLocalStorage (stringifyModel model) )
+            updateAndSaveToLocalStorage { model | nextAction = NoOpNextAction }
 
         FirstNameInput firstName ->
             ( { model
@@ -548,54 +548,32 @@ update msg model =
             )
 
         EmailVerificationButtonClicked ->
-            ( { model
-                | nextAction = RedirectToEmailVerification
-              }
-            , saveToLocalStorage (stringifyModel model)
-            )
+            updateAndSaveToLocalStorage { model | nextAction = RedirectToEmailVerification }
 
         ApiaryManagerInput managerApiaryId ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | managerApiaryId = Just managerApiaryId
-                        , managerRampId = Nothing
-                        , managerIsValid = Nothing
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | managerApiaryId = Just managerApiaryId
+                    , managerRampId = Nothing
+                    , managerIsValid = Nothing
+                    , nextAction = NoOpNextAction
+                }
 
         RampManagerInput managerRampId ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | managerApiaryId = Nothing
-                        , managerRampId = Just managerRampId
-                        , managerIsValid = Just True
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | managerApiaryId = Nothing
+                    , managerRampId = Just managerRampId
+                    , managerIsValid = Just True
+                    , nextAction = NoOpNextAction
+                }
 
         OrderPhysicalCardChecked orderPhysicalCard ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | orderPhysicalCard = orderPhysicalCard
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | orderPhysicalCard = orderPhysicalCard
+                    , nextAction = NoOpNextAction
+                }
 
         AddressLineOneInput addressLineOne ->
             ( { model
@@ -624,18 +602,12 @@ update msg model =
             )
 
         StateInput state ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | state = Just state
-                        , nextAction = NoOpNextAction
-                        , addressLineTwoRequired = False
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | state = Just state
+                    , nextAction = NoOpNextAction
+                    , addressLineTwoRequired = False
+                }
 
         ZipInput zip ->
             ( { model
@@ -742,48 +714,28 @@ update msg model =
 
         PlaceChanged value ->
             let
-                addressLineOne : String
-                addressLineOne =
-                    String.trim (getAddressComponent (decodePlaceChanged value) "street_number")
-                        ++ " "
-                        ++ String.trim (getAddressComponent (decodePlaceChanged value) "route")
+                addressComponents : List AddressComponent
+                addressComponents =
+                    decodePlaceChanged value
 
-                addressLineTwo : String
-                addressLineTwo =
-                    String.trim (getAddressComponent (decodePlaceChanged value) "subpremise")
-
-                city : String
-                city =
-                    String.trim (getAddressComponent (decodePlaceChanged value) "locality")
-
-                state : Maybe String
-                state =
-                    Just (String.trim (getAddressComponent (decodePlaceChanged value) "administrative_area_level_1"))
-
-                zip : String
-                zip =
-                    String.trim (getAddressComponent (decodePlaceChanged value) "postal_code")
+                newModel : Model
+                newModel =
+                    { model
+                        | addressLineOne =
+                            String.trim (getAddressComponent addressComponents "street_number")
+                                ++ " "
+                                ++ String.trim (getAddressComponent addressComponents "route")
+                        , addressLineTwo = String.trim (getAddressComponent addressComponents "subpremise")
+                        , city = String.trim (getAddressComponent addressComponents "locality")
+                        , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
+                        , zip = String.trim (getAddressComponent addressComponents "postal_code")
+                        , nextAction = NoOpNextAction
+                    }
             in
-            ( { model
-                | addressLineOne = addressLineOne
-                , addressLineTwo = addressLineTwo
-                , city = city
-                , state = state
-                , zip = zip
-                , nextAction = NoOpNextAction
-              }
+            ( newModel
             , Cmd.batch
                 [ Task.attempt (\_ -> NoOpMsg) (focus "address_line_two")
-                , saveToLocalStorage
-                    (stringifyModel
-                        { model
-                            | addressLineOne = addressLineOne
-                            , addressLineTwo = addressLineTwo
-                            , city = city
-                            , state = state
-                            , zip = zip
-                        }
-                    )
+                , saveFormStateToLocalStorage newModel
                 ]
             )
 
@@ -1100,7 +1052,7 @@ update msg model =
             in
             ( newModel
             , Cmd.batch
-                [ saveToLocalStorage (stringifyModel newModel)
+                [ saveFormStateToLocalStorage newModel
                 , case getManagerRampIdFromApiaryId model of
                     Just _ ->
                         Task.attempt (\_ -> NoOpMsg) (focus "department")
@@ -1111,43 +1063,25 @@ update msg model =
             )
 
         DepartmentInput selectedDepartment ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | rampDepartmentId = Just selectedDepartment
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | rampDepartmentId = Just selectedDepartment
+                    , nextAction = NoOpNextAction
+                }
 
         LocationInput selectedLocation ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | rampLocationId = Just selectedLocation
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | rampLocationId = Just selectedLocation
+                    , nextAction = NoOpNextAction
+                }
 
         RoleInput selectedRole ->
-            let
-                newModel : Model
-                newModel =
-                    { model
-                        | rampRoleId = Just selectedRole
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , saveToLocalStorage (stringifyModel newModel)
-            )
+            updateAndSaveToLocalStorage
+                { model
+                    | rampRoleId = Just selectedRole
+                    , nextAction = NoOpNextAction
+                }
 
 
 subscriptions : Model -> Sub Msg
@@ -2366,6 +2300,16 @@ stringifyModel model =
             , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
             ]
         )
+
+
+saveFormStateToLocalStorage : Model -> Cmd msg
+saveFormStateToLocalStorage model =
+    saveToLocalStorage (stringifyModel model)
+
+
+updateAndSaveToLocalStorage : Model -> ( Model, Cmd msg )
+updateAndSaveToLocalStorage newModel =
+    ( newModel, saveFormStateToLocalStorage newModel )
 
 
 keyDecoder : Decoder ( Msg, Bool )
