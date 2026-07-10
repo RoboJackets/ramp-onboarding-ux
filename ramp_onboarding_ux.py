@@ -2556,7 +2556,7 @@ def handle_invite_accepted(ramp_user_id: str) -> None:
 
 
 @app.post("/ramp")
-def handle_ramp_webhook_event() -> Dict[str, str]:
+def handle_ramp_webhook_event() -> Any:
     """
     Handle a webhook event from Ramp
     """
