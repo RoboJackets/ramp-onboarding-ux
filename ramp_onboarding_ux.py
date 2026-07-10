@@ -2288,21 +2288,6 @@ def ping() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/clear-cache")
-def clear_cache() -> Dict[str, str]:
-    """
-    Clears the cache
-    """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    if session["user_state"] != "provisioned":
-        raise Unauthorized("Not provisioned")
-
-    cache.clear()
-    return {"status": "ok"}
-
-
 @app.get("/send-slack-messages/<ramp_user_id>")
 def send_slack_messages(ramp_user_id: str) -> Dict[str, str]:
     """
@@ -2600,6 +2585,15 @@ def handle_ramp_webhook_event() -> Any:
         logging.info("Ignoring unrecognized Ramp webhook event type %s", payload["type"])
 
     return {"status": "ok"}, 202
+
+
+@app.cli.command("clear-cache")
+def clear_cache() -> None:
+    """
+    Clears the cache
+    """
+    cache.clear()
+    print("Cache cleared.")
 
 
 @app.cli.command("create-webhook-subscription")
