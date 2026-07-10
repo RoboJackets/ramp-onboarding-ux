@@ -196,9 +196,9 @@ cache = Cache(app)
 
 def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
     """
-    Don't cache Ramp user lookup calls if the user doesn't have an active Ramp account
+    Only cache Ramp user lookup calls if the user has an active Ramp account
     """
-    return "rampUserId" not in response
+    return "rampUserId" in response
 
 
 def generate_subresource_integrity_hash(file: str) -> str:
@@ -1948,7 +1948,7 @@ def verify_microsoft_complete() -> Any:
 
 
 @app.get("/get-ramp-user/<apiary_id>")
-@cache.cached(response_filter=only_cache_if_ramp_id_present)
+@cache.cached(timeout=0, response_filter=only_cache_if_ramp_id_present)
 def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     """
     Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account
