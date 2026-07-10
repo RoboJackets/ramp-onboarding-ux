@@ -2742,7 +2742,7 @@ buildInitialModel value =
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForStudents" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "defaultLocationForNonStudents" ] string) value)))
         rampManagerOptions
-        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSingleSignOnUri" ] string) value)))
+        (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "rampSignInUri" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "businessLegalName" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelDeepLink" ] string) value)))
         (String.trim (Result.withDefault "" (decodeValue (at [ serverDataFieldName, "slackSupportChannelName" ] string) value)))
