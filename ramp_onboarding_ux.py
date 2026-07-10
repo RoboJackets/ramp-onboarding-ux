@@ -2418,7 +2418,7 @@ def handle_postmark_inbound_event() -> Any:
 
     handle_invitation_delivery.delay(results.group("invitation_url"))
 
-    return {"status": "ok"}
+    return {"status": "ok"}, 202
 
 
 def verify_ramp_webhook_signature(raw_body: bytes, signature: str, secret: str) -> bool:
@@ -2594,7 +2594,7 @@ def handle_ramp_webhook_event() -> Dict[str, str]:
     else:
         logging.info("Ignoring unrecognized Ramp webhook event type %s", payload["type"])
 
-    return {"status": "ok"}
+    return {"status": "ok"}, 202
 
 
 @app.cli.command("create-webhook-subscription")
