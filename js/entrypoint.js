@@ -30,6 +30,12 @@ app.ports.saveToLocalStorage.subscribe(function (message) {
     app.ports.localStorageSaved.send(true);
 });
 
+app.ports.showAlert.subscribe(function (message) {
+    "use strict";
+
+    alert(message);
+});
+
 app.ports.initializeAutocomplete.subscribe(function (message) {
     "use strict";
 

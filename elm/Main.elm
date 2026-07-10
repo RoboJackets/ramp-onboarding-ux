@@ -817,18 +817,21 @@ update msg model =
                                         Just False
 
                         Err _ ->
-                            Just False
+                            model.addressIsValid
                 , formState =
                     case result of
                         Ok verdict ->
                             case verdict.addressComplete of
-                                Just _ ->
+                                Just True ->
                                     case model.managerRampId of
                                         Just _ ->
                                             CreatingRampAccount
 
                                         Nothing ->
                                             Validating
+
+                                Just False ->
+                                    Editing
 
                                 Nothing ->
                                     Editing
@@ -852,8 +855,12 @@ update msg model =
                     else
                         Cmd.none
 
-                Err _ ->
-                    Task.attempt (\_ -> NoOpMsg) (focus "address_line_one")
+                Err error ->
+                    showAlert
+                        ("There was an error validating your mailing address: "
+                            ++ httpErrorToString error
+                            ++ "\n\nPlease check your internet connection."
+                        )
             )
 
         SetTime time ->
@@ -2194,6 +2201,25 @@ feedbackText validation =
             text
 
 
+httpErrorToString : Http.Error -> String
+httpErrorToString error =
+    case error of
+        BadUrl url ->
+            "Invalid URL: " ++ url
+
+        Timeout ->
+            "The request timed out"
+
+        NetworkError ->
+            "Network error"
+
+        BadStatus status ->
+            "Unexpected HTTP status code " ++ String.fromInt status
+
+        BadBody body ->
+            "Unexpected response body: " ++ body
+
+
 emailAddressDomain : String -> Maybe String
 emailAddressDomain emailAddress =
     case Email.parse emailAddress of
@@ -2907,6 +2933,9 @@ port initializeOneTap : Bool -> Cmd msg
 
 
 port saveToLocalStorage : String -> Cmd msg
+
+
+port showAlert : String -> Cmd msg
 
 
 port localStorageSaved : (Bool -> msg) -> Sub msg
