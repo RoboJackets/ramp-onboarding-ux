@@ -40,6 +40,24 @@ jobs:
       - name: Run mypy
         run: poetry run mypy --strict --scripts-are-modules ramp_onboarding_ux.py
 
+      - name: Setup Nomad
+        uses: hashicorp/setup-nomad@v1.0.0
+
+      - name: Run nomad fmt
+        working-directory: ./.nomad/
+        run: nomad fmt -check ramp-onboarding-ux.nomad
+
+      - name: Run nomad job validate
+        working-directory: ./.nomad/
+        run: |
+          nomad job validate \
+            -var image=ghcr.io/robojackets/ramp-onboarding-ux@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+            -var registry_username=test \
+            -var registry_password=test \
+            -var hostname=example.test \
+            -var priority=10 \
+            ramp-onboarding-ux.nomad
+
   docker:
     name: Docker
     runs-on: ubuntu-latest
