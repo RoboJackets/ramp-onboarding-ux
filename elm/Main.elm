@@ -2279,55 +2279,51 @@ getRampAccountTaskStatus taskId =
         }
 
 
+campusAddressStreetPrefixes : List ( String, CampusAddress )
+campusAddressStreetPrefixes =
+    [ ( "351 ferst", StudentCenter )
+    , ( "301 10th", GraduateLivingCenter )
+    , ( "801 ferst", ManufacturingRelatedDisciplinesComplex )
+    ]
+
+
+matchCampusAddressByStreetPrefix : String -> CampusAddress
+matchCampusAddressByStreetPrefix street =
+    campusAddressStreetPrefixes
+        |> List.filterMap
+            (\( prefix, campusAddress ) ->
+                if String.startsWith prefix street then
+                    Just campusAddress
+
+                else
+                    Nothing
+            )
+        |> List.head
+        |> Maybe.withDefault NotCampusAddress
+
+
 checkCampusAddress : Model -> CampusAddress
 checkCampusAddress model =
-    if
-        String.toLower (String.trim model.addressLineOne)
-            == "351 ferst dr nw"
-            && String.toLower (String.trim model.city)
-            == "atlanta"
-            && Maybe.withDefault "" model.state
-            == "GA"
-            && String.trim (String.left 3 model.zip)
-            == "303"
-    then
-        StudentCenter
+    let
+        city : String
+        city =
+            String.toLower (String.trim model.city)
 
-    else if
-        String.toLower (String.trim model.addressLineOne)
-            == "301 10th st nw"
-            && String.toLower (String.trim model.city)
-            == "atlanta"
-            && Maybe.withDefault "" model.state
-            == "GA"
-            && String.trim (String.left 3 model.zip)
-            == "303"
-    then
-        GraduateLivingCenter
+        state : String
+        state =
+            Maybe.withDefault "" model.state
 
-    else if
-        String.toLower (String.trim model.addressLineOne)
-            == "801 ferst dr nw"
-            && String.toLower (String.trim model.city)
-            == "atlanta"
-            && Maybe.withDefault "" model.state
-            == "GA"
-            && String.trim (String.left 3 model.zip)
-            == "303"
-    then
-        ManufacturingRelatedDisciplinesComplex
-
-    else if
-        String.toLower (String.trim model.addressLineOne)
-            == "801 ferst dr"
-            && String.toLower (String.trim model.city)
-            == "atlanta"
-            && Maybe.withDefault "" model.state
-            == "GA"
-            && String.trim (String.left 3 model.zip)
-            == "303"
-    then
-        ManufacturingRelatedDisciplinesComplex
+        zipPrefix : String
+        zipPrefix =
+            String.left 3 (String.trim model.zip)
+    in
+    if city == "atlanta" && state == "GA" && zipPrefix == "303" then
+        let
+            street : String
+            street =
+                String.toLower (String.trim model.addressLineOne)
+        in
+        matchCampusAddressByStreetPrefix street
 
     else
         NotCampusAddress
