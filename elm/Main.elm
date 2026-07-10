@@ -2282,7 +2282,8 @@ getRampAccountTaskStatus taskId =
 campusAddressStreetPrefixes : List ( String, CampusAddress )
 campusAddressStreetPrefixes =
     [ ( "351 ferst", StudentCenter )
-    , ( "301 10th", GraduateLivingCenter )
+    , ( "301 10", GraduateLivingCenter )
+    , ( "301 ten", GraduateLivingCenter )
     , ( "801 ferst", ManufacturingRelatedDisciplinesComplex )
     ]
 
