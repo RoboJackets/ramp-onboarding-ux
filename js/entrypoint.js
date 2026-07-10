@@ -1,8 +1,18 @@
+const localStorageRequiredMessage = "Local storage is required to use this app. Please make sure it is enabled in your browser, then reload the page.";
+
+let localData = null;
+
+try {
+    localData = localStorage.getItem("formFields");
+} catch (error) {
+    alert(localStorageRequiredMessage);
+}
+
 const app = Elm.Main.init(
     {
         flags: {
             serverData: window.serverData,
-            localData: localStorage.getItem("formFields"),
+            localData: localData,
         }
     }
 );
@@ -10,7 +20,13 @@ const app = Elm.Main.init(
 app.ports.saveToLocalStorage.subscribe(function (message) {
     "use strict";
 
-    localStorage.setItem("formFields", message);
+    try {
+        localStorage.setItem("formFields", message);
+    } catch (error) {
+        alert(localStorageRequiredMessage);
+        return;
+    }
+
     app.ports.localStorageSaved.send(true);
 });
 
