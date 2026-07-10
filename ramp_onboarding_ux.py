@@ -2,6 +2,7 @@
 Overengineered web form to facilitate onboarding users to Ramp
 """
 
+import hmac
 import logging
 import os
 from base64 import b64encode
@@ -9,7 +10,7 @@ from collections import defaultdict
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
-from hashlib import file_digest
+from hashlib import file_digest, sha256
 from ipaddress import ip_address, ip_network
 from json import loads
 from re import fullmatch, search
@@ -36,6 +37,7 @@ from google.oauth2 import id_token
 from ldap3 import Connection, Server
 
 from requests import post
+from requests.exceptions import RequestException
 
 import sentry_sdk
 from sentry_sdk import set_user
@@ -2417,3 +2419,232 @@ def handle_postmark_inbound_event() -> Any:
     handle_invitation_delivery.delay(results.group("invitation_url"))
 
     return {"status": "ok"}
+
+
+def verify_ramp_webhook_signature(raw_body: bytes, signature: str, secret: str) -> bool:
+    """
+    Verify the X-Ramp-Signature header against the raw request body
+    """
+    digest = hmac.new(secret.encode("utf-8"), raw_body, sha256).digest()
+    expected_hex = digest.hex()
+    expected_base64 = b64encode(digest).decode("utf-8")
+
+    return hmac.compare_digest(signature, expected_hex) or hmac.compare_digest(
+        signature, expected_base64
+    )
+
+
+def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str) -> str:
+    """
+    Find the Keycloak user ID for a Ramp user, searching by rampUserId then email attributes
+    """
+    search_keycloak_user_response = keycloak.get(  # type: ignore
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
+        params={
+            "q": "rampUserId:" + ramp_user_id,
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 1:
+        return str(search_keycloak_user_response.json()[0]["id"])
+
+    if len(search_keycloak_user_response.json()) > 1:
+        raise Exception("More than one Keycloak user returned for rampUserId search")
+
+    search_keycloak_user_response = keycloak.get(  # type: ignore
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
+        params={
+            "q": "rampLoginEmailAddress:" + ramp_user_email,
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 1:
+        return str(search_keycloak_user_response.json()[0]["id"])
+
+    if len(search_keycloak_user_response.json()) > 1:
+        raise Exception("More than one Keycloak user returned for rampLoginEmailAddress search")
+
+    search_keycloak_user_response = keycloak.get(  # type: ignore
+        url=app.config["KEYCLOAK_SERVER"]
+        + "/admin/realms/"
+        + app.config["KEYCLOAK_REALM"]
+        + "/users",
+        params={
+            "q": "googleWorkspaceAccount:" + ramp_user_email,
+        },
+        timeout=(5, 5),
+    )
+    search_keycloak_user_response.raise_for_status()
+
+    if len(search_keycloak_user_response.json()) == 0:
+        raise Exception("Could not locate Keycloak user for Ramp user")
+
+    if len(search_keycloak_user_response.json()) == 1:
+        return str(search_keycloak_user_response.json()[0]["id"])
+
+    raise Exception("More than one Keycloak user returned for googleWorkspaceAccount search")
+
+
+def provision_ramp_user(keycloak_user_id: str, ramp_user_id: str) -> None:
+    """
+    Run the standard post-provisioning tasks for a newly active Ramp user
+    """
+    store_ramp_user_id_in_keycloak.delay(keycloak_user_id, ramp_user_id)
+    remove_eligible_role.delay(keycloak_user_id)
+    import_user_to_org_chart.delay(ramp_user_id)
+    notify_slack_account_created.delay(keycloak_user_id, ramp_user_id)
+
+
+@shared_task
+def verify_ramp_webhook_subscription(challenge: str) -> None:
+    """
+    Verify a pending Ramp webhook subscription using the challenge from webhooks.verification
+    """
+    ramp_webhooks_response = ramp.get(  # type: ignore
+        url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks",
+        timeout=(5, 5),
+    )
+    ramp_webhooks_response.raise_for_status()
+
+    for subscription in ramp_webhooks_response.json():
+        if subscription["status"] != "pending_verification":
+            continue
+
+        try:
+            verify_response = ramp.post(  # type: ignore
+                url=app.config["RAMP_API_URL"]
+                + "/developer/v1/webhooks/"
+                + subscription["id"]
+                + "/verify",
+                json={"challenge": challenge},
+                timeout=(5, 5),
+            )
+            verify_response.raise_for_status()
+        except RequestException:
+            logging.exception(
+                "Failed to verify webhook subscription %s",
+                subscription["id"],
+            )
+
+
+@shared_task
+def handle_invite_accepted(ramp_user_id: str) -> None:
+    """
+    Process a users.invite_accepted webhook event from Ramp
+    """
+    ramp_user_response = ramp.get(  # type: ignore
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
+        timeout=(5, 5),
+    )
+    ramp_user_response.raise_for_status()
+
+    keycloak_user_id = find_keycloak_user_id_for_ramp_user(
+        ramp_user_id, ramp_user_response.json()["email"]
+    )
+
+    provision_ramp_user(keycloak_user_id, ramp_user_id)
+
+
+@app.post("/ramp")
+def handle_ramp_webhook_event() -> Dict[str, str]:
+    """
+    Handle a webhook event from Ramp
+    """
+    raw_body = request.get_data()
+    webhook_secret = app.config.get("RAMP_WEBHOOK_SECRET")
+
+    if webhook_secret is not None:
+        signature = request.headers.get("X-Ramp-Signature")
+
+        if signature is None or not verify_ramp_webhook_signature(
+            raw_body, signature, webhook_secret
+        ):
+            raise Unauthorized("signature verification failed")
+    else:
+        logging.warning("RAMP_WEBHOOK_SECRET is not set, skipping signature verification")
+
+    payload = loads(raw_body)
+    logging.info("Received Ramp webhook: %s", raw_body.decode("utf-8"))
+
+    if "business_id" in payload and payload["business_id"] != get_ramp_business()["id"]:
+        logging.warning("Received webhook for a different business_id, ignoring")
+
+        return {"status": "ok"}
+
+    if "id" in payload:
+        cache_result = cache.cache.inc("ramp_webhook_event_" + payload["id"])
+        if cache_result is not None and cache_result > 1:
+            logging.warning("duplicate Ramp webhook event %s, returning early", payload["id"])
+            return {"status": "ok"}
+
+    if payload["type"] == "webhooks.verification":
+        verify_ramp_webhook_subscription.delay(payload["challenge"])
+    elif payload["type"] == "users.invite_accepted":
+        handle_invite_accepted.delay(payload["object"]["id"])
+    else:
+        logging.info("Ignoring unrecognized Ramp webhook event type %s", payload["type"])
+
+    return {"status": "ok"}
+
+
+@app.cli.command("create-webhook-subscription")
+def create_webhook_subscription() -> None:
+    """
+    Create a Ramp webhook subscription for users.invite_accepted events.
+
+    Requires SERVER_NAME to be configured. After creation, set FLASK_RAMP_WEBHOOK_SECRET to the
+    returned secret and restart the application to enable signature verification.
+    """
+    endpoint_url = url_for("handle_ramp_webhook_event", _external=True, _scheme="https")
+
+    ramp_webhook_response = ramp.post(  # type: ignore
+        url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks",
+        json={
+            "endpoint_url": endpoint_url,
+            "event_types": [
+                "users.invite_accepted",
+                "tests.test_event",
+            ],
+        },
+        timeout=(5, 5),
+    )
+    ramp_webhook_response.raise_for_status()
+
+    subscription = ramp_webhook_response.json()
+
+    print("Webhook subscription created:")
+    print("  id:", subscription["id"])
+    print("  status:", subscription["status"])
+    print("  endpoint_url:", endpoint_url)
+    print("  secret:", subscription["secret"])
+    print()
+    print("Set FLASK_RAMP_WEBHOOK_SECRET to the secret above and restart the application.")
+
+
+@app.cli.command("send-mock-webhook-event")
+def send_mock_webhook_event() -> None:
+    """
+    Send a mock tests.test_event webhook to confirm delivery and signature verification
+    """
+    ramp_mock_webhook_response = ramp.post(  # type: ignore
+        url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks/mock-webhook-event",
+        json={
+            "event_type": "tests.test_event",
+            "object_id": str(uuid4()),
+            "object_metadata": {},
+        },
+        timeout=(5, 5),
+    )
+    ramp_mock_webhook_response.raise_for_status()
+
+    print(ramp_mock_webhook_response.json())

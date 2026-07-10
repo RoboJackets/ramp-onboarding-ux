@@ -45,6 +45,42 @@
             ],
             "jinja": true,
             "autoStartBrowser": false
+        },
+        {
+            "name": "Create Webhook Subscription",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "ramp_onboarding_ux.py",
+                "FLASK_DEBUG": "1",
+                "FLASK_CACHE_TYPE": "RedisCache",
+                "FLASK_CACHE_REDIS_URL": "redis://127.0.0.1:6379/2"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "create-webhook-subscription"
+            ],
+            "jinja": true,
+            "autoStartBrowser": false
+        },
+        {
+            "name": "Send Mock Webhook Event",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "ramp_onboarding_ux.py",
+                "FLASK_DEBUG": "1",
+                "FLASK_CACHE_TYPE": "RedisCache",
+                "FLASK_CACHE_REDIS_URL": "redis://127.0.0.1:6379/2"
+            },
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "send-mock-webhook-event"
+            ],
+            "jinja": true,
+            "autoStartBrowser": false
         }
     ]
 }
