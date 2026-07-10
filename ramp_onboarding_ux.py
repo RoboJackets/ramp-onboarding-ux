@@ -2024,6 +2024,11 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     )
     ramp_user_response.raise_for_status()
 
+    if ramp_user_response.json()["department_id"] != app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]:
+        return {
+            "error": "Selected manager isn't in selected department"
+        }
+
     if ramp_user_response.json()["status"] == "USER_ACTIVE":
         return {
             "rampUserId": ramp_user_id,
