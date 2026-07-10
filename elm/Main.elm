@@ -89,6 +89,11 @@ managerFeedbackText =
     "Please select your manager"
 
 
+managerDepartmentFeedbackText : String
+managerDepartmentFeedbackText =
+    "Selected manager isn't in selected department"
+
+
 firstNameFieldName : String
 firstNameFieldName =
     "firstName"
@@ -336,6 +341,13 @@ type alias RampObject =
     }
 
 
+type alias RampUser =
+    { label : String
+    , enabled : Bool
+    , departmentId : String
+    }
+
+
 type alias Model =
     { firstName : String
     , lastName : String
@@ -375,7 +387,7 @@ type alias Model =
     , nonStudentDefaultDepartmentId : String
     , studentDefaultLocationId : String
     , nonStudentDefaultLocationId : String
-    , managerRampOptions : Dict String RampObject
+    , managerRampOptions : Dict String RampUser
     , rampSingleSignOnUri : String
     , businessLegalName : String
     , slackSupportChannelDeepLink : String
@@ -1192,7 +1204,7 @@ renderForm model =
 
         managerValidationResult : ValidationResult
         managerValidationResult =
-            validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId
+            validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.rampDepartmentId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId
 
         departmentValidationResult : ValidationResult
         departmentValidationResult =
@@ -1926,16 +1938,30 @@ validateEmailAddress emailAddress verified =
             Invalid emailFeedbackText
 
 
-validateManager : Bool -> Maybe Bool -> String -> Maybe String -> Maybe Int -> Dict Int String -> Dict String RampObject -> Int -> ValidationResult
-validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedManagerRampFeedbackText selectedManagerRampId selectedManagerApiaryId managerApiaryOptions managerRampOptions selfId =
+validateManager : Bool -> Maybe Bool -> String -> Maybe String -> Maybe Int -> Maybe String -> Dict Int String -> Dict String RampUser -> Int -> ValidationResult
+validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedManagerRampFeedbackText selectedManagerRampId selectedManagerApiaryId selectedDepartmentId managerApiaryOptions managerRampOptions selfId =
     if usingRampManagerOptions then
         case selectedManagerRampId of
             Just managerId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId managerRampOptions)).enabled then
-                    Valid
+                case Dict.get managerId managerRampOptions of
+                    Just manager ->
+                        if not manager.enabled then
+                            Invalid managerFeedbackText
 
-                else
-                    Invalid managerFeedbackText
+                        else
+                            case selectedDepartmentId of
+                                Just deptId ->
+                                    if manager.departmentId /= deptId then
+                                        Invalid managerDepartmentFeedbackText
+
+                                    else
+                                        Valid
+
+                                Nothing ->
+                                    Valid
+
+                    Nothing ->
+                        Invalid managerFeedbackText
 
             Nothing ->
                 Invalid managerFeedbackText
@@ -2101,7 +2127,7 @@ validateModel model =
     else if not model.emailVerified then
         Invalid "email_verification_button"
 
-    else if not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) then
+    else if not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.rampDepartmentId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) then
         Invalid "manager"
 
     else if not (isValid (validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions)) then
@@ -2220,7 +2246,7 @@ managerTupleToHtmlOption selectedManagerId selfId ( managerId, managerName ) =
         [ text managerName ]
 
 
-rampObjectToHtmlOption : Maybe String -> ( String, RampObject ) -> Html msg
+rampObjectToHtmlOption : Maybe String -> ( String, { a | label : String, enabled : Bool } ) -> Html msg
 rampObjectToHtmlOption maybeSelectedId ( rampId, rampObject ) =
     option
         [ Html.Attributes.value rampId
@@ -2384,6 +2410,14 @@ rampObjectDecoder =
         (field "enabled" bool)
 
 
+rampUserDecoder : Decoder RampUser
+rampUserDecoder =
+    Json.Decode.map3 RampUser
+        (field "label" string)
+        (field "enabled" bool)
+        (field "departmentId" string)
+
+
 createTaskResponseDecoder : Decoder TaskId
 createTaskResponseDecoder =
     Json.Decode.map TaskId
@@ -2503,9 +2537,9 @@ buildInitialModel value =
         apiarySelfId =
             Result.withDefault -1 (decodeValue (at [ serverDataFieldName, selfIdFieldName ] int) value)
 
-        rampManagerOptions : Dict String RampObject
+        rampManagerOptions : Dict String RampUser
         rampManagerOptions =
-            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampObjectDecoder)) value)
+            Result.withDefault Dict.empty (decodeValue (at [ serverDataFieldName, rampManagerOptionsFieldName ] (dict rampUserDecoder)) value)
 
         rampDepartmentOptions : Dict String RampObject
         rampDepartmentOptions =
@@ -2566,7 +2600,7 @@ buildInitialModel value =
         )
         (case decodeString (field managerRampIdFieldName string) (Result.withDefault "{}" (decodeValue (field localDataFieldName string) value)) of
             Ok managerId ->
-                if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId rampManagerOptions)).enabled then
+                if (Maybe.withDefault { label = "", enabled = False, departmentId = "" } (Dict.get managerId rampManagerOptions)).enabled then
                     Just managerId
 
                 else
@@ -2575,7 +2609,7 @@ buildInitialModel value =
             Err _ ->
                 case decodeValue (at [ serverDataFieldName, managerRampIdFieldName ] string) value of
                     Ok managerId ->
-                        if (Maybe.withDefault { label = "", enabled = False } (Dict.get managerId rampManagerOptions)).enabled then
+                        if (Maybe.withDefault { label = "", enabled = False, departmentId = "" } (Dict.get managerId rampManagerOptions)).enabled then
                             Just managerId
 
                         else
@@ -2821,7 +2855,7 @@ formatTime zone time =
         ++ String.fromInt (toDay zone time)
 
 
-sortByRampObjectLabel : ( String, RampObject ) -> ( String, RampObject ) -> Order
+sortByRampObjectLabel : ( String, { a | label : String } ) -> ( String, { a | label : String } ) -> Order
 sortByRampObjectLabel first second =
     compare (Tuple.second first).label (Tuple.second second).label
 
@@ -2831,7 +2865,7 @@ sortByRampRoleRankOrder first second =
     compare (Maybe.withDefault 0 (Dict.get (Tuple.first first) rampRoleRankOrder)) (Maybe.withDefault 0 (Dict.get (Tuple.first second) rampRoleRankOrder))
 
 
-labelMatches : Maybe String -> String -> RampObject -> Bool
+labelMatches : Maybe String -> String -> { a | label : String } -> Bool
 labelMatches maybeGivenLabel _ rampObject =
     case maybeGivenLabel of
         Just givenLabel ->
@@ -2844,13 +2878,13 @@ labelMatches maybeGivenLabel _ rampObject =
 getManagerRampIdFromApiaryId : Model -> Maybe String
 getManagerRampIdFromApiaryId model =
     let
-        filteredOptions : Dict String RampObject
+        filteredOptions : Dict String RampUser
         filteredOptions =
             Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions
 
-        matchingOption : ( String, RampObject )
+        matchingOption : ( String, RampUser )
         matchingOption =
-            Maybe.withDefault ( "", { label = "", enabled = False } ) (List.head (Dict.toList filteredOptions))
+            Maybe.withDefault ( "", { label = "", enabled = False, departmentId = "" } ) (List.head (Dict.toList filteredOptions))
     in
     if Dict.size filteredOptions == 1 && (Tuple.second matchingOption).enabled then
         Just (Tuple.first matchingOption)

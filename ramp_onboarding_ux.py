@@ -334,6 +334,7 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
         users[user["id"]] = {
             "label": user["first_name"] + " " + user["last_name"],
             "enabled": user["status"] == "USER_ACTIVE" and user["is_manager"] is True,
+            "departmentId": user["department_id"],
         }
 
         name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
