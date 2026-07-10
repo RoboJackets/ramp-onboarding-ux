@@ -2594,8 +2594,8 @@ def send_slack_messages(ramp_user_id: str) -> None:
     print("Slack messages sent.")
 
 
-@app.cli.command("create-webhook-subscription")
-def create_webhook_subscription() -> None:
+@app.cli.command("create-ramp-webhook-subscription")
+def create_ramp_webhook_subscription() -> None:
     """
     Create a Ramp webhook subscription for users.invite_accepted events.
 
@@ -2628,8 +2628,8 @@ def create_webhook_subscription() -> None:
     print("Set FLASK_RAMP_WEBHOOK_SECRET to the secret above and restart the application.")
 
 
-@app.cli.command("send-mock-webhook-event")
-def send_mock_webhook_event() -> None:
+@app.cli.command("send-mock-ramp-webhook-event")
+def send_mock_ramp_webhook_event() -> None:
     """
     Send a mock tests.test_event webhook to confirm delivery and signature verification
     """

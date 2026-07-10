@@ -205,14 +205,14 @@ job "ramp-onboarding-ux" {
         args    = ["clear-cache"]
       }
 
-      action "create-webhook-subscription" {
+      action "create-ramp-webhook-subscription" {
         command = "/usr/local/bin/flask"
-        args    = ["create-webhook-subscription"]
+        args    = ["create-ramp-webhook-subscription"]
       }
 
-      action "send-mock-webhook-event" {
+      action "send-mock-ramp-webhook-event" {
         command = "/usr/local/bin/flask"
-        args    = ["send-mock-webhook-event"]
+        args    = ["send-mock-ramp-webhook-event"]
       }
 
       service {

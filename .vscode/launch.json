@@ -47,7 +47,7 @@
             "autoStartBrowser": false
         },
         {
-            "name": "Create Webhook Subscription",
+            "name": "Create Ramp Webhook Subscription",
             "type": "debugpy",
             "request": "launch",
             "module": "flask",
@@ -59,13 +59,13 @@
             },
             "envFile": "${workspaceFolder}/.env",
             "args": [
-                "create-webhook-subscription"
+                "create-ramp-webhook-subscription"
             ],
             "jinja": true,
             "autoStartBrowser": false
         },
         {
-            "name": "Send Mock Webhook Event",
+            "name": "Send Mock Ramp Webhook Event",
             "type": "debugpy",
             "request": "launch",
             "module": "flask",
@@ -77,7 +77,7 @@
             },
             "envFile": "${workspaceFolder}/.env",
             "args": [
-                "send-mock-webhook-event"
+                "send-mock-ramp-webhook-event"
             ],
             "jinja": true,
             "autoStartBrowser": false
