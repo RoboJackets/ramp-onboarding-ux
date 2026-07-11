@@ -2332,6 +2332,20 @@ intKeyedDict valueDecoder =
             )
 
 
+stringToInt : Decoder Int
+stringToInt =
+    string
+        |> andThen
+            (\raw ->
+                case String.toInt (String.trim raw) of
+                    Just intValue ->
+                        succeed intValue
+
+                    Nothing ->
+                        fail ("Expected an integer string, but found \"" ++ raw ++ "\"")
+            )
+
+
 serverDataDecoder : Decoder ServerData
 serverDataDecoder =
     succeed ServerData
@@ -2339,11 +2353,11 @@ serverDataDecoder =
         |> andMap (field lastNameFieldName trimmedString)
         |> andMap (field emailAddressFieldName trimmedString)
         |> andMap (field emailVerifiedFieldName bool)
-        |> andMap (field managerApiaryIdFieldName (nullable int))
+        |> andMap (field managerApiaryIdFieldName (nullable stringToInt))
         |> andMap (field apiaryManagerOptionsFieldName (intKeyedDict string))
         |> andMap (field managerRampIdFieldName (nullable string))
         |> andMap (field rampManagerOptionsFieldName (dict rampUserDecoder))
-        |> andMap (field selfIdFieldName int)
+        |> andMap (field selfIdFieldName stringToInt)
         |> andMap (field addressLineOneFieldName trimmedString)
         |> andMap (field addressLineTwoFieldName trimmedString)
         |> andMap (field cityFieldName trimmedString)
