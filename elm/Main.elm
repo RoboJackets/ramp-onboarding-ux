@@ -1170,7 +1170,7 @@ renderForm model =
 
         addressLineTwoValidationResult : ValidationResult
         addressLineTwoValidationResult =
-            validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model)
+            validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (classifyCampusAddress model)
 
         cityValidationResult : ValidationResult
         cityValidationResult =
@@ -1873,7 +1873,7 @@ firstInvalidFieldId model =
     , ( locationFieldId, isValid (validateRampObject "location" model.rampLocationId model.rampLocationOptions) )
     , ( roleFieldId, isValid (validateRampObject "role" model.rampRoleId model.rampRoleOptions) )
     , ( addressLineOneFieldId, not model.orderPhysicalCard || isValid (validateAddressLineOne model.addressLineOne) )
-    , ( addressLineTwoFieldId, not model.orderPhysicalCard || isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model)) )
+    , ( addressLineTwoFieldId, not model.orderPhysicalCard || isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (classifyCampusAddress model)) )
     , ( cityFieldId, not model.orderPhysicalCard || isValid (validateCity model.city) )
     , ( stateFieldId, not model.orderPhysicalCard || isValid (validateState model.state) )
     , ( zipCodeFieldId, not model.orderPhysicalCard || isValid (validateZipCode model.zip) )
@@ -2072,8 +2072,12 @@ stateTupleToHtmlOption selectedState ( stateCode, stateName ) =
         [ text stateName ]
 
 
-stringifyModel : Model -> String
-stringifyModel model =
+
+-- Encodes only the form fields that are persisted to localStorage, not the entire model.
+
+
+encodeFormState : Model -> String
+encodeFormState model =
     Json.Encode.encode 0
         (Json.Encode.object
             [ ( firstNameFieldName, Json.Encode.string (String.trim model.firstName) )
@@ -2139,7 +2143,7 @@ stringifyModel model =
 
 saveFormStateToLocalStorage : Model -> Cmd msg
 saveFormStateToLocalStorage model =
-    saveToLocalStorage (stringifyModel model)
+    saveToLocalStorage (encodeFormState model)
 
 
 updateAndSaveToLocalStorage : Model -> ( Model, Cmd msg )
@@ -2147,17 +2151,21 @@ updateAndSaveToLocalStorage newModel =
     ( newModel, saveFormStateToLocalStorage newModel )
 
 
+
+-- Stops the Enter key from submitting the form, so that selecting a Google Places autocomplete suggestion with Enter doesn't submit a half-filled form.
+
+
 keyDecoder : Decoder ( Msg, Bool )
 keyDecoder =
     field "key" string
         |> Json.Decode.map
             (\key ->
-                ( NoOpMsg, preventDefault key )
+                ( NoOpMsg, isEnterKey key )
             )
 
 
-preventDefault : String -> Bool
-preventDefault key =
+isEnterKey : String -> Bool
+isEnterKey key =
     key == "Enter"
 
 
@@ -2379,7 +2387,7 @@ needsManagerValidation model =
 
 needsAddressValidation : Model -> Bool
 needsAddressValidation model =
-    model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
+    model.orderPhysicalCard && classifyCampusAddress model == NotCampusAddress
 
 
 submissionChecksFromModel : Model -> SubmissionChecks
@@ -2566,8 +2574,8 @@ matchCampusAddressByStreetPrefix street =
         |> withDefault NotCampusAddress
 
 
-checkCampusAddress : Model -> CampusAddress
-checkCampusAddress model =
+classifyCampusAddress : Model -> CampusAddress
+classifyCampusAddress model =
     let
         city : String
         city =
