@@ -1318,128 +1318,120 @@ renderForm model =
             , div [ class "form-text", class "mb-3" ]
                 [ text "You'll receive notifications about your credit card transactions and reimbursements to this address." ]
             , div [ class "col-12" ]
-                [ label [ for managerFieldId, class "form-label" ]
-                    [ text "Manager" ]
-                , select
-                    [ class "form-select"
-                    , id managerFieldId
-                    , required True
-                    , readonly (model.formState /= Editing)
-                    , on "change"
-                        (if model.showAdvancedOptions then
-                            Json.Decode.map RampManagerInput targetValue
-
-                         else
-                            Json.Decode.map ApiaryManagerInput targetValueIntParse
-                        )
-                    , validationClasses model.showValidation managerValidationResult
-                    ]
-                    (placeholderOption
-                        (if model.showAdvancedOptions then
+                (renderSelect
+                    { fieldId = managerFieldId
+                    , labelText = "Manager"
+                    , placeholderSelected =
+                        if model.showAdvancedOptions then
                             model.managerRampId == Nothing
 
-                         else
+                        else
                             case model.managerApiaryId of
                                 Just managerApiaryId ->
                                     model.selfApiaryId == managerApiaryId
 
                                 Nothing ->
                                     True
-                        )
-                        "Select your manager..."
-                        :: (if model.showAdvancedOptions then
-                                List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
+                    , placeholderLabel = "Select your manager..."
+                    , isReadonly = model.formState /= Editing
+                    , onChange =
+                        if model.showAdvancedOptions then
+                            Json.Decode.map RampManagerInput targetValue
 
-                            else
-                                List.map (managerTupleToHtmlOption model.managerApiaryId model.selfApiaryId) (sortBy second (toList model.managerApiaryOptions))
-                           )
-                    )
-                , invalidFeedback managerValidationResult
-                , div [ class "form-text", class "mb-3" ]
-                    [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
-                ]
+                        else
+                            Json.Decode.map ApiaryManagerInput targetValueIntParse
+                    , validationAttribute = validationClasses model.showValidation managerValidationResult
+                    , options =
+                        if model.showAdvancedOptions then
+                            List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
+
+                        else
+                            List.map (managerTupleToHtmlOption model.managerApiaryId model.selfApiaryId) (sortBy second (toList model.managerApiaryOptions))
+                    , validationResult = managerValidationResult
+                    }
+                    ++ [ div [ class "form-text", class "mb-3" ]
+                            [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
+                       ]
+                )
             , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for departmentFieldId, class "form-label" ]
-                    [ text "Department" ]
-                , select
-                    [ class "form-select"
-                    , id departmentFieldId
-                    , required True
-                    , readonly (model.formState /= Editing)
-                    , on "change" (Json.Decode.map DepartmentInput targetValue)
-                    , validationClasses model.showValidation departmentValidationResult
-                    ]
-                    (placeholderOption (model.rampDepartmentId == Nothing) "Select your department..."
-                        :: List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
-                    )
-                , invalidFeedback departmentValidationResult
-                , div [ class "form-text", class "mb-3" ]
-                    [ text "Students should generally select "
-                    , strong [] [ text (rampObjectLabel model.rampDepartmentOptions model.studentDefaultDepartmentId) ]
-                    , text ", and corporation staff should generally select "
-                    , strong [] [ text (rampObjectLabel model.rampDepartmentOptions model.nonStudentDefaultDepartmentId) ]
-                    , text "."
-                    ]
-                ]
+                (renderSelect
+                    { fieldId = departmentFieldId
+                    , labelText = "Department"
+                    , placeholderSelected = model.rampDepartmentId == Nothing
+                    , placeholderLabel = "Select your department..."
+                    , isReadonly = model.formState /= Editing
+                    , onChange = Json.Decode.map DepartmentInput targetValue
+                    , validationAttribute = validationClasses model.showValidation departmentValidationResult
+                    , options =
+                        List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
+                    , validationResult = departmentValidationResult
+                    }
+                    ++ [ div [ class "form-text", class "mb-3" ]
+                            [ text "Students should generally select "
+                            , strong [] [ text (rampObjectLabel model.rampDepartmentOptions model.studentDefaultDepartmentId) ]
+                            , text ", and corporation staff should generally select "
+                            , strong [] [ text (rampObjectLabel model.rampDepartmentOptions model.nonStudentDefaultDepartmentId) ]
+                            , text "."
+                            ]
+                       ]
+                )
             , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for locationFieldId, class "form-label" ]
-                    [ text "Location" ]
-                , select
-                    [ class "form-select"
-                    , id locationFieldId
-                    , required True
-                    , readonly (model.formState /= Editing)
-                    , on "change" (Json.Decode.map LocationInput targetValue)
-                    , validationClasses model.showValidation locationValidationResult
-                    ]
-                    (placeholderOption (model.rampLocationId == Nothing) "Select your location..."
-                        :: List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
-                    )
-                , invalidFeedback locationValidationResult
-                , div [ class "form-text", class "mb-3" ]
-                    [ text (rampObjectLabel model.rampLocationOptions model.studentDefaultLocationId ++ "-based members should select ")
-                    , strong [] [ text (rampObjectLabel model.rampLocationOptions model.studentDefaultLocationId) ]
-                    , text ". All other members should select "
-                    , strong [] [ text (rampObjectLabel model.rampLocationOptions model.nonStudentDefaultLocationId) ]
-                    , text "."
-                    ]
-                ]
+                (renderSelect
+                    { fieldId = locationFieldId
+                    , labelText = "Location"
+                    , placeholderSelected = model.rampLocationId == Nothing
+                    , placeholderLabel = "Select your location..."
+                    , isReadonly = model.formState /= Editing
+                    , onChange = Json.Decode.map LocationInput targetValue
+                    , validationAttribute = validationClasses model.showValidation locationValidationResult
+                    , options =
+                        List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
+                    , validationResult = locationValidationResult
+                    }
+                    ++ [ div [ class "form-text", class "mb-3" ]
+                            [ text (rampObjectLabel model.rampLocationOptions model.studentDefaultLocationId ++ "-based members should select ")
+                            , strong [] [ text (rampObjectLabel model.rampLocationOptions model.studentDefaultLocationId) ]
+                            , text ". All other members should select "
+                            , strong [] [ text (rampObjectLabel model.rampLocationOptions model.nonStudentDefaultLocationId) ]
+                            , text "."
+                            ]
+                       ]
+                )
             , div [ class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for roleFieldId, class "form-label" ]
-                    [ text "Role" ]
-                , select
-                    [ class "form-select"
-                    , id roleFieldId
-                    , required True
-                    , readonly (model.formState /= Editing)
-                    , on "change" (Json.Decode.map RoleInput targetValue)
-                    , validationClasses model.showValidation roleValidationResult
-                    ]
-                    (placeholderOption (model.rampRoleId == Nothing) "Select your role..."
-                        :: List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
-                    )
-                , invalidFeedback roleValidationResult
-                , div [ class "form-text", class "d-md-none", class "mb-3" ]
-                    ([ text "Most members should select "
-                     , strong [] [ text "Employee" ]
-                     , text ", unless you have a specific need for additional access. Read more about roles in the "
-                     ]
-                        ++ userRolesRampHelpCenterLink
-                    )
-                , div [ class "form-text", class "d-none", class "mb-3", class "d-md-block" ]
-                    ([ text "Corporation staff that need to manage our Ramp account should select "
-                     , strong [] [ text "Admin" ]
-                     , text ". Technology staff that need to manage users within Ramp should select "
-                     , strong [] [ text "IT admin" ]
-                     , text ". Members that need to view all activity within Ramp should select "
-                     , strong [] [ text "Accounting" ]
-                     , text ". All other members should select "
-                     , strong [] [ text "Employee" ]
-                     , text ". Read more about roles in the "
-                     ]
-                        ++ userRolesRampHelpCenterLink
-                    )
-                ]
+                (renderSelect
+                    { fieldId = roleFieldId
+                    , labelText = "Role"
+                    , placeholderSelected = model.rampRoleId == Nothing
+                    , placeholderLabel = "Select your role..."
+                    , isReadonly = model.formState /= Editing
+                    , onChange = Json.Decode.map RoleInput targetValue
+                    , validationAttribute = validationClasses model.showValidation roleValidationResult
+                    , options =
+                        List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
+                    , validationResult = roleValidationResult
+                    }
+                    ++ [ div [ class "form-text", class "d-md-none", class "mb-3" ]
+                            ([ text "Most members should select "
+                             , strong [] [ text "Employee" ]
+                             , text ", unless you have a specific need for additional access. Read more about roles in the "
+                             ]
+                                ++ userRolesRampHelpCenterLink
+                            )
+                       , div [ class "form-text", class "d-none", class "mb-3", class "d-md-block" ]
+                            ([ text "Corporation staff that need to manage our Ramp account should select "
+                             , strong [] [ text "Admin" ]
+                             , text ". Technology staff that need to manage users within Ramp should select "
+                             , strong [] [ text "IT admin" ]
+                             , text ". Members that need to view all activity within Ramp should select "
+                             , strong [] [ text "Accounting" ]
+                             , text ". All other members should select "
+                             , strong [] [ text "Employee" ]
+                             , text ". Read more about roles in the "
+                             ]
+                                ++ userRolesRampHelpCenterLink
+                            )
+                       ]
+                )
             , div [ class "col-12" ]
                 [ div [ class "form-check" ]
                     [ input
@@ -1519,22 +1511,18 @@ renderForm model =
                 , invalidFeedback cityValidationResult
                 ]
             , div [ class "col-md-3", class "col-8", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ label [ for stateFieldId, class "form-label" ] [ text "State" ]
-                , select
-                    [ class "form-select"
-                    , id stateFieldId
-                    , minlength 1
-                    , maxlength 40
-                    , required True
-                    , readonly (model.formState /= Editing)
-                    , addressValidationClasses model.showValidation model.addressIsValid stateValidationResult
-                    , on "change" (Json.Decode.map StateInput targetValue)
-                    ]
-                    (placeholderOption (model.state == Nothing) "Select..."
-                        :: List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
-                    )
-                , invalidFeedback stateValidationResult
-                ]
+                (renderSelect
+                    { fieldId = stateFieldId
+                    , labelText = "State"
+                    , placeholderSelected = model.state == Nothing
+                    , placeholderLabel = "Select..."
+                    , isReadonly = model.formState /= Editing
+                    , onChange = Json.Decode.map StateInput targetValue
+                    , validationAttribute = addressValidationClasses model.showValidation model.addressIsValid stateValidationResult
+                    , options = List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
+                    , validationResult = stateValidationResult
+                    }
+                )
             , div [ class "col-md-3", class "col-4", class "mb-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for zipCodeFieldId, class "form-label" ] [ text "ZIP Code" ]
                 , input
@@ -1952,6 +1940,38 @@ placeholderOption isSelected labelText =
         , style "display" "none"
         ]
         [ text labelText ]
+
+
+type alias SelectFieldConfig =
+    { fieldId : String
+    , labelText : String
+    , placeholderSelected : Bool
+    , placeholderLabel : String
+    , isReadonly : Bool
+    , onChange : Decoder Msg
+    , validationAttribute : Attribute Msg
+    , options : List (Html Msg)
+    , validationResult : ValidationResult
+    }
+
+
+renderSelect : SelectFieldConfig -> List (Html Msg)
+renderSelect config =
+    [ label [ for config.fieldId, class "form-label" ]
+        [ text config.labelText ]
+    , select
+        [ class "form-select"
+        , id config.fieldId
+        , required True
+        , readonly config.isReadonly
+        , on "change" config.onChange
+        , config.validationAttribute
+        ]
+        (placeholderOption config.placeholderSelected config.placeholderLabel
+            :: config.options
+        )
+    , invalidFeedback config.validationResult
+    ]
 
 
 loadingIndicatorRow : List (Attribute msg) -> Bool -> String -> Html msg
