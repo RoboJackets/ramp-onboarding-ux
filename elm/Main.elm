@@ -91,129 +91,84 @@ managerDepartmentFeedbackText =
     "Please select a manager within your department"
 
 
-firstNameFieldName : String
-firstNameFieldName =
+
+-- localStorage form-state keys: written by encodeFormState, read by buildInitialModel.
+-- Changing a value orphans previously saved form state.
+
+
+firstNameLocalStorageKey : String
+firstNameLocalStorageKey =
     "firstName"
 
 
-lastNameFieldName : String
-lastNameFieldName =
+lastNameLocalStorageKey : String
+lastNameLocalStorageKey =
     "lastName"
 
 
-emailAddressFieldName : String
-emailAddressFieldName =
+emailAddressLocalStorageKey : String
+emailAddressLocalStorageKey =
     "emailAddress"
 
 
-emailVerifiedFieldName : String
-emailVerifiedFieldName =
-    "emailVerified"
-
-
-managerApiaryIdFieldName : String
-managerApiaryIdFieldName =
+managerApiaryIdLocalStorageKey : String
+managerApiaryIdLocalStorageKey =
     "managerApiaryId"
 
 
-managerRampIdFieldName : String
-managerRampIdFieldName =
+managerRampIdLocalStorageKey : String
+managerRampIdLocalStorageKey =
     "managerRampId"
 
 
-departmentIdFieldName : String
-departmentIdFieldName =
+departmentIdLocalStorageKey : String
+departmentIdLocalStorageKey =
     "departmentId"
 
 
-locationIdFieldName : String
-locationIdFieldName =
+locationIdLocalStorageKey : String
+locationIdLocalStorageKey =
     "locationId"
 
 
-roleIdFieldName : String
-roleIdFieldName =
+roleIdLocalStorageKey : String
+roleIdLocalStorageKey =
     "roleId"
 
 
-orderPhysicalCardFieldName : String
-orderPhysicalCardFieldName =
+orderPhysicalCardLocalStorageKey : String
+orderPhysicalCardLocalStorageKey =
     "orderPhysicalCard"
 
 
-addressLineOneFieldName : String
-addressLineOneFieldName =
+addressLineOneLocalStorageKey : String
+addressLineOneLocalStorageKey =
     "addressLineOne"
 
 
-addressLineTwoFieldName : String
-addressLineTwoFieldName =
+addressLineTwoLocalStorageKey : String
+addressLineTwoLocalStorageKey =
     "addressLineTwo"
 
 
-cityFieldName : String
-cityFieldName =
+cityLocalStorageKey : String
+cityLocalStorageKey =
     "city"
 
 
-stateFieldName : String
-stateFieldName =
+stateLocalStorageKey : String
+stateLocalStorageKey =
     "state"
 
 
-zipCodeFieldName : String
-zipCodeFieldName =
+zipCodeLocalStorageKey : String
+zipCodeLocalStorageKey =
     "zip"
 
 
-showAdvancedOptionsFieldName : String
-showAdvancedOptionsFieldName =
+showAdvancedOptionsLocalStorageKey : String
+showAdvancedOptionsLocalStorageKey =
     "showAdvancedOptions"
-
-
-googleMapsApiKeyFieldName : String
-googleMapsApiKeyFieldName =
-    "googleMapsApiKey"
-
-
-serverDataFieldName : String
-serverDataFieldName =
-    "serverData"
-
-
-localDataFieldName : String
-localDataFieldName =
-    "localData"
-
-
-apiaryManagerOptionsFieldName : String
-apiaryManagerOptionsFieldName =
-    "apiaryManagerOptions"
-
-
-rampManagerOptionsFieldName : String
-rampManagerOptionsFieldName =
-    "rampManagerOptions"
-
-
-departmentOptionsFieldName : String
-departmentOptionsFieldName =
-    "departmentOptions"
-
-
-locationOptionsFieldName : String
-locationOptionsFieldName =
-    "locationOptions"
-
-
-roleOptionsFieldName : String
-roleOptionsFieldName =
-    "roleOptions"
-
-
-selfIdFieldName : String
-selfIdFieldName =
-    "selfApiaryId"
 
 
 
@@ -534,13 +489,13 @@ main =
 
 init : Value -> Url.Url -> Nav.Key -> ( AppModel, Cmd Msg )
 init flags _ _ =
-    case decodeValue (field serverDataFieldName serverDataDecoder) flags of
+    case decodeValue (field "serverData" serverDataDecoder) flags of
         Ok serverData ->
             let
                 localData : Value
                 localData =
                     flags
-                        |> decodeValue (field localDataFieldName string)
+                        |> decodeValue (field "localData" string)
                         |> Result.andThen (decodeString Json.Decode.value)
                         |> Result.withDefault Json.Encode.null
 
@@ -717,7 +672,7 @@ updateReady msg model =
                 Nav.load
                     (Url.Builder.absolute
                         [ "verify-email" ]
-                        [ Url.Builder.string emailAddressFieldName model.emailAddress ]
+                        [ Url.Builder.string "emailAddress" model.emailAddress ]
                     )
 
               else
@@ -936,10 +891,10 @@ updateReady msg model =
                             , body =
                                 jsonBody
                                     (Json.Encode.object
-                                        [ ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
-                                        , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
-                                        , ( cityFieldName, Json.Encode.string (String.trim model.city) )
-                                        , ( stateFieldName
+                                        [ ( "addressLineOne", Json.Encode.string (String.trim model.addressLineOne) )
+                                        , ( "addressLineTwo", Json.Encode.string (String.trim model.addressLineTwo) )
+                                        , ( "city", Json.Encode.string (String.trim model.city) )
+                                        , ( "state"
                                           , case model.state of
                                                 Just state ->
                                                     Json.Encode.string state
@@ -947,7 +902,7 @@ updateReady msg model =
                                                 Nothing ->
                                                     Json.Encode.null
                                           )
-                                        , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
+                                        , ( "zip", Json.Encode.string (String.trim model.zip) )
                                         ]
                                     )
                             , expect = expectWhatever OrderPhysicalCardResponseReceived
@@ -2070,10 +2025,10 @@ encodeFormState : Model -> String
 encodeFormState model =
     Json.Encode.encode 0
         (Json.Encode.object
-            [ ( firstNameFieldName, Json.Encode.string (String.trim model.firstName) )
-            , ( lastNameFieldName, Json.Encode.string (String.trim model.lastName) )
-            , ( emailAddressFieldName, Json.Encode.string (String.trim model.emailAddress) )
-            , ( managerApiaryIdFieldName
+            [ ( firstNameLocalStorageKey, Json.Encode.string (String.trim model.firstName) )
+            , ( lastNameLocalStorageKey, Json.Encode.string (String.trim model.lastName) )
+            , ( emailAddressLocalStorageKey, Json.Encode.string (String.trim model.emailAddress) )
+            , ( managerApiaryIdLocalStorageKey
               , case model.managerApiaryId of
                     Just managerApiaryId ->
                         Json.Encode.int managerApiaryId
@@ -2081,7 +2036,7 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( managerRampIdFieldName
+            , ( managerRampIdLocalStorageKey
               , case model.managerRampId of
                     Just managerRampId ->
                         Json.Encode.string (String.trim managerRampId)
@@ -2089,7 +2044,7 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( departmentIdFieldName
+            , ( departmentIdLocalStorageKey
               , case model.rampDepartmentId of
                     Just departmentId ->
                         Json.Encode.string (String.trim departmentId)
@@ -2097,7 +2052,7 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( locationIdFieldName
+            , ( locationIdLocalStorageKey
               , case model.rampLocationId of
                     Just locationId ->
                         Json.Encode.string (String.trim locationId)
@@ -2105,7 +2060,7 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( roleIdFieldName
+            , ( roleIdLocalStorageKey
               , case model.rampRoleId of
                     Just roleId ->
                         Json.Encode.string (String.trim roleId)
@@ -2113,12 +2068,12 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( showAdvancedOptionsFieldName, Json.Encode.bool model.showAdvancedOptions )
-            , ( orderPhysicalCardFieldName, Json.Encode.bool model.orderPhysicalCard )
-            , ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
-            , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
-            , ( cityFieldName, Json.Encode.string (String.trim model.city) )
-            , ( stateFieldName
+            , ( showAdvancedOptionsLocalStorageKey, Json.Encode.bool model.showAdvancedOptions )
+            , ( orderPhysicalCardLocalStorageKey, Json.Encode.bool model.orderPhysicalCard )
+            , ( addressLineOneLocalStorageKey, Json.Encode.string (String.trim model.addressLineOne) )
+            , ( addressLineTwoLocalStorageKey, Json.Encode.string (String.trim model.addressLineTwo) )
+            , ( cityLocalStorageKey, Json.Encode.string (String.trim model.city) )
+            , ( stateLocalStorageKey
               , case model.state of
                     Just state ->
                         Json.Encode.string (String.trim state)
@@ -2126,7 +2081,7 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
+            , ( zipCodeLocalStorageKey, Json.Encode.string (String.trim model.zip) )
             ]
         )
 
@@ -2307,30 +2262,30 @@ stringToInt =
 serverDataDecoder : Decoder ServerData
 serverDataDecoder =
     succeed ServerData
-        |> andMap (field firstNameFieldName trimmedString)
-        |> andMap (field lastNameFieldName trimmedString)
-        |> andMap (field emailAddressFieldName trimmedString)
-        |> andMap (field emailVerifiedFieldName bool)
-        |> andMap (field managerApiaryIdFieldName (nullable stringToInt))
-        |> andMap (field apiaryManagerOptionsFieldName (intKeyedDict string))
-        |> andMap (field managerRampIdFieldName (nullable string))
-        |> andMap (field rampManagerOptionsFieldName (dict rampUserDecoder))
-        |> andMap (field selfIdFieldName stringToInt)
-        |> andMap (field addressLineOneFieldName trimmedString)
-        |> andMap (field addressLineTwoFieldName trimmedString)
-        |> andMap (field cityFieldName trimmedString)
-        |> andMap (field stateFieldName (nullable string))
-        |> andMap (field zipCodeFieldName trimmedString)
-        |> andMap (field googleMapsApiKeyFieldName trimmedString)
+        |> andMap (field "firstName" trimmedString)
+        |> andMap (field "lastName" trimmedString)
+        |> andMap (field "emailAddress" trimmedString)
+        |> andMap (field "emailVerified" bool)
+        |> andMap (field "managerApiaryId" (nullable stringToInt))
+        |> andMap (field "apiaryManagerOptions" (intKeyedDict string))
+        |> andMap (field "managerRampId" (nullable string))
+        |> andMap (field "rampManagerOptions" (dict rampUserDecoder))
+        |> andMap (field "selfApiaryId" stringToInt)
+        |> andMap (field "addressLineOne" trimmedString)
+        |> andMap (field "addressLineTwo" trimmedString)
+        |> andMap (field "city" trimmedString)
+        |> andMap (field "state" (nullable string))
+        |> andMap (field "zip" trimmedString)
+        |> andMap (field "googleMapsApiKey" trimmedString)
         |> andMap (field "googleClientId" trimmedString)
         |> andMap (field "googleOneTapLoginUri" trimmedString)
-        |> andMap (field showAdvancedOptionsFieldName bool)
-        |> andMap (field departmentOptionsFieldName (dict rampObjectDecoder))
-        |> andMap (field departmentIdFieldName (nullable string))
-        |> andMap (field locationOptionsFieldName (dict rampObjectDecoder))
-        |> andMap (field locationIdFieldName (nullable string))
-        |> andMap (field roleOptionsFieldName (dict rampObjectDecoder))
-        |> andMap (field roleIdFieldName (nullable string))
+        |> andMap (field "showAdvancedOptions" bool)
+        |> andMap (field "departmentOptions" (dict rampObjectDecoder))
+        |> andMap (field "departmentId" (nullable string))
+        |> andMap (field "locationOptions" (dict rampObjectDecoder))
+        |> andMap (field "locationId" (nullable string))
+        |> andMap (field "roleOptions" (dict rampObjectDecoder))
+        |> andMap (field "roleId" (nullable string))
         |> andMap (field "defaultDepartmentForStudents" trimmedString)
         |> andMap (field "defaultDepartmentForNonStudents" trimmedString)
         |> andMap (field "defaultLocationForStudents" trimmedString)
@@ -2522,7 +2477,7 @@ createRampAccountTask model =
                     , ( "departmentId", Json.Encode.string (withDefault "" model.rampDepartmentId) )
                     , ( "locationId", Json.Encode.string (withDefault "" model.rampLocationId) )
                     , ( "role", Json.Encode.string (withDefault "" model.rampRoleId) )
-                    , ( orderPhysicalCardFieldName, Json.Encode.bool model.orderPhysicalCard )
+                    , ( "orderPhysicalCard", Json.Encode.bool model.orderPhysicalCard )
                     ]
                 )
         , expect = expectJson CreateRampAccountTaskIdReceived createTaskResponseDecoder
@@ -2593,27 +2548,27 @@ classifyCampusAddress model =
 
 buildInitialModel : ServerData -> Value -> Model
 buildInitialModel serverData localData =
-    { firstName = trimmedLocalOr firstNameFieldName serverData.firstName localData
-    , lastName = trimmedLocalOr lastNameFieldName serverData.lastName localData
+    { firstName = trimmedLocalOr firstNameLocalStorageKey serverData.firstName localData
+    , lastName = trimmedLocalOr lastNameLocalStorageKey serverData.lastName localData
     , emailAddress =
         if serverData.emailVerified then
             serverData.emailAddress
 
         else
-            trimmedLocalOr emailAddressFieldName serverData.emailAddress localData
+            trimmedLocalOr emailAddressLocalStorageKey serverData.emailAddress localData
     , emailVerified = serverData.emailVerified
     , managerApiaryOptions = serverData.apiaryManagerOptions
-    , managerApiaryId = validatedId managerApiaryIdFieldName int (\managerId -> managerId /= serverData.selfApiaryId && Dict.member managerId serverData.apiaryManagerOptions) localData serverData.managerApiaryId
-    , managerRampId = validatedId managerRampIdFieldName string (isEnabledOption serverData.rampManagerOptions) localData serverData.managerRampId
+    , managerApiaryId = validatedId managerApiaryIdLocalStorageKey int (\managerId -> managerId /= serverData.selfApiaryId && Dict.member managerId serverData.apiaryManagerOptions) localData serverData.managerApiaryId
+    , managerRampId = validatedId managerRampIdLocalStorageKey string (isEnabledOption serverData.rampManagerOptions) localData serverData.managerRampId
     , managerIsValid = Nothing
     , managerFeedbackText = ""
     , selfApiaryId = serverData.selfApiaryId
-    , orderPhysicalCard = localOr orderPhysicalCardFieldName bool True localData
-    , addressLineOne = trimmedLocalOr addressLineOneFieldName serverData.addressLineOne localData
-    , addressLineTwo = trimmedLocalOr addressLineTwoFieldName serverData.addressLineTwo localData
-    , city = trimmedLocalOr cityFieldName serverData.city localData
-    , state = validatedId stateFieldName string (\stateCode -> Dict.member stateCode statesMap) localData serverData.state
-    , zip = trimmedLocalOr zipCodeFieldName serverData.zip localData
+    , orderPhysicalCard = localOr orderPhysicalCardLocalStorageKey bool True localData
+    , addressLineOne = trimmedLocalOr addressLineOneLocalStorageKey serverData.addressLineOne localData
+    , addressLineTwo = trimmedLocalOr addressLineTwoLocalStorageKey serverData.addressLineTwo localData
+    , city = trimmedLocalOr cityLocalStorageKey serverData.city localData
+    , state = validatedId stateLocalStorageKey string (\stateCode -> Dict.member stateCode statesMap) localData serverData.state
+    , zip = trimmedLocalOr zipCodeLocalStorageKey serverData.zip localData
     , addressLineTwoRequired = False
     , addressIsValid = Nothing
     , showValidation = False
@@ -2624,13 +2579,13 @@ buildInitialModel serverData localData =
     , zone = Time.utc
     , formState = Editing
     , redirectingToEmailVerification = False
-    , showAdvancedOptions = serverData.showAdvancedOptions || localOr showAdvancedOptionsFieldName bool False localData
+    , showAdvancedOptions = serverData.showAdvancedOptions || localOr showAdvancedOptionsLocalStorageKey bool False localData
     , rampDepartmentOptions = serverData.departmentOptions
     , rampLocationOptions = serverData.locationOptions
     , rampRoleOptions = serverData.roleOptions
-    , rampDepartmentId = validatedId departmentIdFieldName string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
-    , rampLocationId = validatedId locationIdFieldName string (isEnabledOption serverData.locationOptions) localData serverData.locationId
-    , rampRoleId = validatedId roleIdFieldName string (isEnabledOption serverData.roleOptions) localData serverData.roleId
+    , rampDepartmentId = validatedId departmentIdLocalStorageKey string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
+    , rampLocationId = validatedId locationIdLocalStorageKey string (isEnabledOption serverData.locationOptions) localData serverData.locationId
+    , rampRoleId = validatedId roleIdLocalStorageKey string (isEnabledOption serverData.roleOptions) localData serverData.roleId
     , studentDefaultDepartmentId = serverData.studentDefaultDepartmentId
     , nonStudentDefaultDepartmentId = serverData.nonStudentDefaultDepartmentId
     , studentDefaultLocationId = serverData.studentDefaultLocationId
