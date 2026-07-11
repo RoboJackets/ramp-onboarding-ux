@@ -1,3 +1,5 @@
+import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
+
 const localStorageRequiredMessage = "Local storage is required to use this app. Please make sure it's enabled in your browser, then reload the page.";
 
 let localData = null;
@@ -18,8 +20,6 @@ const app = Elm.Main.init(
 );
 
 app.ports.saveToLocalStorage.subscribe(function (message) {
-    "use strict";
-
     try {
         localStorage.setItem("formFields", message);
     } catch (error) {
@@ -31,27 +31,45 @@ app.ports.saveToLocalStorage.subscribe(function (message) {
 });
 
 app.ports.showAlert.subscribe(function (message) {
-    "use strict";
-
     alert(message);
 });
 
+function attachAutocomplete(places, fieldId) {
+    const input = document.getElementById(fieldId);
+
+    if (input === null) {
+        window.requestAnimationFrame(function () {
+            attachAutocomplete(places, fieldId);
+        });
+        return;
+    }
+
+    const autocomplete = new places.Autocomplete(input, {
+        componentRestrictions: { country: ["us"] },
+        fields: ["address_components"],
+        types: ["address"],
+    });
+
+    autocomplete.addListener("place_changed", function () {
+        app.ports.placeChanged.send(autocomplete.getPlace());
+    });
+}
+
 app.ports.initializeAutocomplete.subscribe(function (message) {
-    "use strict";
+    setOptions({
+        key: message.apiKey,
+        v: "weekly",
+        language: "en",
+        region: "US",
+    });
 
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.async = true;
-    script.src = "https://maps.googleapis.com/maps/api/js?&libraries=places&callback=initializeAutocomplete&loading=async&language=en&region=US&key=" + message;
-
-    document.head.appendChild(script);
+    importLibrary("places").then(function (places) {
+        attachAutocomplete(places, message.fieldId);
+    });
 });
 
-app.ports.initializeOneTap.subscribe(function (message) {
-    "use strict";
-
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
+app.ports.initializeOneTap.subscribe(function () {
+    const script = document.createElement("script");
     script.async = true;
     script.src = "https://accounts.google.com/gsi/client";
 

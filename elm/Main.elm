@@ -547,7 +547,7 @@ init flags _ _ =
             , Cmd.batch
                 [ Task.perform SetTime Time.now
                 , Task.perform SetZone Time.here
-                , initializeAutocomplete model.googleMapsApiKey
+                , initializeAutocomplete { apiKey = model.googleMapsApiKey, fieldId = addressLineOneFieldId }
                 , if showOneTap model then
                     initializeOneTap True
 
@@ -2750,7 +2750,7 @@ termsOfServiceItemToLink ( label, url ) =
 -- PORTS
 
 
-port initializeAutocomplete : String -> Cmd msg
+port initializeAutocomplete : { apiKey : String, fieldId : String } -> Cmd msg
 
 
 port initializeOneTap : Bool -> Cmd msg

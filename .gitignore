@@ -166,6 +166,7 @@ elm-stuff/
 
 # Build artifacts
 js/elm.js
+js/entrypoint.bundle.js
 static/app.js
 main.js
 
