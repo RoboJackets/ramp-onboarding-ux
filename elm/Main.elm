@@ -217,6 +217,85 @@ selfIdFieldName =
 
 
 
+-- FIELD IDS
+
+
+firstNameFieldId : String
+firstNameFieldId =
+    "first_name"
+
+
+lastNameFieldId : String
+lastNameFieldId =
+    "last_name"
+
+
+emailAddressFieldId : String
+emailAddressFieldId =
+    "email_address"
+
+
+emailVerificationButtonId : String
+emailVerificationButtonId =
+    "email_verification_button"
+
+
+managerFieldId : String
+managerFieldId =
+    "manager"
+
+
+departmentFieldId : String
+departmentFieldId =
+    "department"
+
+
+locationFieldId : String
+locationFieldId =
+    "location"
+
+
+roleFieldId : String
+roleFieldId =
+    "role"
+
+
+orderPhysicalCardFieldId : String
+orderPhysicalCardFieldId =
+    "order_physical_card"
+
+
+addressLineOneFieldId : String
+addressLineOneFieldId =
+    "address_line_one"
+
+
+addressLineTwoFieldId : String
+addressLineTwoFieldId =
+    "address_line_two"
+
+
+cityFieldId : String
+cityFieldId =
+    "city"
+
+
+stateFieldId : String
+stateFieldId =
+    "state"
+
+
+zipCodeFieldId : String
+zipCodeFieldId =
+    "zip_code"
+
+
+submitButtonId : String
+submitButtonId =
+    "submit_button"
+
+
+
 -- ICONS
 
 
@@ -503,8 +582,8 @@ updateReady msg model =
             ( model, Cmd.none )
 
         FormSubmitted ->
-            case validateModel model of
-                Invalid fieldId ->
+            case firstInvalidFieldId model of
+                Just fieldId ->
                     ( { model
                         | showValidation = True
                         , formState = Editing
@@ -513,7 +592,7 @@ updateReady msg model =
                     , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
                     )
 
-                Valid ->
+                Nothing ->
                     ( { model
                         | showValidation = True
                         , formState =
@@ -683,7 +762,7 @@ updateReady msg model =
             in
             ( newModel
             , Cmd.batch
-                [ Task.attempt (\_ -> NoOpMsg) (focus "address_line_two")
+                [ Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
                 , saveFormStateToLocalStorage newModel
                 ]
             )
@@ -756,7 +835,7 @@ updateReady msg model =
                                 Cmd.none
 
                     else if missingAddressLineTwo then
-                        Task.attempt (\_ -> NoOpMsg) (focus "address_line_two")
+                        Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
 
                     else
                         Cmd.none
@@ -821,7 +900,7 @@ updateReady msg model =
                             else if model.orderPhysicalCard then
                                 case model.addressIsValid of
                                     Just True ->
-                                        if validateModel model == Valid then
+                                        if firstInvalidFieldId model == Nothing then
                                             CreatingRampAccount
 
                                         else
@@ -851,7 +930,7 @@ updateReady msg model =
                         if model.orderPhysicalCard then
                             case model.addressIsValid of
                                 Just True ->
-                                    if validateModel model == Valid then
+                                    if firstInvalidFieldId model == Nothing then
                                         task
 
                                     else
@@ -1004,10 +1083,10 @@ updateReady msg model =
                 [ saveFormStateToLocalStorage newModel
                 , case getManagerRampIdFromApiaryId model of
                     Just _ ->
-                        Task.attempt (\_ -> NoOpMsg) (focus "department")
+                        Task.attempt (\_ -> NoOpMsg) (focus departmentFieldId)
 
                     Nothing ->
-                        Task.attempt (\_ -> NoOpMsg) (focus "manager")
+                        Task.attempt (\_ -> NoOpMsg) (focus managerFieldId)
                 ]
             )
 
@@ -1202,10 +1281,10 @@ renderForm model =
             , onSubmit FormSubmitted
             ]
             [ div [ class "col-6" ]
-                [ label [ for "first_name", class "form-label" ]
+                [ label [ for firstNameFieldId, class "form-label" ]
                     [ text "First Name" ]
                 , input
-                    [ id "first_name"
+                    [ id firstNameFieldId
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation firstNameValidationResult
@@ -1223,10 +1302,10 @@ renderForm model =
                 , invalidFeedback firstNameValidationResult
                 ]
             , div [ class "col-6" ]
-                [ label [ for "last_name", class "form-label" ]
+                [ label [ for lastNameFieldId, class "form-label" ]
                     [ text "Last Name" ]
                 , input
-                    [ id "last_name"
+                    [ id lastNameFieldId
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation lastNameValidationResult
@@ -1246,11 +1325,11 @@ renderForm model =
             , div [ class "form-text", class "mb-3" ]
                 [ text "Your name must match your government-issued identification and be a maximum of 80 characters." ]
             , div [ class "col-12" ]
-                [ label [ for "email_address", class "form-label" ]
+                [ label [ for emailAddressFieldId, class "form-label" ]
                     [ text "Email Address" ]
                 , div [ class "input-group" ]
                     [ input
-                        [ id "email_address"
+                        [ id emailAddressFieldId
                         , name "email_address"
                         , type_ "email"
                         , class "form-control"
@@ -1269,7 +1348,7 @@ renderForm model =
                         , class "btn-primary"
                         , class "rounded-end"
                         , type_ "button"
-                        , id "email_verification_button"
+                        , id emailVerificationButtonId
                         , disabled
                             (model.emailVerified
                                 || not (Dict.member emailAddressDomainString emailProviderName)
@@ -1308,12 +1387,12 @@ renderForm model =
             , div [ class "form-text", class "mb-3" ]
                 [ text "You'll receive notifications about your credit card transactions and reimbursements to this address." ]
             , div [ class "col-12" ]
-                [ label [ for "manager", class "form-label" ]
+                [ label [ for managerFieldId, class "form-label" ]
                     [ text "Manager" ]
                 , select
                     [ class "form-select"
                     , name "manager"
-                    , id "manager"
+                    , id managerFieldId
                     , required True
                     , readonly (model.formState /= Editing)
                     , on "change"
@@ -1350,12 +1429,12 @@ renderForm model =
                     [ text "Your manager will be responsible for reviewing your credit card transactions and reimbursement requests. This should typically be your project manager." ]
                 ]
             , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for "department", class "form-label" ]
+                [ label [ for departmentFieldId, class "form-label" ]
                     [ text "Department" ]
                 , select
                     [ class "form-select"
                     , name "department"
-                    , id "department"
+                    , id departmentFieldId
                     , required True
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map DepartmentInput targetValue)
@@ -1374,12 +1453,12 @@ renderForm model =
                     ]
                 ]
             , div [ class "col-md-6", class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for "location", class "form-label" ]
+                [ label [ for locationFieldId, class "form-label" ]
                     [ text "Location" ]
                 , select
                     [ class "form-select"
                     , name "location"
-                    , id "location"
+                    , id locationFieldId
                     , required True
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map LocationInput targetValue)
@@ -1398,12 +1477,12 @@ renderForm model =
                     ]
                 ]
             , div [ class "col-12", classList [ ( "d-none", not model.showAdvancedOptions ) ] ]
-                [ label [ for "role", class "form-label" ]
+                [ label [ for roleFieldId, class "form-label" ]
                     [ text "Role" ]
                 , select
                     [ class "form-select"
                     , name "role"
-                    , id "role"
+                    , id roleFieldId
                     , required True
                     , readonly (model.formState /= Editing)
                     , on "change" (Json.Decode.map RoleInput targetValue)
@@ -1437,7 +1516,7 @@ renderForm model =
             , div [ class "col-12" ]
                 [ div [ class "form-check" ]
                     [ input
-                        [ id "order_physical_card"
+                        [ id orderPhysicalCardFieldId
                         , name "order_physical_card"
                         , type_ "checkbox"
                         , class "form-check-input"
@@ -1447,19 +1526,19 @@ renderForm model =
                         , checked model.orderPhysicalCard
                         ]
                         []
-                    , label [ for "order_physical_card", class "form-check-label" ]
+                    , label [ for orderPhysicalCardFieldId, class "form-check-label" ]
                         [ text "Order a physical card" ]
                     , div [ class "form-text", class "mb-3" ]
                         [ text "We recommend a physical card for everyone. You will only be able to use it once you activate it ", strong [] [ text " and " ], text " request funds within Ramp. If you choose not to order one now, you can do so later within Ramp." ]
                     ]
                 ]
             , div [ class "col-12", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ label [ for "address_line_one", class "form-label" ] [ text "Mailing Address" ]
+                [ label [ for addressLineOneFieldId, class "form-label" ] [ text "Mailing Address" ]
                 , input
                     [ type_ "text"
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid addressLineOneValidationResult
-                    , id "address_line_one"
+                    , id addressLineOneFieldId
                     , name "address_line_one"
                     , minlength 1
                     , maxlength 100
@@ -1485,7 +1564,7 @@ renderForm model =
                     [ type_ "text"
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid addressLineTwoValidationResult
-                    , id "address_line_two"
+                    , id addressLineTwoFieldId
                     , name "address_line_two"
                     , maxlength 100
                     , placeholder "Apt, Suite, Unit, etc. (optional)"
@@ -1498,12 +1577,12 @@ renderForm model =
                 , invalidFeedback addressLineTwoValidationResult
                 ]
             , div [ class "col-md-6", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ label [ for "city", class "form-label" ] [ text "City" ]
+                [ label [ for cityFieldId, class "form-label" ] [ text "City" ]
                 , input
                     [ type_ "text"
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid cityValidationResult
-                    , id "city"
+                    , id cityFieldId
                     , name "city"
                     , minlength 1
                     , maxlength 40
@@ -1518,10 +1597,10 @@ renderForm model =
                 , invalidFeedback cityValidationResult
                 ]
             , div [ class "col-md-3", class "col-8", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ label [ for "state", class "form-label" ] [ text "State" ]
+                [ label [ for stateFieldId, class "form-label" ] [ text "State" ]
                 , select
                     [ class "form-select"
-                    , id "state"
+                    , id stateFieldId
                     , name "state"
                     , minlength 1
                     , maxlength 40
@@ -1536,12 +1615,12 @@ renderForm model =
                 , invalidFeedback stateValidationResult
                 ]
             , div [ class "col-md-3", class "col-4", class "mb-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ label [ for "zip_code", class "form-label" ] [ text "ZIP Code" ]
+                [ label [ for zipCodeFieldId, class "form-label" ] [ text "ZIP Code" ]
                 , input
                     [ type_ "text"
                     , attribute "inputmode" "numeric"
                     , class "form-control"
-                    , id "zip_code"
+                    , id zipCodeFieldId
                     , name "zip_code"
                     , placeholder "ZIP Code"
                     , minlength 5
@@ -1575,7 +1654,7 @@ renderForm model =
                     [ type_ "submit"
                     , class "btn"
                     , class "btn-primary"
-                    , id "submit_button"
+                    , id submitButtonId
                     , disabled (model.formState /= Editing)
                     ]
                     [ text "Create Account"
@@ -1865,68 +1944,31 @@ validateZipCode zipCode =
         Invalid "Please enter exactly 5 digits"
 
 
-validateModel : Model -> ValidationResult
-validateModel model =
-    if not (isValid (validateName "first" model.firstName)) then
-        Invalid "first_name"
+firstInvalidFieldId : Model -> Maybe String
+firstInvalidFieldId model =
+    [ ( firstNameFieldId, isValid (validateName "first" model.firstName) )
+    , ( lastNameFieldId, isValid (validateName "last" model.lastName) )
+    , ( emailAddressFieldId, isValid (validateEmailAddress model.emailAddress True) )
+    , ( emailVerificationButtonId, model.emailVerified )
+    , ( managerFieldId, isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.rampDepartmentId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId) )
+    , ( departmentFieldId, isValid (validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions) )
+    , ( locationFieldId, isValid (validateRampObject "location" model.rampLocationId model.rampLocationOptions) )
+    , ( roleFieldId, isValid (validateRampObject "role" model.rampRoleId model.rampRoleOptions) )
+    , ( addressLineOneFieldId, not model.orderPhysicalCard || isValid (validateAddressLineOne model.addressLineOne) )
+    , ( addressLineTwoFieldId, not model.orderPhysicalCard || isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (checkCampusAddress model)) )
+    , ( cityFieldId, not model.orderPhysicalCard || isValid (validateCity model.city) )
+    , ( stateFieldId, not model.orderPhysicalCard || isValid (validateState model.state) )
+    , ( zipCodeFieldId, not model.orderPhysicalCard || isValid (validateZipCode model.zip) )
+    ]
+        |> List.filterMap
+            (\( fieldId, fieldIsValid ) ->
+                if fieldIsValid then
+                    Nothing
 
-    else if not (isValid (validateName "last" model.lastName)) then
-        Invalid "last_name"
-
-    else if not (isValid (validateEmailAddress model.emailAddress True)) then
-        Invalid "email_address"
-
-    else if not model.emailVerified then
-        Invalid "email_verification_button"
-
-    else if not (isValid (validateManager model.showAdvancedOptions model.managerIsValid model.managerFeedbackText model.managerRampId model.managerApiaryId model.rampDepartmentId model.managerApiaryOptions model.managerRampOptions model.selfApiaryId)) then
-        Invalid "manager"
-
-    else if not (isValid (validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions)) then
-        Invalid "department"
-
-    else if not (isValid (validateRampObject "location" model.rampLocationId model.rampLocationOptions)) then
-        Invalid "location"
-
-    else if not (isValid (validateRampObject "role" model.rampRoleId model.rampRoleOptions)) then
-        Invalid "role"
-
-    else if model.orderPhysicalCard && not (isValid (validateAddressLineOne model.addressLineOne)) then
-        Invalid "address_line_one"
-
-    else if
-        model.orderPhysicalCard
-            && not
-                (isValid
-                    (validateAddressLineTwo
-                        model.addressLineTwo
-                        model.addressLineTwoRequired
-                        (checkCampusAddress model)
-                    )
-                )
-    then
-        Invalid "address_line_two"
-
-    else if model.orderPhysicalCard && not (isValid (validateCity model.city)) then
-        Invalid "city"
-
-    else if
-        model.orderPhysicalCard
-            && (case model.state of
-                    Just _ ->
-                        False
-
-                    Nothing ->
-                        True
-               )
-    then
-        Invalid "state"
-
-    else if model.orderPhysicalCard && not (isValid (validateZipCode model.zip)) then
-        Invalid "zip_code"
-
-    else
-        Valid
+                else
+                    Just fieldId
+            )
+        |> List.head
 
 
 
