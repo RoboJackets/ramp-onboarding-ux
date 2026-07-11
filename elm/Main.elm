@@ -357,12 +357,6 @@ rampRoleRankOrder =
 -- TYPES
 
 
-type NextAction
-    = RedirectToEmailVerification
-    | ContinueSubmission
-    | NoOpNextAction
-
-
 type CampusAddress
     = StudentCenter
     | GraduateLivingCenter
@@ -452,7 +446,7 @@ type alias Model =
     , time : Time.Posix
     , zone : Time.Zone
     , formState : FormState
-    , nextAction : NextAction
+    , redirectingToEmailVerification : Bool
     , createRampAccountTaskId : Maybe String
     , showAdvancedOptions : Bool
     , rampDepartmentOptions : Dict String RampObject
@@ -590,7 +584,6 @@ updateReady msg model =
                     ( { model
                         | showValidation = True
                         , formState = Editing
-                        , nextAction = NoOpNextAction
                       }
                     , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
                     )
@@ -604,41 +597,33 @@ updateReady msg model =
 
                             else
                                 CreatingRampAccount
-                        , nextAction = ContinueSubmission
                       }
-                    , saveFormStateToLocalStorage model
+                    , Cmd.batch
+                        [ saveFormStateToLocalStorage model
+                        , continueSubmission model
+                        ]
                     )
 
         FormChanged ->
-            updateAndSaveToLocalStorage { model | nextAction = NoOpNextAction }
+            updateAndSaveToLocalStorage model
 
         FirstNameInput firstName ->
-            ( { model
-                | firstName = firstName
-                , nextAction = NoOpNextAction
-              }
-            , Cmd.none
-            )
+            ( { model | firstName = firstName }, Cmd.none )
 
         LastNameInput lastName ->
-            ( { model
-                | lastName = lastName
-                , nextAction = NoOpNextAction
-              }
-            , Cmd.none
-            )
+            ( { model | lastName = lastName }, Cmd.none )
 
         EmailAddressInput emailAddress ->
             ( { model
                 | emailAddress = emailAddress
                 , emailVerified = False
-                , nextAction = NoOpNextAction
+                , redirectingToEmailVerification = False
               }
             , Cmd.none
             )
 
         EmailVerificationButtonClicked ->
-            updateAndSaveToLocalStorage { model | nextAction = RedirectToEmailVerification }
+            updateAndSaveToLocalStorage { model | redirectingToEmailVerification = True }
 
         ApiaryManagerInput managerApiaryId ->
             updateAndSaveToLocalStorage
@@ -646,7 +631,6 @@ updateReady msg model =
                     | managerApiaryId = Just managerApiaryId
                     , managerRampId = Nothing
                     , managerIsValid = Nothing
-                    , nextAction = NoOpNextAction
                 }
 
         RampManagerInput managerRampId ->
@@ -655,37 +639,25 @@ updateReady msg model =
                     | managerApiaryId = Nothing
                     , managerRampId = Just managerRampId
                     , managerIsValid = Just True
-                    , nextAction = NoOpNextAction
                 }
 
         OrderPhysicalCardChecked orderPhysicalCard ->
-            updateAndSaveToLocalStorage
-                { model
-                    | orderPhysicalCard = orderPhysicalCard
-                    , nextAction = NoOpNextAction
-                }
+            updateAndSaveToLocalStorage { model | orderPhysicalCard = orderPhysicalCard }
 
         AddressLineOneInput addressLineOne ->
             ( { model
                 | addressLineOne = addressLineOne
-                , nextAction = NoOpNextAction
                 , addressLineTwoRequired = False
               }
             , Cmd.none
             )
 
         AddressLineTwoInput addressLineTwo ->
-            ( { model
-                | addressLineTwo = addressLineTwo
-                , nextAction = NoOpNextAction
-              }
-            , Cmd.none
-            )
+            ( { model | addressLineTwo = addressLineTwo }, Cmd.none )
 
         CityInput city ->
             ( { model
                 | city = city
-                , nextAction = NoOpNextAction
                 , addressLineTwoRequired = False
               }
             , Cmd.none
@@ -695,52 +667,31 @@ updateReady msg model =
             updateAndSaveToLocalStorage
                 { model
                     | state = Just state
-                    , nextAction = NoOpNextAction
                     , addressLineTwoRequired = False
                 }
 
         ZipInput zip ->
             ( { model
                 | zip = zip
-                , nextAction = NoOpNextAction
                 , addressLineTwoRequired = False
               }
             , Cmd.none
             )
 
         NoOpMsg ->
-            ( { model | nextAction = NoOpNextAction }, Cmd.none )
+            ( model, Cmd.none )
 
         LocalStorageSaved _ ->
-            ( { model | nextAction = NoOpNextAction }
-            , case model.nextAction of
-                RedirectToEmailVerification ->
-                    Nav.load
-                        (Url.Builder.absolute
-                            [ "verify-email" ]
-                            [ Url.Builder.string emailAddressFieldName model.emailAddress ]
-                        )
+            ( model
+            , if model.redirectingToEmailVerification then
+                Nav.load
+                    (Url.Builder.absolute
+                        [ "verify-email" ]
+                        [ Url.Builder.string emailAddressFieldName model.emailAddress ]
+                    )
 
-                ContinueSubmission ->
-                    if needsManagerValidation model || needsAddressValidation model then
-                        Cmd.batch
-                            [ if needsManagerValidation model then
-                                requestManagerValidation model
-
-                              else
-                                Cmd.none
-                            , if needsAddressValidation model then
-                                requestGoogleAddressValidation model
-
-                              else
-                                Cmd.none
-                            ]
-
-                    else
-                        createRampAccountTask model
-
-                NoOpNextAction ->
-                    Cmd.none
+              else
+                Cmd.none
             )
 
         PlaceChanged value ->
@@ -758,7 +709,6 @@ updateReady msg model =
                                 , city = String.trim (getAddressComponent addressComponents "locality")
                                 , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
                                 , zip = String.trim (getAddressComponent addressComponents "postal_code")
-                                , nextAction = NoOpNextAction
                             }
                     in
                     ( newModel
@@ -788,8 +738,7 @@ updateReady msg model =
                             False
             in
             ( { model
-                | nextAction = NoOpNextAction
-                , addressLineTwoRequired =
+                | addressLineTwoRequired =
                     case result of
                         Ok _ ->
                             missingAddressLineTwo
@@ -858,20 +807,10 @@ updateReady msg model =
             )
 
         SetTime time ->
-            ( { model
-                | time = time
-                , nextAction = NoOpNextAction
-              }
-            , Cmd.none
-            )
+            ( { model | time = time }, Cmd.none )
 
         SetZone zone ->
-            ( { model
-                | zone = zone
-                , nextAction = NoOpNextAction
-              }
-            , Cmd.none
-            )
+            ( { model | zone = zone }, Cmd.none )
 
         ManagerValidationResultReceived result ->
             ( { model
@@ -923,7 +862,6 @@ updateReady msg model =
 
                         Err _ ->
                             Editing
-                , nextAction = NoOpNextAction
               }
             , case result of
                 Ok managerRampInfo ->
@@ -978,7 +916,6 @@ updateReady msg model =
 
                         Err _ ->
                             Error
-                , nextAction = NoOpNextAction
               }
             , case result of
                 Ok createRampAccountTaskId ->
@@ -1006,7 +943,6 @@ updateReady msg model =
 
                         Err _ ->
                             Error
-                , nextAction = NoOpNextAction
               }
             , case result of
                 Ok TaskSucceeded ->
@@ -1061,7 +997,6 @@ updateReady msg model =
 
                         Err _ ->
                             Error
-                , nextAction = NoOpNextAction
               }
             , case result of
                 Ok _ ->
@@ -1080,7 +1015,6 @@ updateReady msg model =
                         , managerApiaryId = Nothing
                         , managerRampId = getManagerRampIdFromApiaryId model
                         , managerIsValid = Just True
-                        , nextAction = NoOpNextAction
                     }
             in
             ( newModel
@@ -1096,25 +1030,13 @@ updateReady msg model =
             )
 
         DepartmentInput selectedDepartment ->
-            updateAndSaveToLocalStorage
-                { model
-                    | rampDepartmentId = Just selectedDepartment
-                    , nextAction = NoOpNextAction
-                }
+            updateAndSaveToLocalStorage { model | rampDepartmentId = Just selectedDepartment }
 
         LocationInput selectedLocation ->
-            updateAndSaveToLocalStorage
-                { model
-                    | rampLocationId = Just selectedLocation
-                    , nextAction = NoOpNextAction
-                }
+            updateAndSaveToLocalStorage { model | rampLocationId = Just selectedLocation }
 
         RoleInput selectedRole ->
-            updateAndSaveToLocalStorage
-                { model
-                    | rampRoleId = Just selectedRole
-                    , nextAction = NoOpNextAction
-                }
+            updateAndSaveToLocalStorage { model | rampRoleId = Just selectedRole }
 
 
 subscriptions : AppModel -> Sub Msg
@@ -1353,7 +1275,7 @@ renderForm model =
                         , disabled
                             (model.emailVerified
                                 || not (Dict.member emailAddressDomainString emailProviderName)
-                                || (model.nextAction /= NoOpNextAction)
+                                || model.redirectingToEmailVerification
                             )
                         , onClick EmailVerificationButtonClicked
                         ]
@@ -2422,6 +2344,26 @@ needsAddressValidation model =
     model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
 
 
+continueSubmission : Model -> Cmd Msg
+continueSubmission model =
+    if needsManagerValidation model || needsAddressValidation model then
+        Cmd.batch
+            [ if needsManagerValidation model then
+                requestManagerValidation model
+
+              else
+                Cmd.none
+            , if needsAddressValidation model then
+                requestGoogleAddressValidation model
+
+              else
+                Cmd.none
+            ]
+
+    else
+        createRampAccountTask model
+
+
 requestManagerValidation : Model -> Cmd Msg
 requestManagerValidation model =
     Http.get
@@ -2586,7 +2528,7 @@ buildInitialModel serverData localData =
     , time = millisToPosix 0
     , zone = Time.utc
     , formState = Editing
-    , nextAction = NoOpNextAction
+    , redirectingToEmailVerification = False
     , createRampAccountTaskId = Nothing
     , showAdvancedOptions = serverData.showAdvancedOptions || localOr showAdvancedOptionsFieldName bool False localData
     , rampDepartmentOptions = serverData.departmentOptions
