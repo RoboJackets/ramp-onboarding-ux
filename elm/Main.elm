@@ -24,8 +24,6 @@ import Time exposing (..)
 import Tuple exposing (..)
 import Url
 import Url.Builder
-import W3.Html exposing (toAttribute)
-import W3.Html.Attributes exposing (inputmode, numeric)
 
 
 
@@ -1486,7 +1484,7 @@ renderForm model =
                 [ label [ for "zip_code", class "form-label" ] [ text "ZIP Code" ]
                 , input
                     [ type_ "text"
-                    , toAttribute (inputmode numeric)
+                    , attribute "inputmode" "numeric"
                     , class "form-control"
                     , id "zip_code"
                     , name "zip_code"
