@@ -406,8 +406,11 @@ type alias TaskId =
     { taskId : String }
 
 
-type alias TaskStatus =
-    { taskStatus : String }
+type TaskStatus
+    = TaskStarted
+    | TaskInProgress
+    | TaskSucceeded
+    | TaskFailed
 
 
 type alias RampObject =
@@ -983,65 +986,61 @@ updateReady msg model =
             ( { model
                 | formState =
                     case result of
-                        Ok createRampAccountTaskStatus ->
-                            case createRampAccountTaskStatus.taskStatus of
-                                "SUCCESS" ->
-                                    OrderingPhysicalCard
+                        Ok TaskSucceeded ->
+                            OrderingPhysicalCard
 
-                                "STARTED" ->
-                                    CreatingRampAccount
+                        Ok TaskStarted ->
+                            CreatingRampAccount
 
-                                "IN_PROGRESS" ->
-                                    CreatingRampAccount
+                        Ok TaskInProgress ->
+                            CreatingRampAccount
 
-                                _ ->
-                                    Error
+                        Ok TaskFailed ->
+                            Error
 
                         Err _ ->
                             Error
                 , nextAction = NoOpNextAction
               }
             , case result of
-                Ok createRampAccountTaskStatus ->
-                    case createRampAccountTaskStatus.taskStatus of
-                        "SUCCESS" ->
-                            if model.orderPhysicalCard then
-                                Http.post
-                                    { url =
-                                        Url.Builder.absolute
-                                            [ "order-physical-card" ]
-                                            []
-                                    , body =
-                                        jsonBody
-                                            (Json.Encode.object
-                                                [ ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
-                                                , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
-                                                , ( cityFieldName, Json.Encode.string (String.trim model.city) )
-                                                , ( stateFieldName
-                                                  , case model.state of
-                                                        Just state ->
-                                                            Json.Encode.string state
+                Ok TaskSucceeded ->
+                    if model.orderPhysicalCard then
+                        Http.post
+                            { url =
+                                Url.Builder.absolute
+                                    [ "order-physical-card" ]
+                                    []
+                            , body =
+                                jsonBody
+                                    (Json.Encode.object
+                                        [ ( addressLineOneFieldName, Json.Encode.string (String.trim model.addressLineOne) )
+                                        , ( addressLineTwoFieldName, Json.Encode.string (String.trim model.addressLineTwo) )
+                                        , ( cityFieldName, Json.Encode.string (String.trim model.city) )
+                                        , ( stateFieldName
+                                          , case model.state of
+                                                Just state ->
+                                                    Json.Encode.string state
 
-                                                        Nothing ->
-                                                            Json.Encode.null
-                                                  )
-                                                , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
-                                                ]
-                                            )
-                                    , expect = expectWhatever OrderPhysicalCardResponseReceived
-                                    }
+                                                Nothing ->
+                                                    Json.Encode.null
+                                          )
+                                        , ( zipCodeFieldName, Json.Encode.string (String.trim model.zip) )
+                                        ]
+                                    )
+                            , expect = expectWhatever OrderPhysicalCardResponseReceived
+                            }
 
-                            else
-                                Nav.load model.rampSignInUri
+                    else
+                        Nav.load model.rampSignInUri
 
-                        "STARTED" ->
-                            getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
+                Ok TaskStarted ->
+                    getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
 
-                        "IN_PROGRESS" ->
-                            getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
+                Ok TaskInProgress ->
+                    getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
 
-                        _ ->
-                            Cmd.none
+                Ok TaskFailed ->
+                    Cmd.none
 
                 Err _ ->
                     Cmd.none
@@ -2366,8 +2365,25 @@ createTaskResponseDecoder =
 
 getTaskResponseDecoder : Decoder TaskStatus
 getTaskResponseDecoder =
-    Json.Decode.map TaskStatus
-        (at [ "taskStatus" ] Json.Decode.string)
+    at [ "taskStatus" ] string
+        |> Json.Decode.andThen
+            (\status ->
+                case status of
+                    "STARTED" ->
+                        succeed TaskStarted
+
+                    "IN_PROGRESS" ->
+                        succeed TaskInProgress
+
+                    "SUCCESS" ->
+                        succeed TaskSucceeded
+
+                    "ERROR" ->
+                        succeed TaskFailed
+
+                    _ ->
+                        fail ("Unknown task status: " ++ status)
+            )
 
 
 needsManagerValidation : Model -> Bool
