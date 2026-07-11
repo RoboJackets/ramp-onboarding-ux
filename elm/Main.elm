@@ -6,12 +6,12 @@ import Browser.Navigation as Nav
 import Char exposing (isDigit)
 import Dict exposing (Dict, toList)
 import Email
-import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, select, strong, text)
+import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, pre, select, strong, text)
 import Html.Attributes exposing (action, attribute, checked, class, classList, disabled, for, href, id, maxlength, method, minlength, name, novalidate, placeholder, readonly, required, selected, style, target, type_)
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
-import Json.Decode exposing (Decoder, Value, at, bool, decodeString, decodeValue, dict, field, int, keyValuePairs, maybe, string, succeed)
+import Json.Decode exposing (Decoder, Value, at, bool, decodeString, decodeValue, dict, fail, field, int, keyValuePairs, maybe, nullable, string, succeed)
 import Json.Encode
 import List exposing (sortBy, sortWith, take)
 import Maybe exposing (withDefault)
@@ -391,6 +391,11 @@ type alias Model =
     }
 
 
+type AppModel
+    = Ready Model
+    | ServerDataInvalid Json.Decode.Error
+
+
 type Msg
     = UrlRequest Browser.UrlRequest
     | UrlChanged Url.Url
@@ -428,7 +433,7 @@ type Msg
 -- PLUMBING
 
 
-main : Program Value Model Msg
+main : Program Value AppModel Msg
 main =
     Browser.application
         { init = init
@@ -440,29 +445,51 @@ main =
         }
 
 
-init : Value -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init : Value -> Url.Url -> Nav.Key -> ( AppModel, Cmd Msg )
 init flags _ _ =
-    let
-        model : Model
-        model =
-            buildInitialModel flags
-    in
-    ( model
-    , Cmd.batch
-        [ Task.perform SetTime Time.now
-        , Task.perform SetZone Time.here
-        , initializeAutocomplete model.googleMapsApiKey
-        , if showOneTap model then
-            initializeOneTap True
+    case decodeValue (field serverDataFieldName serverDataDecoder) flags of
+        Ok serverData ->
+            let
+                localData : Value
+                localData =
+                    flags
+                        |> decodeValue (field localDataFieldName string)
+                        |> Result.andThen (decodeString Json.Decode.value)
+                        |> Result.withDefault Json.Encode.null
 
-          else
-            Cmd.none
-        ]
-    )
+                model : Model
+                model =
+                    buildInitialModel serverData localData
+            in
+            ( Ready model
+            , Cmd.batch
+                [ Task.perform SetTime Time.now
+                , Task.perform SetZone Time.here
+                , initializeAutocomplete model.googleMapsApiKey
+                , if showOneTap model then
+                    initializeOneTap True
+
+                  else
+                    Cmd.none
+                ]
+            )
+
+        Err decodeError ->
+            ( ServerDataInvalid decodeError, Cmd.none )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Msg -> AppModel -> ( AppModel, Cmd Msg )
+update msg appModel =
+    case appModel of
+        Ready model ->
+            Tuple.mapFirst Ready (updateReady msg model)
+
+        ServerDataInvalid _ ->
+            ( appModel, Cmd.none )
+
+
+updateReady : Msg -> Model -> ( Model, Cmd Msg )
+updateReady msg model =
     case msg of
         UrlRequest urlRequest ->
             case urlRequest of
@@ -1006,16 +1033,45 @@ update msg model =
                 }
 
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.batch
-        [ localStorageSaved LocalStorageSaved
-        , placeChanged PlaceChanged
-        ]
+subscriptions : AppModel -> Sub Msg
+subscriptions appModel =
+    case appModel of
+        Ready _ ->
+            Sub.batch
+                [ localStorageSaved LocalStorageSaved
+                , placeChanged PlaceChanged
+                ]
+
+        ServerDataInvalid _ ->
+            Sub.none
 
 
-view : Model -> Browser.Document Msg
-view model =
+view : AppModel -> Browser.Document Msg
+view appModel =
+    case appModel of
+        Ready model ->
+            viewReady model
+
+        ServerDataInvalid decodeError ->
+            { title = "Ramp Onboarding"
+            , body =
+                [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
+                    [ h1 []
+                        [ text "Ramp Onboarding"
+                        ]
+                    , p [ class "mt-4", class "mb-4" ]
+                        [ text "Something went wrong while loading this page. Please refresh to try again."
+                        ]
+                    , pre [ class "text-secondary" ]
+                        [ text (Json.Decode.errorToString decodeError)
+                        ]
+                    ]
+                ]
+            }
+
+
+viewReady : Model -> Browser.Document Msg
+viewReady model =
     { title = "Ramp Onboarding"
     , body =
         case model.formState of
@@ -2173,6 +2229,108 @@ rampUserDecoder =
         (field "departmentId" string)
 
 
+type alias ServerData =
+    { firstName : String
+    , lastName : String
+    , emailAddress : String
+    , emailVerified : Bool
+    , managerApiaryId : Maybe Int
+    , apiaryManagerOptions : Dict Int String
+    , managerRampId : Maybe String
+    , rampManagerOptions : Dict String RampUser
+    , selfApiaryId : Int
+    , addressLineOne : String
+    , addressLineTwo : String
+    , city : String
+    , state : Maybe String
+    , zip : String
+    , googleMapsApiKey : String
+    , googleClientId : String
+    , googleOneTapLoginUri : String
+    , showAdvancedOptions : Bool
+    , departmentOptions : Dict String RampObject
+    , departmentId : Maybe String
+    , locationOptions : Dict String RampObject
+    , locationId : Maybe String
+    , roleOptions : Dict String RampObject
+    , roleId : Maybe String
+    , studentDefaultDepartmentId : String
+    , nonStudentDefaultDepartmentId : String
+    , studentDefaultLocationId : String
+    , nonStudentDefaultLocationId : String
+    , rampSignInUri : String
+    , businessLegalName : String
+    , slackSupportChannelDeepLink : String
+    , slackSupportChannelName : String
+    }
+
+
+andMap : Decoder a -> Decoder (a -> b) -> Decoder b
+andMap =
+    Json.Decode.map2 (|>)
+
+
+trimmedString : Decoder String
+trimmedString =
+    Json.Decode.map String.trim string
+
+
+intKeyedDict : Decoder a -> Decoder (Dict Int a)
+intKeyedDict valueDecoder =
+    let
+        toIntPair : ( String, a ) -> Maybe ( Int, a )
+        toIntPair ( key, entryValue ) =
+            Maybe.map (\intKey -> ( intKey, entryValue )) (String.toInt key)
+    in
+    keyValuePairs valueDecoder
+        |> Json.Decode.andThen
+            (\pairs ->
+                case List.filter (\( key, _ ) -> String.toInt key == Nothing) pairs of
+                    [] ->
+                        succeed (Dict.fromList (List.filterMap toIntPair pairs))
+
+                    ( badKey, _ ) :: _ ->
+                        fail ("Expected an integer key, but found \"" ++ badKey ++ "\"")
+            )
+
+
+serverDataDecoder : Decoder ServerData
+serverDataDecoder =
+    succeed ServerData
+        |> andMap (field firstNameFieldName trimmedString)
+        |> andMap (field lastNameFieldName trimmedString)
+        |> andMap (field emailAddressFieldName trimmedString)
+        |> andMap (field emailVerifiedFieldName bool)
+        |> andMap (field managerApiaryIdFieldName (nullable int))
+        |> andMap (field apiaryManagerOptionsFieldName (intKeyedDict string))
+        |> andMap (field managerRampIdFieldName (nullable string))
+        |> andMap (field rampManagerOptionsFieldName (dict rampUserDecoder))
+        |> andMap (field selfIdFieldName int)
+        |> andMap (field addressLineOneFieldName trimmedString)
+        |> andMap (field addressLineTwoFieldName trimmedString)
+        |> andMap (field cityFieldName trimmedString)
+        |> andMap (field stateFieldName (nullable string))
+        |> andMap (field zipCodeFieldName trimmedString)
+        |> andMap (field googleMapsApiKeyFieldName trimmedString)
+        |> andMap (field "googleClientId" trimmedString)
+        |> andMap (field "googleOneTapLoginUri" trimmedString)
+        |> andMap (field showAdvancedOptionsFieldName bool)
+        |> andMap (field departmentOptionsFieldName (dict rampObjectDecoder))
+        |> andMap (field departmentIdFieldName (nullable string))
+        |> andMap (field locationOptionsFieldName (dict rampObjectDecoder))
+        |> andMap (field locationIdFieldName (nullable string))
+        |> andMap (field roleOptionsFieldName (dict rampObjectDecoder))
+        |> andMap (field roleIdFieldName (nullable string))
+        |> andMap (field "defaultDepartmentForStudents" trimmedString)
+        |> andMap (field "defaultDepartmentForNonStudents" trimmedString)
+        |> andMap (field "defaultLocationForStudents" trimmedString)
+        |> andMap (field "defaultLocationForNonStudents" trimmedString)
+        |> andMap (field "rampSignInUri" trimmedString)
+        |> andMap (field "businessLegalName" trimmedString)
+        |> andMap (field "slackSupportChannelDeepLink" trimmedString)
+        |> andMap (field "slackSupportChannelName" trimmedString)
+
+
 createTaskResponseDecoder : Decoder TaskId
 createTaskResponseDecoder =
     Json.Decode.map TaskId
@@ -2327,123 +2485,75 @@ checkCampusAddress model =
         NotCampusAddress
 
 
-buildInitialModel : Value -> Model
-buildInitialModel flags =
-    let
-        serverData : Value
-        serverData =
-            Result.withDefault Json.Encode.null (decodeValue (field serverDataFieldName Json.Decode.value) flags)
-
-        localData : Value
-        localData =
-            flags
-                |> decodeValue (field localDataFieldName string)
-                |> Result.andThen (decodeString Json.Decode.value)
-                |> Result.withDefault Json.Encode.null
-
-        emailAddressVerified : Bool
-        emailAddressVerified =
-            Result.withDefault False (decodeValue (field emailVerifiedFieldName bool) serverData)
-
-        apiaryManagerOptions : Dict Int String
-        apiaryManagerOptions =
-            Dict.fromList (List.filterMap (\( key, managerName ) -> Maybe.map (\managerId -> ( managerId, managerName )) (String.toInt key)) (Result.withDefault [] (decodeValue (field apiaryManagerOptionsFieldName (keyValuePairs string)) serverData)))
-
-        apiarySelfId : Int
-        apiarySelfId =
-            Result.withDefault -1 (decodeValue (field selfIdFieldName int) serverData)
-
-        rampManagerOptions : Dict String RampUser
-        rampManagerOptions =
-            Result.withDefault Dict.empty (decodeValue (field rampManagerOptionsFieldName (dict rampUserDecoder)) serverData)
-
-        rampDepartmentOptions : Dict String RampObject
-        rampDepartmentOptions =
-            Result.withDefault Dict.empty (decodeValue (field departmentOptionsFieldName (dict rampObjectDecoder)) serverData)
-
-        rampLocationOptions : Dict String RampObject
-        rampLocationOptions =
-            Result.withDefault Dict.empty (decodeValue (field locationOptionsFieldName (dict rampObjectDecoder)) serverData)
-
-        rampRoleOptions : Dict String RampObject
-        rampRoleOptions =
-            Result.withDefault Dict.empty (decodeValue (field roleOptionsFieldName (dict rampObjectDecoder)) serverData)
-    in
-    { firstName = trimmedLocalThenServer firstNameFieldName localData serverData
-    , lastName = trimmedLocalThenServer lastNameFieldName localData serverData
+buildInitialModel : ServerData -> Value -> Model
+buildInitialModel serverData localData =
+    { firstName = trimmedLocalOr firstNameFieldName serverData.firstName localData
+    , lastName = trimmedLocalOr lastNameFieldName serverData.lastName localData
     , emailAddress =
-        if emailAddressVerified then
-            trimmedServerString emailAddressFieldName serverData
+        if serverData.emailVerified then
+            serverData.emailAddress
 
         else
-            trimmedLocalThenServer emailAddressFieldName localData serverData
-    , emailVerified = emailAddressVerified
-    , managerApiaryOptions = apiaryManagerOptions
-    , managerApiaryId = validatedIdFromLocalThenServer managerApiaryIdFieldName int (\managerId -> managerId /= apiarySelfId && Dict.member managerId apiaryManagerOptions) localData serverData
-    , managerRampId = validatedIdFromLocalThenServer managerRampIdFieldName string (isEnabledOption rampManagerOptions) localData serverData
+            trimmedLocalOr emailAddressFieldName serverData.emailAddress localData
+    , emailVerified = serverData.emailVerified
+    , managerApiaryOptions = serverData.apiaryManagerOptions
+    , managerApiaryId = validatedId managerApiaryIdFieldName int (\managerId -> managerId /= serverData.selfApiaryId && Dict.member managerId serverData.apiaryManagerOptions) localData serverData.managerApiaryId
+    , managerRampId = validatedId managerRampIdFieldName string (isEnabledOption serverData.rampManagerOptions) localData serverData.managerRampId
     , managerIsValid = Nothing
     , managerFeedbackText = ""
-    , selfApiaryId = apiarySelfId
-    , orderPhysicalCard = localThenServer orderPhysicalCardFieldName bool True localData serverData
-    , addressLineOne = trimmedLocalThenServer addressLineOneFieldName localData serverData
-    , addressLineTwo = trimmedLocalThenServer addressLineTwoFieldName localData serverData
-    , city = trimmedLocalThenServer cityFieldName localData serverData
-    , state = validatedIdFromLocalThenServer stateFieldName string (\stateCode -> Dict.member stateCode statesMap) localData serverData
-    , zip = trimmedLocalThenServer zipCodeFieldName localData serverData
+    , selfApiaryId = serverData.selfApiaryId
+    , orderPhysicalCard = localOr orderPhysicalCardFieldName bool True localData
+    , addressLineOne = trimmedLocalOr addressLineOneFieldName serverData.addressLineOne localData
+    , addressLineTwo = trimmedLocalOr addressLineTwoFieldName serverData.addressLineTwo localData
+    , city = trimmedLocalOr cityFieldName serverData.city localData
+    , state = validatedId stateFieldName string (\stateCode -> Dict.member stateCode statesMap) localData serverData.state
+    , zip = trimmedLocalOr zipCodeFieldName serverData.zip localData
     , addressLineTwoRequired = False
     , addressIsValid = Nothing
     , showValidation = False
-    , googleMapsApiKey = trimmedServerString googleMapsApiKeyFieldName serverData
-    , googleClientId = trimmedServerString "googleClientId" serverData
-    , googleOneTapLoginUri = trimmedServerString "googleOneTapLoginUri" serverData
-    , time = Time.millisToPosix 0
+    , googleMapsApiKey = serverData.googleMapsApiKey
+    , googleClientId = serverData.googleClientId
+    , googleOneTapLoginUri = serverData.googleOneTapLoginUri
+    , time = millisToPosix 0
     , zone = Time.utc
     , formState = Editing
     , nextAction = NoOpNextAction
     , createRampAccountTaskId = Nothing
-    , showAdvancedOptions = localThenServer showAdvancedOptionsFieldName bool False localData serverData
-    , rampDepartmentOptions = rampDepartmentOptions
-    , rampLocationOptions = rampLocationOptions
-    , rampRoleOptions = rampRoleOptions
-    , rampDepartmentId = validatedIdFromLocalThenServer departmentIdFieldName string (isEnabledOption rampDepartmentOptions) localData serverData
-    , rampLocationId = validatedIdFromLocalThenServer locationIdFieldName string (isEnabledOption rampLocationOptions) localData serverData
-    , rampRoleId = validatedIdFromLocalThenServer roleIdFieldName string (isEnabledOption rampRoleOptions) localData serverData
-    , studentDefaultDepartmentId = trimmedServerString "defaultDepartmentForStudents" serverData
-    , nonStudentDefaultDepartmentId = trimmedServerString "defaultDepartmentForNonStudents" serverData
-    , studentDefaultLocationId = trimmedServerString "defaultLocationForStudents" serverData
-    , nonStudentDefaultLocationId = trimmedServerString "defaultLocationForNonStudents" serverData
-    , managerRampOptions = rampManagerOptions
-    , rampSignInUri = trimmedServerString "rampSignInUri" serverData
-    , businessLegalName = trimmedServerString "businessLegalName" serverData
-    , slackSupportChannelDeepLink = trimmedServerString "slackSupportChannelDeepLink" serverData
-    , slackSupportChannelName = trimmedServerString "slackSupportChannelName" serverData
+    , showAdvancedOptions = localOr showAdvancedOptionsFieldName bool serverData.showAdvancedOptions localData
+    , rampDepartmentOptions = serverData.departmentOptions
+    , rampLocationOptions = serverData.locationOptions
+    , rampRoleOptions = serverData.roleOptions
+    , rampDepartmentId = validatedId departmentIdFieldName string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
+    , rampLocationId = validatedId locationIdFieldName string (isEnabledOption serverData.locationOptions) localData serverData.locationId
+    , rampRoleId = validatedId roleIdFieldName string (isEnabledOption serverData.roleOptions) localData serverData.roleId
+    , studentDefaultDepartmentId = serverData.studentDefaultDepartmentId
+    , nonStudentDefaultDepartmentId = serverData.nonStudentDefaultDepartmentId
+    , studentDefaultLocationId = serverData.studentDefaultLocationId
+    , nonStudentDefaultLocationId = serverData.nonStudentDefaultLocationId
+    , managerRampOptions = serverData.rampManagerOptions
+    , rampSignInUri = serverData.rampSignInUri
+    , businessLegalName = serverData.businessLegalName
+    , slackSupportChannelDeepLink = serverData.slackSupportChannelDeepLink
+    , slackSupportChannelName = serverData.slackSupportChannelName
     }
 
 
-localThenServer : String -> Decoder a -> a -> Value -> Value -> a
-localThenServer fieldName decoder fallback localData serverData =
-    case decodeValue (field fieldName decoder) localData of
-        Ok localValue ->
-            localValue
-
-        Err _ ->
-            Result.withDefault fallback (decodeValue (field fieldName decoder) serverData)
+localOr : String -> Decoder a -> a -> Value -> a
+localOr fieldName decoder fallback localData =
+    Result.withDefault fallback (decodeValue (field fieldName decoder) localData)
 
 
-trimmedLocalThenServer : String -> Value -> Value -> String
-trimmedLocalThenServer fieldName localData serverData =
-    String.trim (localThenServer fieldName string "" localData serverData)
+trimmedLocalOr : String -> String -> Value -> String
+trimmedLocalOr fieldName fallback localData =
+    String.trim (localOr fieldName string fallback localData)
 
 
-trimmedServerString : String -> Value -> String
-trimmedServerString fieldName serverData =
-    String.trim (Result.withDefault "" (decodeValue (field fieldName string) serverData))
-
-
-validatedIdFromLocalThenServer : String -> Decoder a -> (a -> Bool) -> Value -> Value -> Maybe a
-validatedIdFromLocalThenServer fieldName decoder isValidId localData serverData =
-    [ localData, serverData ]
-        |> List.filterMap (\source -> Result.toMaybe (decodeValue (field fieldName decoder) source))
+validatedId : String -> Decoder a -> (a -> Bool) -> Value -> Maybe a -> Maybe a
+validatedId fieldName decoder isValidId localData serverValue =
+    [ Result.toMaybe (decodeValue (field fieldName decoder) localData)
+    , serverValue
+    ]
+        |> List.filterMap identity
         |> List.filter isValidId
         |> List.head
 
