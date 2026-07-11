@@ -91,7 +91,7 @@ managerFeedbackText =
 
 managerDepartmentFeedbackText : String
 managerDepartmentFeedbackText =
-    "Please select a manager in your department"
+    "Please select a manager within your department"
 
 
 firstNameFieldName : String
