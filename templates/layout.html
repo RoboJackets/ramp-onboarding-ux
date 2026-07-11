@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 
     <link rel="icon" href="/static/favicon.ico" sizes="32x32">
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -14,10 +16,13 @@
 
     <title>Ramp Onboarding</title>
 </head>
+
 <body>
-<div class="container mt-md-4 mt-3" style="max-width: 48rem;">
-      <h1>Ramp Onboarding</h1>
-{% block body %}{%  endblock %}
-</div>
+    {# This markup is re-rendered by Elm when the app boots. Keep it in sync with Main.elm. #}
+    <div class="container mt-md-4 mt-3" style="max-width: 48rem;">
+        <h1>Ramp Onboarding</h1>
+        {% block body %}{% endblock %}
+    </div>
 </body>
+
 </html>

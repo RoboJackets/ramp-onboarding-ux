@@ -1,9 +1,11 @@
 {% extends "layout.html" %}
 {% block body %}
-    {# This markup is a placeholder. It's re-rendered by Elm once the app boots. Keep it in sync with Main.elm. #}
-    <p class="mt-4 mb-4">{{ business_legal_name }} uses <a href="https://ramp.com" target="_blank">Ramp</a> to issue corporate credit cards and manage reimbursements. We need some information from you to create your Ramp account.</p>
-    <script>
+{# This markup is a placeholder. It's re-rendered by Elm once the app boots. Keep it in sync with Main.elm. #}
+<p class="mt-4 mb-4">{{ business_legal_name }} uses <a href="https://ramp.com" target="_blank">Ramp</a> to issue
+    corporate credit cards and manage reimbursements. We need some information from you to create your Ramp account.</p>
+<script>
     window.serverData = {{ elm_model | tojson }}
-    </script>
-    <script src="{{ url_for('static', filename='app.js') }}" integrity="{{ calculate_integrity(url_for('static', filename='app.js')) }}" crossorigin="anonymous"></script>
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"
+    integrity="{{ calculate_integrity(url_for('static', filename='app.js')) }}" crossorigin="anonymous"></script>
 {% endblock %}
