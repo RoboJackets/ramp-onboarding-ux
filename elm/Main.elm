@@ -369,11 +369,22 @@ type ValidationResult
     | Invalid String
 
 
+type Check
+    = InFlight
+    | Done
+
+
+type alias SubmissionChecks =
+    { manager : Check
+    , address : Check
+    }
+
+
 type FormState
     = Editing
-    | Validating
+    | Validating SubmissionChecks
     | Error
-    | CreatingRampAccount
+    | CreatingRampAccount (Maybe String)
     | OrderingPhysicalCard
     | ProvisioningComplete
 
@@ -447,7 +458,6 @@ type alias Model =
     , zone : Time.Zone
     , formState : FormState
     , redirectingToEmailVerification : Bool
-    , createRampAccountTaskId : Maybe String
     , showAdvancedOptions : Bool
     , rampDepartmentOptions : Dict String RampObject
     , rampLocationOptions : Dict String RampObject
@@ -589,18 +599,35 @@ updateReady msg model =
                     )
 
                 Nothing ->
-                    ( { model
-                        | showValidation = True
-                        , formState =
-                            if needsManagerValidation model || needsAddressValidation model then
-                                Validating
+                    let
+                        checks : SubmissionChecks
+                        checks =
+                            submissionChecksFromModel model
 
-                            else
-                                CreatingRampAccount
-                      }
+                        updatedModel : Model
+                        updatedModel =
+                            { model
+                                | showValidation = True
+                                , formState = Validating checks
+                            }
+
+                        ( proceededModel, proceedCmd ) =
+                            proceedIfReady updatedModel
+                    in
+                    ( proceededModel
                     , Cmd.batch
                         [ saveFormStateToLocalStorage model
-                        , continueSubmission model
+                        , if needsManagerValidation model then
+                            requestManagerValidation model
+
+                          else
+                            Cmd.none
+                        , if needsAddressValidation model then
+                            requestGoogleAddressValidation model
+
+                          else
+                            Cmd.none
+                        , proceedCmd
                         ]
                     )
 
@@ -736,75 +763,58 @@ updateReady msg model =
 
                         Err _ ->
                             False
-            in
-            ( { model
-                | addressLineTwoRequired =
-                    case result of
-                        Ok _ ->
-                            missingAddressLineTwo
 
-                        Err _ ->
-                            False
-                , addressIsValid =
-                    case result of
-                        Ok verdict ->
-                            case verdict.addressComplete of
-                                Just addressComplete ->
-                                    Just addressComplete
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | addressLineTwoRequired =
+                            case result of
+                                Ok _ ->
+                                    missingAddressLineTwo
 
-                                Nothing ->
-                                    if missingAddressLineTwo then
-                                        Just True
-
-                                    else
-                                        Just False
-
-                        Err _ ->
-                            model.addressIsValid
-                , formState =
-                    case result of
-                        Ok verdict ->
-                            case verdict.addressComplete of
-                                Just True ->
-                                    case model.managerRampId of
-                                        Just _ ->
-                                            CreatingRampAccount
+                                Err _ ->
+                                    False
+                        , addressIsValid =
+                            case result of
+                                Ok verdict ->
+                                    case verdict.addressComplete of
+                                        Just addressComplete ->
+                                            Just addressComplete
 
                                         Nothing ->
-                                            Validating
+                                            if missingAddressLineTwo then
+                                                Just True
 
-                                Just False ->
-                                    Editing
+                                            else
+                                                Just False
 
-                                Nothing ->
-                                    Editing
-
-                        Err _ ->
-                            Editing
-              }
-            , case result of
+                                Err _ ->
+                                    model.addressIsValid
+                    }
+            in
+            case result of
                 Ok verdict ->
-                    if withDefault False verdict.addressComplete then
-                        case model.managerRampId of
-                            Just _ ->
-                                createRampAccountTask model
+                    case verdict.addressComplete of
+                        Just True ->
+                            proceedIfReady (markAddressCheckDone updatedModel)
 
-                            Nothing ->
+                        _ ->
+                            ( { updatedModel | formState = abortValidation model.formState }
+                            , if missingAddressLineTwo then
+                                Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+
+                              else
                                 Cmd.none
-
-                    else if missingAddressLineTwo then
-                        Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
-
-                    else
-                        Cmd.none
+                            )
 
                 Err error ->
-                    showAlert
+                    ( { updatedModel | formState = abortValidation model.formState }
+                    , showAlert
                         ("There was an error validating your mailing address: "
                             ++ httpErrorToString error
                             ++ "\n\nPlease check your internet connection."
                         )
-            )
+                    )
 
         SetTime time ->
             ( { model | time = time }, Cmd.none )
@@ -813,119 +823,82 @@ updateReady msg model =
             ( { model | zone = zone }, Cmd.none )
 
         ManagerValidationResultReceived result ->
-            ( { model
-                | managerRampId =
-                    case result of
-                        Ok managerRampInfo ->
-                            managerRampInfo.managerRampId
+            let
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | managerRampId =
+                            case result of
+                                Ok managerRampInfo ->
+                                    managerRampInfo.managerRampId
 
-                        Err _ ->
-                            Nothing
-                , managerFeedbackText =
-                    case result of
-                        Ok managerRampInfo ->
-                            withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
+                                Err _ ->
+                                    Nothing
+                        , managerFeedbackText =
+                            case result of
+                                Ok managerRampInfo ->
+                                    withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
 
-                        Err _ ->
-                            "There was an error verifying your manager"
-                , managerIsValid =
-                    case result of
-                        Ok managerRampInfo ->
-                            if managerRampInfo.managerRampId == Nothing then
-                                Just False
+                                Err _ ->
+                                    "There was an error verifying your manager"
+                        , managerIsValid =
+                            case result of
+                                Ok managerRampInfo ->
+                                    if managerRampInfo.managerRampId == Nothing then
+                                        Just False
 
-                            else
-                                Just True
+                                    else
+                                        Just True
 
-                        Err _ ->
-                            Just False
-                , formState =
-                    case result of
-                        Ok managerRampInfo ->
-                            if managerRampInfo.managerRampId == Nothing then
-                                Editing
-
-                            else if model.orderPhysicalCard then
-                                case model.addressIsValid of
-                                    Just True ->
-                                        if firstInvalidFieldId model == Nothing then
-                                            CreatingRampAccount
-
-                                        else
-                                            Editing
-
-                                    _ ->
-                                        Editing
-
-                            else
-                                CreatingRampAccount
-
-                        Err _ ->
-                            Editing
-              }
-            , case result of
+                                Err _ ->
+                                    Just False
+                    }
+            in
+            case result of
                 Ok managerRampInfo ->
                     if managerRampInfo.managerRampId == Nothing then
-                        Cmd.none
+                        ( { updatedModel | formState = abortValidation model.formState }
+                        , Cmd.none
+                        )
 
                     else
-                        let
-                            task : Cmd Msg
-                            task =
-                                createRampAccountTask { model | managerRampId = managerRampInfo.managerRampId }
-                        in
-                        if model.orderPhysicalCard then
-                            case model.addressIsValid of
-                                Just True ->
-                                    if firstInvalidFieldId model == Nothing then
-                                        task
-
-                                    else
-                                        Cmd.none
-
-                                Just False ->
-                                    Cmd.none
-
-                                Nothing ->
-                                    if checkCampusAddress model /= NotCampusAddress then
-                                        task
-
-                                    else
-                                        Cmd.none
-
-                        else
-                            task
+                        proceedIfReady (markManagerCheckDone updatedModel)
 
                 Err _ ->
-                    Cmd.none
-            )
+                    ( { updatedModel | formState = abortValidation model.formState }
+                    , Cmd.none
+                    )
 
         CreateRampAccountTaskIdReceived result ->
-            ( { model
-                | createRampAccountTaskId =
-                    case result of
-                        Ok createRampAccountTaskId ->
-                            Just createRampAccountTaskId.taskId
-
-                        Err _ ->
-                            Nothing
-                , formState =
-                    case result of
-                        Ok _ ->
-                            CreatingRampAccount
-
-                        Err _ ->
-                            Error
-              }
-            , case result of
+            case result of
                 Ok createRampAccountTaskId ->
-                    getRampAccountTaskStatus createRampAccountTaskId.taskId
+                    ( { model | formState = CreatingRampAccount (Just createRampAccountTaskId.taskId) }
+                    , getRampAccountTaskStatus createRampAccountTaskId.taskId
+                    )
 
                 Err _ ->
-                    Cmd.none
-            )
+                    ( { model | formState = Error }, Cmd.none )
 
         CreateRampAccountTaskStatusReceived result ->
+            let
+                taskId : String
+                taskId =
+                    case model.formState of
+                        CreatingRampAccount maybeTaskId ->
+                            withDefault "" maybeTaskId
+
+                        _ ->
+                            ""
+
+                preserveCreatingRampAccount : FormState
+                preserveCreatingRampAccount =
+                    case model.formState of
+                        CreatingRampAccount maybeTaskId ->
+                            CreatingRampAccount maybeTaskId
+
+                        _ ->
+                            CreatingRampAccount Nothing
+            in
             ( { model
                 | formState =
                     case result of
@@ -933,10 +906,10 @@ updateReady msg model =
                             OrderingPhysicalCard
 
                         Ok TaskStarted ->
-                            CreatingRampAccount
+                            preserveCreatingRampAccount
 
                         Ok TaskInProgress ->
-                            CreatingRampAccount
+                            preserveCreatingRampAccount
 
                         Ok TaskFailed ->
                             Error
@@ -976,10 +949,10 @@ updateReady msg model =
                         Nav.load model.rampSignInUri
 
                 Ok TaskStarted ->
-                    getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
+                    getRampAccountTaskStatus taskId
 
                 Ok TaskInProgress ->
-                    getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
+                    getRampAccountTaskStatus taskId
 
                 Ok TaskFailed ->
                     Cmd.none
@@ -1084,10 +1057,10 @@ viewReady model =
             Editing ->
                 renderForm model
 
-            Validating ->
+            Validating _ ->
                 renderForm model
 
-            CreatingRampAccount ->
+            CreatingRampAccount _ ->
                 renderLoadingIndicators model
 
             OrderingPhysicalCard ->
@@ -1617,7 +1590,14 @@ renderLoadingIndicators model =
 
         ssoConfigured : Bool
         ssoConfigured =
-            accountCreated || (model.formState == CreatingRampAccount && model.createRampAccountTaskId /= Nothing)
+            accountCreated
+                || (case model.formState of
+                        CreatingRampAccount (Just _) ->
+                            True
+
+                        _ ->
+                            False
+                   )
 
         cardOrdered : Bool
         cardOrdered =
@@ -2344,24 +2324,72 @@ needsAddressValidation model =
     model.orderPhysicalCard && checkCampusAddress model == NotCampusAddress
 
 
-continueSubmission : Model -> Cmd Msg
-continueSubmission model =
-    if needsManagerValidation model || needsAddressValidation model then
-        Cmd.batch
-            [ if needsManagerValidation model then
-                requestManagerValidation model
+submissionChecksFromModel : Model -> SubmissionChecks
+submissionChecksFromModel model =
+    { manager =
+        if needsManagerValidation model then
+            InFlight
 
-              else
-                Cmd.none
-            , if needsAddressValidation model then
-                requestGoogleAddressValidation model
+        else
+            Done
+    , address =
+        if needsAddressValidation model then
+            InFlight
 
-              else
-                Cmd.none
-            ]
+        else
+            Done
+    }
 
-    else
-        createRampAccountTask model
+
+abortValidation : FormState -> FormState
+abortValidation formState =
+    case formState of
+        Validating _ ->
+            Editing
+
+        _ ->
+            formState
+
+
+markManagerCheckDone : Model -> Model
+markManagerCheckDone model =
+    case model.formState of
+        Validating checks ->
+            { model | formState = Validating { checks | manager = Done } }
+
+        _ ->
+            model
+
+
+markAddressCheckDone : Model -> Model
+markAddressCheckDone model =
+    case model.formState of
+        Validating checks ->
+            { model | formState = Validating { checks | address = Done } }
+
+        _ ->
+            model
+
+
+proceedIfReady : Model -> ( Model, Cmd Msg )
+proceedIfReady model =
+    case model.formState of
+        Validating checks ->
+            case ( checks.manager, checks.address ) of
+                ( Done, Done ) ->
+                    if firstInvalidFieldId model == Nothing then
+                        ( { model | formState = CreatingRampAccount Nothing }
+                        , createRampAccountTask model
+                        )
+
+                    else
+                        ( { model | formState = Editing }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
 
 
 requestManagerValidation : Model -> Cmd Msg
@@ -2529,7 +2557,6 @@ buildInitialModel serverData localData =
     , zone = Time.utc
     , formState = Editing
     , redirectingToEmailVerification = False
-    , createRampAccountTaskId = Nothing
     , showAdvancedOptions = serverData.showAdvancedOptions || localOr showAdvancedOptionsFieldName bool False localData
     , rampDepartmentOptions = serverData.departmentOptions
     , rampLocationOptions = serverData.locationOptions
