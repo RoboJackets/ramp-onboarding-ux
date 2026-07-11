@@ -810,7 +810,7 @@ updateReady msg model =
                 Err error ->
                     ( { updatedModel | formState = abortValidation model.formState }
                     , showAlert
-                        ("There was an error validating your mailing address: "
+                        ("There was an error verifying your mailing address: "
                             ++ httpErrorToString error
                             ++ "\n\nPlease check your internet connection."
                         )
@@ -839,8 +839,9 @@ updateReady msg model =
                                 Ok managerRampInfo ->
                                     withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
 
-                                Err _ ->
-                                    "There was an error verifying your manager"
+                                Err error ->
+                                    "There was an error verifying your manager: "
+                                        ++ httpErrorToString error
                         , managerIsValid =
                             case result of
                                 Ok managerRampInfo ->
@@ -864,9 +865,13 @@ updateReady msg model =
                     else
                         proceedIfReady (markManagerCheckDone updatedModel)
 
-                Err _ ->
+                Err error ->
                     ( { updatedModel | formState = abortValidation model.formState }
-                    , Cmd.none
+                    , showAlert
+                        ("There was an error verifying your manager: "
+                            ++ httpErrorToString error
+                            ++ "\n\nPlease check your internet connection."
+                        )
                     )
 
         CreateRampAccountTaskIdReceived result ->
