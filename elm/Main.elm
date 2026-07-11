@@ -92,8 +92,8 @@ managerDepartmentFeedbackText =
 
 
 
--- localStorage form-state keys: written by encodeFormState, read by buildInitialModel.
--- Changing a value orphans previously saved form state.
+-- localStorage form-state keys: written by encodeFormState, read by buildInitialModel
+-- Changing a value orphans previously saved form state
 
 
 firstNameLocalStorageKey : String
