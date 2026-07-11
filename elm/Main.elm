@@ -1,27 +1,26 @@
-port module Main exposing (..)
+port module Main exposing (main)
 
 import Browser
-import Browser.Dom exposing (..)
+import Browser.Dom exposing (focus)
 import Browser.Navigation as Nav
 import Char exposing (isDigit)
-import Dict exposing (..)
+import Dict exposing (Dict, toList)
 import Email
-import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (..)
-import Html.Events.Extra exposing (..)
-import Http exposing (..)
-import Json.Decode exposing (..)
+import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, select, strong, text)
+import Html.Attributes exposing (action, attribute, checked, class, classList, disabled, for, href, id, maxlength, method, minlength, name, novalidate, placeholder, readonly, required, selected, style, target, type_)
+import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
+import Html.Events.Extra exposing (targetValueIntParse)
+import Http exposing (expectJson, expectWhatever, jsonBody)
+import Json.Decode exposing (Decoder, Value, at, bool, decodeString, decodeValue, dict, field, int, keyValuePairs, maybe, string, succeed)
 import Json.Encode
-import List exposing (..)
-import Maybe exposing (..)
+import List exposing (sortBy, sortWith, take)
+import Maybe exposing (withDefault)
 import Regex
-import String
 import Svg exposing (Svg, path, svg)
 import Svg.Attributes exposing (d)
 import Task
-import Time exposing (..)
-import Tuple exposing (..)
+import Time exposing (Month(..), Posix, Weekday(..), Zone, millisToPosix, posixToMillis, toDay, toMonth, toWeekday)
+import Tuple exposing (first, second)
 import Url
 import Url.Builder
 
@@ -55,17 +54,17 @@ termsOfService =
 
 nameRegex : Regex.Regex
 nameRegex =
-    Maybe.withDefault Regex.never (Regex.fromString "^[a-zA-Z-'\\. ]+$")
+    withDefault Regex.never (Regex.fromString "^[a-zA-Z-'\\. ]+$")
 
 
 studentCenterMailboxRegex : Regex.Regex
 studentCenterMailboxRegex =
-    Maybe.withDefault Regex.never (Regex.fromString "^\\d{6} georgia tech station$")
+    withDefault Regex.never (Regex.fromString "^\\d{6} georgia tech station$")
 
 
 graduateLivingCenterMailboxRegex : Regex.Regex
 graduateLivingCenterMailboxRegex =
-    Maybe.withDefault Regex.never (Regex.fromString "^(apt|apartment) [1-6][0-2][0-9][a-d]$")
+    withDefault Regex.never (Regex.fromString "^(apt|apartment) [1-6][0-2][0-9][a-d]$")
 
 
 
@@ -470,8 +469,8 @@ update msg model =
                 Browser.Internal url ->
                     ( model, Nav.load (Url.toString url) )
 
-                Browser.External href ->
-                    ( model, Nav.load href )
+                Browser.External externalUrl ->
+                    ( model, Nav.load externalUrl )
 
         UrlChanged _ ->
             ( model, Cmd.none )
@@ -668,7 +667,7 @@ update msg model =
                 missingAddressLineTwo =
                     case result of
                         Ok verdict ->
-                            List.member "subpremise" (Maybe.withDefault [] verdict.missingComponentTypes)
+                            List.member "subpremise" (withDefault [] verdict.missingComponentTypes)
 
                         Err _ ->
                             False
@@ -721,7 +720,7 @@ update msg model =
               }
             , case result of
                 Ok verdict ->
-                    if Maybe.withDefault False verdict.addressComplete then
+                    if withDefault False verdict.addressComplete then
                         case model.managerRampId of
                             Just _ ->
                                 createRampAccountTask model
@@ -771,7 +770,7 @@ update msg model =
                 , managerFeedbackText =
                     case result of
                         Ok managerRampInfo ->
-                            Maybe.withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
+                            withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
 
                         Err _ ->
                             "There was an error verifying your manager"
@@ -930,10 +929,10 @@ update msg model =
                                 Nav.load model.rampSignInUri
 
                         "STARTED" ->
-                            getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
+                            getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
 
                         "IN_PROGRESS" ->
-                            getRampAccountTaskStatus (Maybe.withDefault "" model.createRampAccountTaskId)
+                            getRampAccountTaskStatus (withDefault "" model.createRampAccountTaskId)
 
                         _ ->
                             Cmd.none
@@ -1542,7 +1541,7 @@ renderForm model =
              , text ", "
              ]
                 ++ List.intersperse (text ", ") (List.map termsOfServiceItemToLink (List.take (List.length termsOfService - 1) termsOfService))
-                ++ [ text ", and ", termsOfServiceItemToLink (Maybe.withDefault ( "", "" ) (List.head (List.reverse termsOfService))), text "." ]
+                ++ [ text ", and ", termsOfServiceItemToLink (withDefault ( "", "" ) (List.head (List.reverse termsOfService))), text "." ]
             )
         ]
     , div
@@ -1710,11 +1709,11 @@ validateAddressLineOneGoogleResult maybeIsValid =
 
 
 validateAddressLineTwo : String -> Bool -> CampusAddress -> ValidationResult
-validateAddressLineTwo addressLineTwo required campusAddress =
+validateAddressLineTwo addressLineTwo isRequired campusAddress =
     if String.length (String.trim addressLineTwo) > 100 then
         Invalid "Your second address line may be a maximum of 100 characters"
 
-    else if blankString addressLineTwo && (required || campusAddress /= NotCampusAddress) then
+    else if blankString addressLineTwo && (isRequired || campusAddress /= NotCampusAddress) then
         Invalid
             ("This address requires "
                 ++ (case campusAddress of
@@ -1791,7 +1790,7 @@ validateRampObject : String -> Maybe String -> Dict String RampObject -> Validat
 validateRampObject objectName selectedObject objectOptions =
     case selectedObject of
         Just selectedObjectId ->
-            if (Maybe.withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled then
+            if (withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled then
                 Valid
 
             else
@@ -1894,8 +1893,8 @@ feedbackText validation =
         Valid ->
             ""
 
-        Invalid text ->
-            text
+        Invalid feedback ->
+            feedback
 
 
 validationClasses : Bool -> ValidationResult -> Attribute msg
@@ -1909,8 +1908,8 @@ validationClasses showValidation validationResult =
 addressValidationClasses : Bool -> Maybe Bool -> ValidationResult -> Attribute msg
 addressValidationClasses showValidation addressIsValid validationResult =
     classList
-        [ ( "is-valid", showValidation && isValid validationResult && Maybe.withDefault True addressIsValid )
-        , ( "is-invalid", showValidation && (not (isValid validationResult) || not (Maybe.withDefault True addressIsValid)) )
+        [ ( "is-valid", showValidation && isValid validationResult && withDefault True addressIsValid )
+        , ( "is-invalid", showValidation && (not (isValid validationResult) || not (withDefault True addressIsValid)) )
         ]
 
 
@@ -1946,25 +1945,25 @@ rampObjectLabel : Dict String RampObject -> String -> String
 rampObjectLabel options optionId =
     Dict.get optionId options
         |> Maybe.map .label
-        |> Maybe.withDefault ""
+        |> withDefault ""
 
 
 httpErrorToString : Http.Error -> String
 httpErrorToString error =
     case error of
-        BadUrl url ->
+        Http.BadUrl url ->
             "Invalid URL: " ++ url
 
-        Timeout ->
+        Http.Timeout ->
             "The request timed out"
 
-        NetworkError ->
+        Http.NetworkError ->
             "Network error"
 
-        BadStatus status ->
+        Http.BadStatus status ->
             "Unexpected HTTP status code " ++ String.fromInt status
 
-        BadBody body ->
+        Http.BadBody body ->
             "Unexpected response body: " ++ body
 
 
@@ -2201,7 +2200,7 @@ requestManagerValidation model =
     Http.get
         { url =
             Url.Builder.absolute
-                [ "get-ramp-user", String.fromInt (Maybe.withDefault 0 model.managerApiaryId) ]
+                [ "get-ramp-user", String.fromInt (withDefault 0 model.managerApiaryId) ]
                 []
         , expect = expectJson ManagerValidationResultReceived managerValidationResponseDecoder
         }
@@ -2223,7 +2222,7 @@ requestGoogleAddressValidation model =
                       , Json.Encode.object
                             [ ( "regionCode", Json.Encode.string "US" )
                             , ( "postalCode", Json.Encode.string (String.trim model.zip) )
-                            , ( "administrativeArea", Json.Encode.string (Maybe.withDefault "" model.state) )
+                            , ( "administrativeArea", Json.Encode.string (withDefault "" model.state) )
                             , ( "locality", Json.Encode.string (String.trim model.city) )
                             , ( "addressLines"
                               , Json.Encode.list Json.Encode.string
@@ -2255,10 +2254,10 @@ createRampAccountTask model =
                 (Json.Encode.object
                     [ ( "firstName", Json.Encode.string (String.trim model.firstName) )
                     , ( "lastName", Json.Encode.string (String.trim model.lastName) )
-                    , ( "directManagerId", Json.Encode.string (Maybe.withDefault "" model.managerRampId) )
-                    , ( "departmentId", Json.Encode.string (Maybe.withDefault "" model.rampDepartmentId) )
-                    , ( "locationId", Json.Encode.string (Maybe.withDefault "" model.rampLocationId) )
-                    , ( "role", Json.Encode.string (Maybe.withDefault "" model.rampRoleId) )
+                    , ( "directManagerId", Json.Encode.string (withDefault "" model.managerRampId) )
+                    , ( "departmentId", Json.Encode.string (withDefault "" model.rampDepartmentId) )
+                    , ( "locationId", Json.Encode.string (withDefault "" model.rampLocationId) )
+                    , ( "role", Json.Encode.string (withDefault "" model.rampRoleId) )
                     , ( orderPhysicalCardFieldName, Json.Encode.bool model.orderPhysicalCard )
                     ]
                 )
@@ -2298,7 +2297,7 @@ matchCampusAddressByStreetPrefix street =
                     Nothing
             )
         |> List.head
-        |> Maybe.withDefault NotCampusAddress
+        |> withDefault NotCampusAddress
 
 
 checkCampusAddress : Model -> CampusAddress
@@ -2310,7 +2309,7 @@ checkCampusAddress model =
 
         state : String
         state =
-            Maybe.withDefault "" model.state
+            withDefault "" model.state
 
         zipPrefix : String
         zipPrefix =
@@ -2453,7 +2452,7 @@ isEnabledOption : Dict String { a | enabled : Bool } -> String -> Bool
 isEnabledOption options optionId =
     Dict.get optionId options
         |> Maybe.map .enabled
-        |> Maybe.withDefault False
+        |> withDefault False
 
 
 nonBlankString : String -> Bool
@@ -2547,13 +2546,13 @@ formatTime zone time =
 
 
 sortByRampObjectLabel : ( String, { a | label : String } ) -> ( String, { a | label : String } ) -> Order
-sortByRampObjectLabel first second =
-    compare (Tuple.second first).label (Tuple.second second).label
+sortByRampObjectLabel left right =
+    compare (second left).label (second right).label
 
 
 sortByRampRoleRankOrder : ( String, RampObject ) -> ( String, RampObject ) -> Order
-sortByRampRoleRankOrder first second =
-    compare (Maybe.withDefault 0 (Dict.get (Tuple.first first) rampRoleRankOrder)) (Maybe.withDefault 0 (Dict.get (Tuple.first second) rampRoleRankOrder))
+sortByRampRoleRankOrder left right =
+    compare (withDefault 0 (Dict.get (first left) rampRoleRankOrder)) (withDefault 0 (Dict.get (first right) rampRoleRankOrder))
 
 
 labelMatches : Maybe String -> String -> { a | label : String } -> Bool
@@ -2571,14 +2570,14 @@ getManagerRampIdFromApiaryId model =
     let
         filteredOptions : Dict String RampUser
         filteredOptions =
-            Dict.filter (labelMatches (Dict.get (Maybe.withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions
+            Dict.filter (labelMatches (Dict.get (withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions
 
         matchingOption : ( String, RampUser )
         matchingOption =
-            Maybe.withDefault ( "", { label = "", enabled = False, departmentId = "" } ) (List.head (Dict.toList filteredOptions))
+            withDefault ( "", { label = "", enabled = False, departmentId = "" } ) (List.head (Dict.toList filteredOptions))
     in
-    if Dict.size filteredOptions == 1 && (Tuple.second matchingOption).enabled then
-        Just (Tuple.first matchingOption)
+    if Dict.size filteredOptions == 1 && (second matchingOption).enabled then
+        Just (first matchingOption)
 
     else
         Nothing
