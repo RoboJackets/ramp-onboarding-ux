@@ -1196,6 +1196,7 @@ renderForm model =
                         millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24))
                 )
     in
+    -- The markup above the <form> tag should match the server-side rendered markup in form.html, so the first contentful paint is consistent with the largest contentful paint.
     [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
         [ h1 []
             [ text "Ramp Onboarding"
