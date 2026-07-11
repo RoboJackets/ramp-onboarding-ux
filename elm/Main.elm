@@ -554,6 +554,7 @@ init flags _ _ =
                 , Task.perform SetZone Time.here
                 , initializeAutocomplete { apiKey = model.googleMapsApiKey, fieldId = addressLineOneFieldId }
                 , if showOneTap model then
+                    -- the value passed to this port is not used on the JavaScript side, Elm doesn't allow empty messages
                     initializeOneTap True
 
                   else
@@ -710,6 +711,7 @@ updateReady msg model =
             ( model, Cmd.none )
 
         LocalStorageSaved _ ->
+            -- JavaScript always sends True here, Elm doesn't allow empty messages
             ( model
             , if model.redirectingToEmailVerification then
                 Nav.load
