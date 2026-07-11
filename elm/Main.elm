@@ -2063,7 +2063,7 @@ stateTupleToHtmlOption selectedState ( stateCode, stateName ) =
 
 
 
--- Encodes only the form fields that are persisted to localStorage, not the entire model.
+-- Encodes only the form fields that are persisted to localStorage, not the entire model
 
 
 encodeFormState : Model -> String
@@ -2142,7 +2142,7 @@ updateAndSaveToLocalStorage newModel =
 
 
 
--- Stops the Enter key from submitting the form, so that selecting a Google Places autocomplete suggestion with Enter doesn't submit a half-filled form.
+-- Stops the Enter key from submitting the form, so that selecting a Google Places autocomplete suggestion with Enter doesn't submit a half-filled form
 
 
 keyDecoder : Decoder ( Msg, Bool )
@@ -2825,6 +2825,10 @@ termsOfServiceItemToLink ( label, url ) =
 port initializeAutocomplete : { apiKey : String, fieldId : String } -> Cmd msg
 
 
+
+-- the value passed to initializeOneTap is not used on the JavaScript side, Elm doesn't allow empty messages
+
+
 port initializeOneTap : Bool -> Cmd msg
 
 
@@ -2832,6 +2836,10 @@ port saveToLocalStorage : String -> Cmd msg
 
 
 port showAlert : String -> Cmd msg
+
+
+
+-- JavaScript always sends True from localStorageSaved, Elm doesn't allow empty messages
 
 
 port localStorageSaved : (Bool -> msg) -> Sub msg
