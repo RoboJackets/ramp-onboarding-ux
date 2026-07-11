@@ -288,14 +288,9 @@ spinner =
 -- MAPS
 
 
-emailProviderIcon : Dict String (Svg msg)
-emailProviderIcon =
-    Dict.fromList [ ( "robojackets.org", googleIcon ), ( "gatech.edu", microsoftIcon ) ]
-
-
-emailProviderName : Dict String String
-emailProviderName =
-    Dict.fromList [ ( "robojackets.org", "Google" ), ( "gatech.edu", "Microsoft" ) ]
+emailProviderByDomain : Dict String EmailProvider
+emailProviderByDomain =
+    Dict.fromList [ ( "robojackets.org", Google ), ( "gatech.edu", Microsoft ) ]
 
 
 statesMap : Dict String String
@@ -310,6 +305,11 @@ rampRoleRankOrder =
 
 
 -- TYPES
+
+
+type EmailProvider
+    = Google
+    | Microsoft
 
 
 type CampusAddress
@@ -1093,9 +1093,9 @@ renderForm model =
         emailAddressValidationResult =
             validateEmailAddress model.emailAddress model.emailVerified
 
-        emailAddressDomainString : String
-        emailAddressDomainString =
-            withDefault "unknown" (emailAddressDomain model.emailAddress)
+        maybeEmailProvider : Maybe EmailProvider
+        maybeEmailProvider =
+            emailProviderForAddress model.emailAddress
 
         managerValidationResult : ValidationResult
         managerValidationResult =
@@ -1230,7 +1230,8 @@ renderForm model =
                         , id emailVerificationButtonId
                         , disabled
                             (model.emailVerified
-                                || not (Dict.member emailAddressDomainString emailProviderName)
+                                || maybeEmailProvider
+                                == Nothing
                                 || model.redirectingToEmailVerification
                             )
                         , onClick EmailVerificationButtonClicked
@@ -1239,9 +1240,9 @@ renderForm model =
                             checkIcon
 
                           else
-                            case emailAddressDomain model.emailAddress of
-                                Just domain ->
-                                    withDefault exclamationCircleIcon (Dict.get domain emailProviderIcon)
+                            case maybeEmailProvider of
+                                Just provider ->
+                                    emailProviderIcon provider
 
                                 Nothing ->
                                     exclamationCircleIcon
@@ -1251,12 +1252,13 @@ renderForm model =
                                 ++ (if model.emailVerified then
                                         "Verified"
 
-                                    else if Dict.member emailAddressDomainString emailProviderName then
-                                        "Verify with "
-                                            ++ withDefault "Unknown" (Dict.get emailAddressDomainString emailProviderName)
-
                                     else
-                                        "Verify"
+                                        case maybeEmailProvider of
+                                            Just provider ->
+                                                "Verify with " ++ emailProviderDisplayName provider
+
+                                            Nothing ->
+                                                "Verify"
                                    )
                             )
                         ]
@@ -1616,14 +1618,16 @@ validateEmailAddress emailAddress verified =
         Ok addressParts ->
             case getSecondLevelDomain addressParts.domain of
                 Just domain ->
-                    if not (Dict.member domain emailProviderName) then
-                        Invalid emailFeedbackText
+                    case Dict.get domain emailProviderByDomain of
+                        Just provider ->
+                            if not verified then
+                                Invalid ("Please verify your email address with " ++ emailProviderDisplayName provider)
 
-                    else if not verified then
-                        Invalid ("Please verify your email address with " ++ emailProvider domain)
+                            else
+                                Valid
 
-                    else
-                        Valid
+                        Nothing ->
+                            Invalid emailFeedbackText
 
                 Nothing ->
                     Invalid emailFeedbackText
@@ -1973,19 +1977,37 @@ emailAddressDomain emailAddress =
 getSecondLevelDomain : String -> Maybe String
 getSecondLevelDomain domain =
     case take 2 (List.reverse (String.split "." (String.toLower (String.trim domain)))) of
-        [ "edu", "gatech" ] ->
-            Just "gatech.edu"
-
-        [ "org", "robojackets" ] ->
-            Just "robojackets.org"
+        [ tld, sld ] ->
+            Just (sld ++ "." ++ tld)
 
         _ ->
             Nothing
 
 
-emailProvider : String -> String
-emailProvider domain =
-    withDefault "unknown" (Dict.get (String.toLower (String.trim domain)) emailProviderName)
+emailProviderForAddress : String -> Maybe EmailProvider
+emailProviderForAddress emailAddress =
+    emailAddressDomain emailAddress
+        |> Maybe.andThen (\domain -> Dict.get domain emailProviderByDomain)
+
+
+emailProviderDisplayName : EmailProvider -> String
+emailProviderDisplayName provider =
+    case provider of
+        Google ->
+            "Google"
+
+        Microsoft ->
+            "Microsoft"
+
+
+emailProviderIcon : EmailProvider -> Svg msg
+emailProviderIcon provider =
+    case provider of
+        Google ->
+            googleIcon
+
+        Microsoft ->
+            microsoftIcon
 
 
 managerTupleToHtmlOption : Maybe Int -> Int -> ( Int, String ) -> Html msg
@@ -2635,18 +2657,13 @@ blankString value =
     String.isEmpty (String.trim value)
 
 
+
+-- One Tap is a Google product, so it is only shown when the email domain is hosted by Google.
+
+
 showOneTap : Model -> Bool
 showOneTap model =
-    if model.emailVerified then
-        False
-
-    else
-        case Dict.get (withDefault "unknown" (emailAddressDomain model.emailAddress)) emailProviderName of
-            Just providerName ->
-                providerName == "Google"
-
-            Nothing ->
-                False
+    not model.emailVerified && emailProviderForAddress model.emailAddress == Just Google
 
 
 millisPerDay : Float
