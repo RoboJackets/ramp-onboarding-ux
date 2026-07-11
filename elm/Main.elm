@@ -7,7 +7,7 @@ import Char exposing (isDigit)
 import Dict exposing (Dict, toList)
 import Email
 import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, pre, select, strong, text)
-import Html.Attributes exposing (action, attribute, checked, class, classList, disabled, for, href, id, maxlength, method, minlength, name, novalidate, placeholder, readonly, required, selected, style, target, type_)
+import Html.Attributes exposing (attribute, checked, class, classList, disabled, for, href, id, maxlength, minlength, novalidate, placeholder, readonly, required, selected, style, target, type_)
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
@@ -1275,8 +1275,6 @@ renderForm model =
         , Html.form
             [ class "row"
             , class "g-3"
-            , method "POST"
-            , action "/"
             , novalidate True
             , onSubmit FormSubmitted
             ]
@@ -1288,7 +1286,6 @@ renderForm model =
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation firstNameValidationResult
-                    , name "first_name"
                     , minlength 1
                     , maxlength 40
                     , required True
@@ -1309,7 +1306,6 @@ renderForm model =
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation lastNameValidationResult
-                    , name "last_name"
                     , minlength 1
                     , maxlength 40
                     , required True
@@ -1330,7 +1326,6 @@ renderForm model =
                 , div [ class "input-group" ]
                     [ input
                         [ id emailAddressFieldId
-                        , name "email_address"
                         , type_ "email"
                         , class "form-control"
                         , validationClasses model.showValidation emailAddressValidationResult
@@ -1391,7 +1386,6 @@ renderForm model =
                     [ text "Manager" ]
                 , select
                     [ class "form-select"
-                    , name "manager"
                     , id managerFieldId
                     , required True
                     , readonly (model.formState /= Editing)
@@ -1433,7 +1427,6 @@ renderForm model =
                     [ text "Department" ]
                 , select
                     [ class "form-select"
-                    , name "department"
                     , id departmentFieldId
                     , required True
                     , readonly (model.formState /= Editing)
@@ -1457,7 +1450,6 @@ renderForm model =
                     [ text "Location" ]
                 , select
                     [ class "form-select"
-                    , name "location"
                     , id locationFieldId
                     , required True
                     , readonly (model.formState /= Editing)
@@ -1481,7 +1473,6 @@ renderForm model =
                     [ text "Role" ]
                 , select
                     [ class "form-select"
-                    , name "role"
                     , id roleFieldId
                     , required True
                     , readonly (model.formState /= Editing)
@@ -1517,11 +1508,9 @@ renderForm model =
                 [ div [ class "form-check" ]
                     [ input
                         [ id orderPhysicalCardFieldId
-                        , name "order_physical_card"
                         , type_ "checkbox"
                         , class "form-check-input"
                         , readonly (model.formState /= Editing)
-                        , Html.Attributes.value "order_physical_card"
                         , onCheck OrderPhysicalCardChecked
                         , checked model.orderPhysicalCard
                         ]
@@ -1539,7 +1528,6 @@ renderForm model =
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid addressLineOneValidationResult
                     , id addressLineOneFieldId
-                    , name "address_line_one"
                     , minlength 1
                     , maxlength 100
                     , required True
@@ -1565,7 +1553,6 @@ renderForm model =
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid addressLineTwoValidationResult
                     , id addressLineTwoFieldId
-                    , name "address_line_two"
                     , maxlength 100
                     , placeholder "Apt, Suite, Unit, etc. (optional)"
                     , readonly (model.formState /= Editing)
@@ -1583,7 +1570,6 @@ renderForm model =
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid cityValidationResult
                     , id cityFieldId
-                    , name "city"
                     , minlength 1
                     , maxlength 40
                     , placeholder "City"
@@ -1601,7 +1587,6 @@ renderForm model =
                 , select
                     [ class "form-select"
                     , id stateFieldId
-                    , name "state"
                     , minlength 1
                     , maxlength 40
                     , required True
@@ -1621,7 +1606,6 @@ renderForm model =
                     , attribute "inputmode" "numeric"
                     , class "form-control"
                     , id zipCodeFieldId
-                    , name "zip_code"
                     , placeholder "ZIP Code"
                     , minlength 5
                     , maxlength 5
