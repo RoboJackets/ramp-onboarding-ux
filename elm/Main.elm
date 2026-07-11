@@ -11,7 +11,7 @@ import Html.Attributes exposing (attribute, autocomplete, checked, class, classL
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
-import Json.Decode exposing (Decoder, Value, at, bool, decodeString, decodeValue, dict, fail, field, int, keyValuePairs, maybe, nullable, string, succeed)
+import Json.Decode exposing (Decoder, Value, andThen, at, bool, decodeString, decodeValue, dict, fail, field, int, keyValuePairs, maybe, nullable, string, succeed)
 import Json.Encode
 import List exposing (sortBy, sortWith, take)
 import Maybe exposing (withDefault)
@@ -744,31 +744,37 @@ updateReady msg model =
             )
 
         PlaceChanged value ->
-            let
-                addressComponents : List AddressComponent
-                addressComponents =
-                    decodePlaceChanged value
+            case decodePlaceChanged value of
+                Ok addressComponents ->
+                    let
+                        newModel : Model
+                        newModel =
+                            { model
+                                | addressLineOne =
+                                    String.trim (getAddressComponent addressComponents "street_number")
+                                        ++ " "
+                                        ++ String.trim (getAddressComponent addressComponents "route")
+                                , addressLineTwo = String.trim (getAddressComponent addressComponents "subpremise")
+                                , city = String.trim (getAddressComponent addressComponents "locality")
+                                , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
+                                , zip = String.trim (getAddressComponent addressComponents "postal_code")
+                                , nextAction = NoOpNextAction
+                            }
+                    in
+                    ( newModel
+                    , Cmd.batch
+                        [ Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+                        , saveFormStateToLocalStorage newModel
+                        ]
+                    )
 
-                newModel : Model
-                newModel =
-                    { model
-                        | addressLineOne =
-                            String.trim (getAddressComponent addressComponents "street_number")
-                                ++ " "
-                                ++ String.trim (getAddressComponent addressComponents "route")
-                        , addressLineTwo = String.trim (getAddressComponent addressComponents "subpremise")
-                        , city = String.trim (getAddressComponent addressComponents "locality")
-                        , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
-                        , zip = String.trim (getAddressComponent addressComponents "postal_code")
-                        , nextAction = NoOpNextAction
-                    }
-            in
-            ( newModel
-            , Cmd.batch
-                [ Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
-                , saveFormStateToLocalStorage newModel
-                ]
-            )
+                Err decodeError ->
+                    ( model
+                    , showAlert
+                        ("There was an error parsing the selected address: "
+                            ++ Json.Decode.errorToString decodeError
+                        )
+                    )
 
         GoogleAddressValidationResultReceived result ->
             let
@@ -2195,20 +2201,26 @@ preventDefault key =
     key == "Enter"
 
 
-decodePlaceChanged : Value -> List AddressComponent
+decodePlaceChanged : Value -> Result Json.Decode.Error (List AddressComponent)
 decodePlaceChanged value =
-    Result.withDefault []
-        (decodeValue
-            (field "address_components"
-                (Json.Decode.list
-                    (Json.Decode.map2 AddressComponent
-                        (field "short_name" string)
-                        (field "types" (Json.Decode.list string))
-                    )
+    decodeValue
+        (field "address_components"
+            (Json.Decode.list
+                (Json.Decode.map2 AddressComponent
+                    (field "short_name" string)
+                    (field "types" (Json.Decode.list string))
                 )
+                |> andThen
+                    (\components ->
+                        if List.isEmpty components then
+                            fail "address_components is empty"
+
+                        else
+                            succeed components
+                    )
             )
-            value
         )
+        value
 
 
 getAddressComponent : List AddressComponent -> String -> String
