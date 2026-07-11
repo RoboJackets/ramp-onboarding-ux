@@ -1186,17 +1186,7 @@ renderForm model =
 
         physicalCardEstimatedDeliveryDate : String
         physicalCardEstimatedDeliveryDate =
-            formatTime model.zone
-                (case toWeekday model.zone (millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24))) of
-                    Sat ->
-                        millisToPosix (posixToMillis model.time + ceiling (11.5 * 1000 * 60 * 60 * 24))
-
-                    Sun ->
-                        millisToPosix (posixToMillis model.time + ceiling (10.5 * 1000 * 60 * 60 * 24))
-
-                    _ ->
-                        millisToPosix (posixToMillis model.time + ceiling (9.5 * 1000 * 60 * 60 * 24))
-                )
+            formatTime model.zone (estimatePhysicalCardDeliveryDate model.zone model.time)
     in
     -- The markup above the <form> tag should match the server-side rendered markup in form.html, so the first contentful paint is consistent with the largest contentful paint.
     [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
@@ -2702,6 +2692,44 @@ showOneTap model =
 
             Nothing ->
                 False
+
+
+millisPerDay : Float
+millisPerDay =
+    1000 * 60 * 60 * 24
+
+
+
+-- Physical cards are shipped via USPS First Class mail, which typically takes about a week and a half to arrive. The extra half day means afternoon orders round to the next calendar day.
+
+
+estimatedShippingDays : Float
+estimatedShippingDays =
+    9.5
+
+
+addDays : Float -> Posix -> Posix
+addDays days time =
+    millisToPosix (posixToMillis time + ceiling (days * millisPerDay))
+
+
+
+-- USPS delivers First Class mail Monday through Saturday but not Sunday, so estimates that land on a Sunday are pushed to the following Monday.
+
+
+estimatePhysicalCardDeliveryDate : Zone -> Posix -> Posix
+estimatePhysicalCardDeliveryDate zone now =
+    let
+        estimate : Posix
+        estimate =
+            addDays estimatedShippingDays now
+    in
+    case toWeekday zone estimate of
+        Sun ->
+            addDays 1 estimate
+
+        _ ->
+            estimate
 
 
 formatTime : Zone -> Posix -> String
