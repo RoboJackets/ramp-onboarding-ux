@@ -7,7 +7,7 @@ import Char exposing (isDigit)
 import Dict exposing (Dict, toList)
 import Email
 import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, pre, select, strong, text)
-import Html.Attributes exposing (attribute, checked, class, classList, disabled, for, href, id, maxlength, minlength, novalidate, placeholder, readonly, required, selected, style, target, type_)
+import Html.Attributes exposing (attribute, autocomplete, checked, class, classList, disabled, for, href, id, maxlength, minlength, novalidate, placeholder, readonly, required, selected, style, target, type_)
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
@@ -1276,6 +1276,7 @@ renderForm model =
             [ class "row"
             , class "g-3"
             , novalidate True
+            , autocomplete False
             , onSubmit FormSubmitted
             ]
             [ div [ class "col-6" ]
