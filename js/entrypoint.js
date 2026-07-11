@@ -27,7 +27,7 @@ app.ports.saveToLocalStorage.subscribe(function (message) {
         return;
     }
 
-    app.ports.localStorageSaved.send(true);
+    app.ports.localStorageSaved.send(null);
 });
 
 app.ports.showAlert.subscribe(function (message) {

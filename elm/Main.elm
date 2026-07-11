@@ -454,7 +454,7 @@ type Msg
     | StateInput String
     | ZipInput String
     | NoOpMsg
-    | LocalStorageSaved Bool
+    | LocalStorageSaved
     | EmailVerificationButtonClicked
     | PlaceChanged Value
     | ManagerValidationResultReceived (Result Http.Error ManagerValidation)
@@ -509,8 +509,7 @@ init flags _ _ =
                 , Task.perform SetZone Time.here
                 , initializeAutocomplete { apiKey = model.googleMapsApiKey, fieldId = addressLineOneFieldId }
                 , if showOneTap model then
-                    -- the value passed to this port is not used on the JavaScript side, Elm doesn't allow empty messages
-                    initializeOneTap True
+                    initializeOneTap ()
 
                   else
                     Cmd.none
@@ -665,8 +664,7 @@ updateReady msg model =
         NoOpMsg ->
             ( model, Cmd.none )
 
-        LocalStorageSaved _ ->
-            -- JavaScript always sends True here, Elm doesn't allow empty messages
+        LocalStorageSaved ->
             ( model
             , if model.redirectingToEmailVerification then
                 Nav.load
@@ -1009,7 +1007,7 @@ subscriptions appModel =
     case appModel of
         Ready _ ->
             Sub.batch
-                [ localStorageSaved LocalStorageSaved
+                [ localStorageSaved (always LocalStorageSaved)
                 , placeChanged PlaceChanged
                 ]
 
@@ -2797,11 +2795,7 @@ termsOfServiceItemToLink ( label, url ) =
 port initializeAutocomplete : { apiKey : String, fieldId : String } -> Cmd msg
 
 
-
--- the value passed to initializeOneTap is not used on the JavaScript side, Elm doesn't allow empty messages
-
-
-port initializeOneTap : Bool -> Cmd msg
+port initializeOneTap : () -> Cmd msg
 
 
 port saveToLocalStorage : String -> Cmd msg
@@ -2810,11 +2804,7 @@ port saveToLocalStorage : String -> Cmd msg
 port showAlert : String -> Cmd msg
 
 
-
--- JavaScript always sends True from localStorageSaved, Elm doesn't allow empty messages
-
-
-port localStorageSaved : (Bool -> msg) -> Sub msg
+port localStorageSaved : (() -> msg) -> Sub msg
 
 
 port placeChanged : (Value -> msg) -> Sub msg
