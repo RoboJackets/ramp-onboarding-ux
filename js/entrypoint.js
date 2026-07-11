@@ -1,4 +1,4 @@
-const localStorageRequiredMessage = "Local storage is required to use this app. Please make sure it is enabled in your browser, then reload the page.";
+const localStorageRequiredMessage = "Local storage is required to use this app. Please make sure it's enabled in your browser, then reload the page.";
 
 let localData = null;
 
