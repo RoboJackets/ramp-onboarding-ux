@@ -6,7 +6,6 @@ import hmac
 import logging
 import os
 from base64 import b64encode
-from collections import defaultdict
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
@@ -14,7 +13,7 @@ from hashlib import file_digest, sha256
 from ipaddress import ip_address, ip_network
 from json import loads
 from re import fullmatch, search
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
@@ -310,7 +309,7 @@ def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
 
 
 @cache.cached(timeout=0, key_prefix="ramp_users")
-def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[str, bool]]]]:
+def get_ramp_users() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of users from Ramp
     """
@@ -325,8 +324,6 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
 
     users = {}
 
-    name_map = defaultdict(list)
-
     for user in ramp_users_response.json()["data"]:
         if user["department_id"] == app.config["RAMP_DISABLED_DEPARTMENT"]:
             continue
@@ -337,9 +334,7 @@ def get_ramp_users() -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, Union[st
             "departmentId": user["department_id"],
         }
 
-        name_map[user["first_name"] + " " + user["last_name"]].append(user["id"])
-
-    return name_map, users
+    return users
 
 
 @cache.cached(timeout=0, key_prefix="ramp_business")
@@ -1383,18 +1378,11 @@ def index() -> Any:
     else:
         default_location = app.config["RAMP_DEFAULT_LOCATION_NON_STUDENTS"]
 
-    ramp_manager_id = None
+    ramp_manager_id = session.get("manager_ramp_id")
 
     apiary_managers = get_apiary_managers()
 
-    name_map, ramp_managers = get_ramp_users()
-
-    if (
-        not session["is_student"]
-        and session["manager_id"] is not None
-        and len(name_map[apiary_managers[session["manager_id"]]]) == 1
-    ):
-        ramp_manager_id = name_map[apiary_managers[session["manager_id"]]][0]
+    ramp_managers = get_ramp_users()
 
     if session["can_request_it_admin"]:
         default_role_id = "IT_ADMIN"
@@ -1508,6 +1496,7 @@ def login() -> Any:
     session["address_state"] = None
     session["zip_code"] = ""
     session["manager_id"] = None
+    session["manager_ramp_id"] = None
     session["sub"] = userinfo["sub"]
     session["ramp_user_id"] = userinfo["rampUserId"] if "rampUserId" in userinfo else None
     session["is_student"] = True
@@ -1736,6 +1725,22 @@ def login() -> Any:
                     session["address_line_two"] = address_validation_json["result"]["address"][
                         "postalAddress"
                     ]["addressLines"][1]
+
+        if session["manager_id"] is not None:
+            required_department_id = (
+                app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"] if session["is_student"] else None
+            )
+
+            try:
+                manager_resolution = resolve_ramp_user(
+                    str(session["manager_id"]),
+                    required_department_id,
+                )
+
+                if "rampUserId" in manager_resolution:
+                    session["manager_ramp_id"] = manager_resolution["rampUserId"]
+            except RequestException:
+                pass
 
     if session["ramp_user_id"] is None:
         # check ramp to see if they already have an invitation with one of the emails from keycloak
@@ -1968,6 +1973,13 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
         }
     )
 
+    return resolve_ramp_user(apiary_id, app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])
+
+
+def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) -> Dict[str, str]:
+    """
+    Resolves an Apiary user ID to a Ramp user ID via Keycloak, with optional department gating
+    """
     apiary_user_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"] + "/api/v1/users/" + apiary_id,
         headers={
@@ -2027,7 +2039,10 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     )
     ramp_user_response.raise_for_status()
 
-    if ramp_user_response.json()["department_id"] != app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]:
+    if (
+        required_department_id is not None
+        and ramp_user_response.json()["department_id"] != required_department_id
+    ):
         return {"error": "Please select a manager within your department"}
 
     if ramp_user_response.json()["status"] == "USER_ACTIVE":

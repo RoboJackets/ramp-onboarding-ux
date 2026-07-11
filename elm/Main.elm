@@ -510,6 +510,7 @@ type Msg
     | SetTime Time.Posix
     | SetZone Time.Zone
     | ShowAdvancedOptionsButtonClicked
+    | AdvancedModeManagerPrefillReceived (Result Http.Error ManagerValidation)
     | DepartmentInput String
     | LocationInput String
     | RoleInput String
@@ -991,21 +992,50 @@ updateReady msg model =
                     { model
                         | showAdvancedOptions = True
                         , managerApiaryId = Nothing
-                        , managerRampId = getManagerRampIdFromApiaryId model
                         , managerIsValid = Just True
                     }
+
+                prefillCmd : Cmd Msg
+                prefillCmd =
+                    case ( model.managerRampId, model.managerApiaryId ) of
+                        ( Nothing, Just managerApiaryId ) ->
+                            requestManagerRampIdPrefill managerApiaryId
+
+                        _ ->
+                            Cmd.none
+
+                focusCmd : Cmd Msg
+                focusCmd =
+                    if model.managerRampId /= Nothing then
+                        Task.attempt (\_ -> NoOpMsg) (focus departmentFieldId)
+
+                    else
+                        Task.attempt (\_ -> NoOpMsg) (focus managerFieldId)
             in
             ( newModel
             , Cmd.batch
                 [ saveFormStateToLocalStorage newModel
-                , case getManagerRampIdFromApiaryId model of
-                    Just _ ->
-                        Task.attempt (\_ -> NoOpMsg) (focus departmentFieldId)
-
-                    Nothing ->
-                        Task.attempt (\_ -> NoOpMsg) (focus managerFieldId)
+                , focusCmd
+                , prefillCmd
                 ]
             )
+
+        AdvancedModeManagerPrefillReceived result ->
+            case result of
+                Ok managerRampInfo ->
+                    case ( model.managerRampId, managerRampInfo.managerRampId ) of
+                        ( Nothing, Just rampId ) ->
+                            if isEnabledOption model.managerRampOptions rampId then
+                                updateAndSaveToLocalStorage { model | managerRampId = Just rampId }
+
+                            else
+                                ( model, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
 
         DepartmentInput selectedDepartment ->
             updateAndSaveToLocalStorage { model | rampDepartmentId = Just selectedDepartment }
@@ -2408,6 +2438,17 @@ requestManagerValidation model =
         }
 
 
+requestManagerRampIdPrefill : Int -> Cmd Msg
+requestManagerRampIdPrefill managerApiaryId =
+    Http.get
+        { url =
+            Url.Builder.absolute
+                [ "get-ramp-user", String.fromInt managerApiaryId ]
+                []
+        , expect = expectJson AdvancedModeManagerPrefillReceived managerValidationResponseDecoder
+        }
+
+
 requestGoogleAddressValidation : Model -> Cmd Msg
 requestGoogleAddressValidation model =
     Http.post
@@ -2706,34 +2747,6 @@ sortByRampObjectLabel left right =
 sortByRampRoleRankOrder : ( String, RampObject ) -> ( String, RampObject ) -> Order
 sortByRampRoleRankOrder left right =
     compare (withDefault 0 (Dict.get (first left) rampRoleRankOrder)) (withDefault 0 (Dict.get (first right) rampRoleRankOrder))
-
-
-labelMatches : Maybe String -> String -> { a | label : String } -> Bool
-labelMatches maybeGivenLabel _ rampObject =
-    case maybeGivenLabel of
-        Just givenLabel ->
-            givenLabel == rampObject.label
-
-        Nothing ->
-            False
-
-
-getManagerRampIdFromApiaryId : Model -> Maybe String
-getManagerRampIdFromApiaryId model =
-    let
-        filteredOptions : Dict String RampUser
-        filteredOptions =
-            Dict.filter (labelMatches (Dict.get (withDefault 0 model.managerApiaryId) model.managerApiaryOptions)) model.managerRampOptions
-
-        matchingOption : ( String, RampUser )
-        matchingOption =
-            withDefault ( "", { label = "", enabled = False, departmentId = "" } ) (List.head (Dict.toList filteredOptions))
-    in
-    if Dict.size filteredOptions == 1 && (second matchingOption).enabled then
-        Just (first matchingOption)
-
-    else
-        Nothing
 
 
 termsOfServiceItemToLink : ( String, String ) -> Html msg
