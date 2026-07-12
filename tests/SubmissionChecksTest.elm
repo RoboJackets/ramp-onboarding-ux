@@ -354,5 +354,51 @@ suite =
                             , .managerIsValid >> Expect.equal (Just True)
                             , .formState >> Expect.equal (CreatingRampAccount Nothing)
                             ]
+            , test "ignores PlaceChanged when not Editing" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+
+                        validating =
+                            { model
+                                | formState = Validating { manager = Done, address = InFlight }
+                            }
+
+                        placeSelected =
+                            Json.Encode.object
+                                [ ( "address_components"
+                                  , Json.Encode.list identity
+                                        [ Json.Encode.object
+                                            [ ( "short_name", Json.Encode.string "999" )
+                                            , ( "types", Json.Encode.list Json.Encode.string [ "street_number" ] )
+                                            ]
+                                        , Json.Encode.object
+                                            [ ( "short_name", Json.Encode.string "Other St" )
+                                            , ( "types", Json.Encode.list Json.Encode.string [ "route" ] )
+                                            ]
+                                        , Json.Encode.object
+                                            [ ( "short_name", Json.Encode.string "Atlanta" )
+                                            , ( "types", Json.Encode.list Json.Encode.string [ "locality" ] )
+                                            ]
+                                        , Json.Encode.object
+                                            [ ( "short_name", Json.Encode.string "GA" )
+                                            , ( "types", Json.Encode.list Json.Encode.string [ "administrative_area_level_1" ] )
+                                            ]
+                                        , Json.Encode.object
+                                            [ ( "short_name", Json.Encode.string "30309" )
+                                            , ( "types", Json.Encode.list Json.Encode.string [ "postal_code" ] )
+                                            ]
+                                        ]
+                                  )
+                                ]
+                    in
+                    updateReady (PlaceChanged placeSelected) validating
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .addressLineOne >> Expect.equal "123 Main St"
+                            , .formState >> Expect.equal (Validating { manager = Done, address = InFlight })
+                            ]
             ]
         ]

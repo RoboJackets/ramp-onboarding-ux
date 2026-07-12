@@ -695,39 +695,44 @@ updateReady msg model =
             )
 
         PlaceChanged value ->
-            case decodePlaceChanged value of
-                Ok (PlaceSelected addressComponents) ->
-                    let
-                        newModel : Model
-                        newModel =
-                            { model
-                                | addressLineOne =
-                                    String.trim (getAddressComponent addressComponents "street_number")
-                                        ++ " "
-                                        ++ String.trim (getAddressComponent addressComponents "route")
-                                , addressLineTwo = String.trim (getAddressComponent addressComponents "subpremise")
-                                , city = String.trim (getAddressComponent addressComponents "locality")
-                                , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
-                                , zip = String.trim (getAddressComponent addressComponents "postal_code")
-                            }
-                    in
-                    ( newModel
-                    , Cmd.batch
-                        [ Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
-                        , saveFormStateToLocalStorage newModel
-                        ]
-                    )
+            case model.formState of
+                Editing ->
+                    case decodePlaceChanged value of
+                        Ok (PlaceSelected addressComponents) ->
+                            let
+                                newModel : Model
+                                newModel =
+                                    { model
+                                        | addressLineOne =
+                                            String.trim (getAddressComponent addressComponents "street_number")
+                                                ++ " "
+                                                ++ String.trim (getAddressComponent addressComponents "route")
+                                        , addressLineTwo = String.trim (getAddressComponent addressComponents "subpremise")
+                                        , city = String.trim (getAddressComponent addressComponents "locality")
+                                        , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
+                                        , zip = String.trim (getAddressComponent addressComponents "postal_code")
+                                    }
+                            in
+                            ( newModel
+                            , Cmd.batch
+                                [ Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+                                , saveFormStateToLocalStorage newModel
+                                ]
+                            )
 
-                Ok PlaceIncomplete ->
+                        Ok PlaceIncomplete ->
+                            ( model, Cmd.none )
+
+                        Err decodeError ->
+                            ( model
+                            , showAlert
+                                ("There was an error parsing the selected address: "
+                                    ++ Json.Decode.errorToString decodeError
+                                )
+                            )
+
+                _ ->
                     ( model, Cmd.none )
-
-                Err decodeError ->
-                    ( model
-                    , showAlert
-                        ("There was an error parsing the selected address: "
-                            ++ Json.Decode.errorToString decodeError
-                        )
-                    )
 
         GoogleAddressValidationResultReceived requested result ->
             case model.formState of
