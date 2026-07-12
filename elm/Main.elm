@@ -881,8 +881,10 @@ updateReady msg model =
             , case result of
                 Ok TaskSucceeded ->
                     if model.orderPhysicalCard then
-                        Http.post
-                            { url =
+                        Http.request
+                            { method = "POST"
+                            , headers = []
+                            , url =
                                 Url.Builder.absolute
                                     [ "order-physical-card" ]
                                     []
@@ -904,6 +906,8 @@ updateReady msg model =
                                         ]
                                     )
                             , expect = expectWhatever OrderPhysicalCardResponseReceived
+                            , timeout = Just httpRequestTimeoutMs
+                            , tracker = Nothing
                             }
 
                     else
@@ -2437,32 +2441,49 @@ proceedIfReady model =
             ( model, Cmd.none )
 
 
+httpRequestTimeoutMs : Float
+httpRequestTimeoutMs =
+    5000
+
+
 requestManagerValidation : Model -> Cmd Msg
 requestManagerValidation model =
-    Http.get
-        { url =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url =
             Url.Builder.absolute
                 [ "get-ramp-user", String.fromInt (withDefault 0 model.managerApiaryId) ]
                 []
+        , body = Http.emptyBody
         , expect = expectJson ManagerValidationResultReceived managerValidationResponseDecoder
+        , timeout = Just httpRequestTimeoutMs
+        , tracker = Nothing
         }
 
 
 requestManagerRampIdPrefill : Int -> Cmd Msg
 requestManagerRampIdPrefill managerApiaryId =
-    Http.get
-        { url =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url =
             Url.Builder.absolute
                 [ "get-ramp-user", String.fromInt managerApiaryId ]
                 []
+        , body = Http.emptyBody
         , expect = expectJson AdvancedModeManagerPrefillReceived managerValidationResponseDecoder
+        , timeout = Just httpRequestTimeoutMs
+        , tracker = Nothing
         }
 
 
 requestGoogleAddressValidation : Model -> Cmd Msg
 requestGoogleAddressValidation model =
-    Http.post
-        { url =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url =
             Url.Builder.crossOrigin
                 "https://addressvalidation.googleapis.com/v1:validateAddress"
                 []
@@ -2492,13 +2513,17 @@ requestGoogleAddressValidation model =
                     ]
                 )
         , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
+        , timeout = Just httpRequestTimeoutMs
+        , tracker = Nothing
         }
 
 
 createRampAccountTask : Model -> Cmd Msg
 createRampAccountTask model =
-    Http.post
-        { url =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url =
             Url.Builder.absolute
                 [ "create-ramp-account" ]
                 []
@@ -2515,17 +2540,24 @@ createRampAccountTask model =
                     ]
                 )
         , expect = expectJson CreateRampAccountTaskIdReceived createTaskResponseDecoder
+        , timeout = Just httpRequestTimeoutMs
+        , tracker = Nothing
         }
 
 
 getRampAccountTaskStatus : String -> Cmd Msg
 getRampAccountTaskStatus taskId =
-    Http.get
-        { url =
+    Http.request
+        { method = "GET"
+        , headers = []
+        , url =
             Url.Builder.absolute
                 [ "create-ramp-account", taskId ]
                 []
+        , body = Http.emptyBody
         , expect = expectJson CreateRampAccountTaskStatusReceived getTaskResponseDecoder
+        , timeout = Just httpRequestTimeoutMs
+        , tracker = Nothing
         }
 
 
