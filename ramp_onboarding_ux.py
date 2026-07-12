@@ -138,6 +138,14 @@ app = Flask(__name__)
 
 app.config.from_prefixed_env()
 
+
+@app.after_request
+def add_document_policy_header(response: Response) -> Response:
+    """Enable Chromium JS Self-Profiling for Sentry browser profiling."""
+    response.headers["Document-Policy"] = "js-profiling"
+    return response
+
+
 if not get_debug_flag():
     Minify(app=app, caching_limit=0, go=False)
 
@@ -1397,6 +1405,12 @@ def index() -> Any:
         sentry_browser_config={
             "dsn": os.environ.get("SENTRY_DSN") or None,
             "environment": os.environ.get("SENTRY_ENVIRONMENT"),
+            "release": os.environ.get("SENTRY_RELEASE"),
+            "debug": get_debug_flag(),
+            "tracesSampleRate": 1.0,
+            "profileSessionSampleRate": 1.0,
+            "profileLifecycle": "trace",
+            "initialScope": {"tags": {"runtime": "browser"}},
         },
         elm_model={
             "firstName": session["first_name"],

@@ -8,11 +8,12 @@ const sentryEnabled = Boolean(sentryConfig.dsn);
 
 if (sentryEnabled) {
     Sentry.init({
-        dsn: sentryConfig.dsn,
-        environment: sentryConfig.environment || undefined,
-        initialScope: {
-            tags: { runtime: "browser" },
-        },
+        ...sentryConfig,
+        integrations: [
+            Sentry.browserTracingIntegration(),
+            Sentry.browserProfilingIntegration(),
+            Sentry.httpClientIntegration(),
+        ],
     });
 
     const serverData = window.serverData;
