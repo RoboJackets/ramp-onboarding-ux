@@ -350,6 +350,11 @@ type alias AddressComponent =
     }
 
 
+type PlaceChange
+    = PlaceSelected (List AddressComponent)
+    | PlaceIncomplete
+
+
 type ManagerValidation
     = ManagerResolved { managerApiaryId : Int, managerRampId : String }
     | ManagerRejected { managerApiaryId : Int, managerFeedbackText : String }
@@ -691,7 +696,7 @@ updateReady msg model =
 
         PlaceChanged value ->
             case decodePlaceChanged value of
-                Ok addressComponents ->
+                Ok (PlaceSelected addressComponents) ->
                     let
                         newModel : Model
                         newModel =
@@ -712,6 +717,9 @@ updateReady msg model =
                         , saveFormStateToLocalStorage newModel
                         ]
                     )
+
+                Ok PlaceIncomplete ->
+                    ( model, Cmd.none )
 
                 Err decodeError ->
                     ( model
@@ -2159,26 +2167,33 @@ isEnterKey key =
     key == "Enter"
 
 
-decodePlaceChanged : Value -> Result Json.Decode.Error (List AddressComponent)
-decodePlaceChanged value =
-    decodeValue
-        (field "address_components"
-            (Json.Decode.list
-                (Json.Decode.map2 AddressComponent
-                    (field "short_name" string)
-                    (field "types" (Json.Decode.list string))
-                )
-                |> andThen
-                    (\components ->
-                        if List.isEmpty components then
-                            fail "address_components is empty"
+addressComponentDecoder : Decoder AddressComponent
+addressComponentDecoder =
+    Json.Decode.map2 AddressComponent
+        (field "short_name" string)
+        (field "types" (Json.Decode.list string))
 
-                        else
-                            succeed components
-                    )
-            )
-        )
-        value
+
+decodePlaceChanged : Value -> Result Json.Decode.Error PlaceChange
+decodePlaceChanged value =
+    case decodeValue (maybe (field "address_components" Json.Decode.value)) value of
+        Ok Nothing ->
+            Ok PlaceIncomplete
+
+        Ok (Just addressComponentsValue) ->
+            case decodeValue (Json.Decode.list addressComponentDecoder) addressComponentsValue of
+                Ok components ->
+                    if List.isEmpty components then
+                        Ok PlaceIncomplete
+
+                    else
+                        Ok (PlaceSelected components)
+
+                Err decodeError ->
+                    Err decodeError
+
+        Err decodeError ->
+            Err decodeError
 
 
 getAddressComponent : List AddressComponent -> String -> String

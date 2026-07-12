@@ -7,9 +7,11 @@ import Json.Encode
 import Main
     exposing
         ( AddressComponent
+        , PlaceChange(..)
         , ValidationResult(..)
         , addressComponentTypeMatches
         , blankString
+        , decodePlaceChanged
         , feedbackText
         , getAddressComponent
         , isEnabledOption
@@ -78,6 +80,57 @@ suite =
                 \_ ->
                     addressComponentTypeMatches "locality" { value = "Atlanta", types = [ "locality", "political" ] }
                         |> Expect.equal True
+            ]
+        , describe "decodePlaceChanged"
+            [ test "name-only place (Enter without selecting) is incomplete" <|
+                \_ ->
+                    Json.Encode.object [ ( "name", Json.Encode.string "123 Main St" ) ]
+                        |> decodePlaceChanged
+                        |> Expect.equal (Ok PlaceIncomplete)
+            , test "empty address_components is incomplete" <|
+                \_ ->
+                    Json.Encode.object [ ( "address_components", Json.Encode.list identity [] ) ]
+                        |> decodePlaceChanged
+                        |> Expect.equal (Ok PlaceIncomplete)
+            , test "valid address_components are selected" <|
+                \_ ->
+                    Json.Encode.object
+                        [ ( "address_components"
+                          , Json.Encode.list identity
+                                [ Json.Encode.object
+                                    [ ( "short_name", Json.Encode.string "123" )
+                                    , ( "types", Json.Encode.list Json.Encode.string [ "street_number" ] )
+                                    ]
+                                , Json.Encode.object
+                                    [ ( "short_name", Json.Encode.string "Main St" )
+                                    , ( "types", Json.Encode.list Json.Encode.string [ "route" ] )
+                                    ]
+                                ]
+                          )
+                        ]
+                        |> decodePlaceChanged
+                        |> Expect.equal
+                            (Ok
+                                (PlaceSelected
+                                    [ { value = "123", types = [ "street_number" ] }
+                                    , { value = "Main St", types = [ "route" ] }
+                                    ]
+                                )
+                            )
+            , test "malformed address_components is an error" <|
+                \_ ->
+                    Json.Encode.object
+                        [ ( "address_components"
+                          , Json.Encode.list identity
+                                [ Json.Encode.object
+                                    [ ( "short_name", Json.Encode.int 123 )
+                                    , ( "types", Json.Encode.list Json.Encode.string [ "street_number" ] )
+                                    ]
+                                ]
+                          )
+                        ]
+                        |> decodePlaceChanged
+                        |> Expect.err
             ]
         , describe "localOr / trimmedLocalOr / validatedId / isEnabledOption"
             [ test "localOr returns the decoded local value" <|
