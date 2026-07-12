@@ -7,7 +7,7 @@ import Char exposing (isDigit)
 import Dict exposing (Dict, toList)
 import Email
 import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, pre, select, strong, text)
-import Html.Attributes exposing (attribute, autocomplete, checked, class, classList, disabled, for, href, id, maxlength, minlength, novalidate, placeholder, readonly, required, selected, style, target, type_)
+import Html.Attributes exposing (attribute, autocomplete, checked, class, classList, disabled, for, href, id, maxlength, novalidate, placeholder, readonly, selected, style, target, type_)
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
@@ -1176,9 +1176,7 @@ renderForm model =
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation firstNameValidationResult
-                    , minlength 1
                     , maxlength 40
-                    , required True
                     , readonly (model.formState /= Editing)
                     , placeholder "First Name"
                     , on "change" (succeed FormChanged)
@@ -1196,9 +1194,7 @@ renderForm model =
                     , type_ "text"
                     , class "form-control"
                     , validationClasses model.showValidation lastNameValidationResult
-                    , minlength 1
                     , maxlength 40
-                    , required True
                     , readonly (model.formState /= Editing)
                     , placeholder "Last Name"
                     , on "change" (succeed FormChanged)
@@ -1219,8 +1215,6 @@ renderForm model =
                         , type_ "email"
                         , class "form-control"
                         , validationClasses model.showValidation emailAddressValidationResult
-                        , minlength 13
-                        , required True
                         , readonly (model.formState /= Editing)
                         , placeholder "Email Address"
                         , on "change" (succeed FormChanged)
@@ -1412,9 +1406,7 @@ renderForm model =
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid addressLineOneValidationResult
                     , id addressLineOneFieldId
-                    , minlength 1
                     , maxlength 100
-                    , required True
                     , readonly (model.formState /= Editing)
                     , placeholder "Street Address"
                     , onInput AddressLineOneInput
@@ -1454,11 +1446,9 @@ renderForm model =
                     , class "form-control"
                     , addressValidationClasses model.showValidation model.addressIsValid cityValidationResult
                     , id cityFieldId
-                    , minlength 1
                     , maxlength 40
                     , placeholder "City"
                     , readonly (model.formState /= Editing)
-                    , required True
                     , onInput CityInput
                     , on "change" (succeed FormChanged)
                     , Html.Attributes.value model.city
@@ -1487,9 +1477,7 @@ renderForm model =
                     , class "form-control"
                     , id zipCodeFieldId
                     , placeholder "ZIP Code"
-                    , minlength 5
                     , maxlength 5
-                    , required True
                     , readonly (model.formState /= Editing)
                     , onInput ZipInput
                     , on "change" (succeed FormChanged)
@@ -1921,7 +1909,6 @@ renderSelect config =
     , select
         [ class "form-select"
         , id config.fieldId
-        , required True
         , disabled config.isDisabled
         , on "change" config.onChange
         , config.validationAttribute
