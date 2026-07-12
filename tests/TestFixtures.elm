@@ -19,7 +19,7 @@ minimalServerData =
     , emailAddress = "ada@robojackets.org"
     , emailVerified = True
     , managerApiaryId = Just 2
-    , apiaryManagerOptions = Dict.fromList [ ( 2, "Manager Two" ) ]
+    , apiaryManagerOptions = Dict.fromList [ ( 2, "Manager Two" ), ( 3, "Manager Three" ) ]
     , managerRampId = Just "ramp-manager"
     , rampManagerOptions =
         Dict.fromList

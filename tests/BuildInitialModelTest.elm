@@ -91,7 +91,8 @@ suite =
                 let
                     localData =
                         Json.Encode.object
-                            [ ( "departmentId", Json.Encode.string "dept-disabled" )
+                            [ ( "showAdvancedOptions", Json.Encode.bool True )
+                            , ( "departmentId", Json.Encode.string "dept-disabled" )
                             ]
 
                     model =
@@ -104,7 +105,8 @@ suite =
                 let
                     localData =
                         Json.Encode.object
-                            [ ( "departmentId", Json.Encode.string "dept-staff" )
+                            [ ( "showAdvancedOptions", Json.Encode.bool True )
+                            , ( "departmentId", Json.Encode.string "dept-staff" )
                             ]
 
                     model =
@@ -128,4 +130,84 @@ suite =
                 in
                 model.state
                     |> Expect.equal (Just "GA")
+        , test "clears managerRampId in simple mode when local Apiary manager differs from server" <|
+            \_ ->
+                let
+                    localData =
+                        Json.Encode.object
+                            [ ( "managerApiaryId", Json.Encode.int 3 )
+                            , ( "managerRampId", Json.Encode.null )
+                            ]
+
+                    model =
+                        buildInitialModel minimalServerData localData
+                in
+                Expect.all
+                    [ .managerApiaryId >> Expect.equal (Just 3)
+                    , .managerRampId >> Expect.equal Nothing
+                    ]
+                    model
+        , test "keeps server managerRampId in simple mode when local Apiary manager still matches" <|
+            \_ ->
+                let
+                    localData =
+                        Json.Encode.object
+                            [ ( "managerApiaryId", Json.Encode.int 2 )
+                            , ( "managerRampId", Json.Encode.null )
+                            ]
+
+                    model =
+                        buildInitialModel minimalServerData localData
+                in
+                Expect.all
+                    [ .managerApiaryId >> Expect.equal (Just 2)
+                    , .managerRampId >> Expect.equal (Just "ramp-manager")
+                    ]
+                    model
+        , test "ignores stored Ramp fields in simple mode" <|
+            \_ ->
+                let
+                    localData =
+                        Json.Encode.object
+                            [ ( "managerApiaryId", Json.Encode.int 3 )
+                            , ( "managerRampId", Json.Encode.string "ramp-manager" )
+                            , ( "departmentId", Json.Encode.string "dept-staff" )
+                            ]
+
+                    model =
+                        buildInitialModel minimalServerData localData
+                in
+                Expect.all
+                    [ .managerRampId >> Expect.equal Nothing
+                    , .rampDepartmentId >> Expect.equal (Just "dept-students")
+                    ]
+                    model
+        , test "restores managerRampId from localStorage in advanced mode" <|
+            \_ ->
+                let
+                    localData =
+                        Json.Encode.object
+                            [ ( "showAdvancedOptions", Json.Encode.bool True )
+                            , ( "managerRampId", Json.Encode.string "ramp-manager" )
+                            ]
+
+                    model =
+                        buildInitialModel minimalServerData localData
+                in
+                model.managerRampId
+                    |> Expect.equal (Just "ramp-manager")
+        , test "falls back to server managerRampId in advanced mode when local is null" <|
+            \_ ->
+                let
+                    localData =
+                        Json.Encode.object
+                            [ ( "showAdvancedOptions", Json.Encode.bool True )
+                            , ( "managerRampId", Json.Encode.null )
+                            ]
+
+                    model =
+                        buildInitialModel minimalServerData localData
+                in
+                model.managerRampId
+                    |> Expect.equal (Just "ramp-manager")
         ]

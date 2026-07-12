@@ -2039,13 +2039,15 @@ stateTupleToHtmlOption selectedState ( stateCode, stateName ) =
 
 
 
--- Encodes only the form fields that are persisted to localStorage, not the entire model
+-- Encodes only the form fields that are persisted to localStorage, not the entire model.
+-- Ramp fields and showAdvancedOptions are written only in advanced mode.
 
 
 encodeFormState : Model -> String
 encodeFormState model =
-    Json.Encode.encode 0
-        (Json.Encode.object
+    let
+        baseFields : List ( String, Json.Encode.Value )
+        baseFields =
             [ ( firstNameLocalStorageKey, Json.Encode.string (String.trim model.firstName) )
             , ( lastNameLocalStorageKey, Json.Encode.string (String.trim model.lastName) )
             , ( emailAddressLocalStorageKey, Json.Encode.string (String.trim model.emailAddress) )
@@ -2057,39 +2059,6 @@ encodeFormState model =
                     Nothing ->
                         Json.Encode.null
               )
-            , ( managerRampIdLocalStorageKey
-              , case model.managerRampId of
-                    Just managerRampId ->
-                        Json.Encode.string (String.trim managerRampId)
-
-                    Nothing ->
-                        Json.Encode.null
-              )
-            , ( departmentIdLocalStorageKey
-              , case model.rampDepartmentId of
-                    Just departmentId ->
-                        Json.Encode.string (String.trim departmentId)
-
-                    Nothing ->
-                        Json.Encode.null
-              )
-            , ( locationIdLocalStorageKey
-              , case model.rampLocationId of
-                    Just locationId ->
-                        Json.Encode.string (String.trim locationId)
-
-                    Nothing ->
-                        Json.Encode.null
-              )
-            , ( roleIdLocalStorageKey
-              , case model.rampRoleId of
-                    Just roleId ->
-                        Json.Encode.string (String.trim roleId)
-
-                    Nothing ->
-                        Json.Encode.null
-              )
-            , ( showAdvancedOptionsLocalStorageKey, Json.Encode.bool model.showAdvancedOptions )
             , ( orderPhysicalCardLocalStorageKey, Json.Encode.bool model.orderPhysicalCard )
             , ( addressLineOneLocalStorageKey, Json.Encode.string (String.trim model.addressLineOne) )
             , ( addressLineTwoLocalStorageKey, Json.Encode.string (String.trim model.addressLineTwo) )
@@ -2104,6 +2073,50 @@ encodeFormState model =
               )
             , ( zipCodeLocalStorageKey, Json.Encode.string (String.trim model.zip) )
             ]
+    in
+    Json.Encode.encode 0
+        (Json.Encode.object
+            (baseFields
+                ++ (if model.showAdvancedOptions then
+                        [ ( showAdvancedOptionsLocalStorageKey, Json.Encode.bool True )
+                        , ( managerRampIdLocalStorageKey
+                          , case model.managerRampId of
+                                Just managerRampId ->
+                                    Json.Encode.string (String.trim managerRampId)
+
+                                Nothing ->
+                                    Json.Encode.null
+                          )
+                        , ( departmentIdLocalStorageKey
+                          , case model.rampDepartmentId of
+                                Just departmentId ->
+                                    Json.Encode.string (String.trim departmentId)
+
+                                Nothing ->
+                                    Json.Encode.null
+                          )
+                        , ( locationIdLocalStorageKey
+                          , case model.rampLocationId of
+                                Just locationId ->
+                                    Json.Encode.string (String.trim locationId)
+
+                                Nothing ->
+                                    Json.Encode.null
+                          )
+                        , ( roleIdLocalStorageKey
+                          , case model.rampRoleId of
+                                Just roleId ->
+                                    Json.Encode.string (String.trim roleId)
+
+                                Nothing ->
+                                    Json.Encode.null
+                          )
+                        ]
+
+                    else
+                        []
+                   )
+            )
         )
 
 
@@ -2569,6 +2582,15 @@ classifyCampusAddress model =
 
 buildInitialModel : ServerData -> Value -> Model
 buildInitialModel serverData localData =
+    let
+        showAdvancedOptions : Bool
+        showAdvancedOptions =
+            serverData.showAdvancedOptions || localOr showAdvancedOptionsLocalStorageKey bool False localData
+
+        managerApiaryId : Maybe Int
+        managerApiaryId =
+            validatedId managerApiaryIdLocalStorageKey int (\managerId -> managerId /= serverData.selfApiaryId && Dict.member managerId serverData.apiaryManagerOptions) localData serverData.managerApiaryId
+    in
     { firstName = trimmedLocalOr firstNameLocalStorageKey serverData.firstName localData
     , lastName = trimmedLocalOr lastNameLocalStorageKey serverData.lastName localData
     , emailAddress =
@@ -2579,8 +2601,18 @@ buildInitialModel serverData localData =
             trimmedLocalOr emailAddressLocalStorageKey serverData.emailAddress localData
     , emailVerified = serverData.emailVerified
     , managerApiaryOptions = serverData.apiaryManagerOptions
-    , managerApiaryId = validatedId managerApiaryIdLocalStorageKey int (\managerId -> managerId /= serverData.selfApiaryId && Dict.member managerId serverData.apiaryManagerOptions) localData serverData.managerApiaryId
-    , managerRampId = validatedId managerRampIdLocalStorageKey string (isEnabledOption serverData.rampManagerOptions) localData serverData.managerRampId
+    , managerApiaryId = managerApiaryId
+    , managerRampId =
+        if showAdvancedOptions then
+            validatedId managerRampIdLocalStorageKey string (isEnabledOption serverData.rampManagerOptions) localData serverData.managerRampId
+
+        else if managerApiaryId == serverData.managerApiaryId then
+            -- the server-resolved Ramp ID belongs to the server's Apiary manager; it is only
+            -- valid while the restored selection still matches
+            validServerId (isEnabledOption serverData.rampManagerOptions) serverData.managerRampId
+
+        else
+            Nothing
     , managerIsValid = Nothing
     , managerFeedbackText = ""
     , selfApiaryId = serverData.selfApiaryId
@@ -2600,13 +2632,28 @@ buildInitialModel serverData localData =
     , zone = Time.utc
     , formState = Editing
     , redirectingToEmailVerification = False
-    , showAdvancedOptions = serverData.showAdvancedOptions || localOr showAdvancedOptionsLocalStorageKey bool False localData
+    , showAdvancedOptions = showAdvancedOptions
     , rampDepartmentOptions = serverData.departmentOptions
     , rampLocationOptions = serverData.locationOptions
     , rampRoleOptions = serverData.roleOptions
-    , rampDepartmentId = validatedId departmentIdLocalStorageKey string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
-    , rampLocationId = validatedId locationIdLocalStorageKey string (isEnabledOption serverData.locationOptions) localData serverData.locationId
-    , rampRoleId = validatedId roleIdLocalStorageKey string (isEnabledOption serverData.roleOptions) localData serverData.roleId
+    , rampDepartmentId =
+        if showAdvancedOptions then
+            validatedId departmentIdLocalStorageKey string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
+
+        else
+            validServerId (isEnabledOption serverData.departmentOptions) serverData.departmentId
+    , rampLocationId =
+        if showAdvancedOptions then
+            validatedId locationIdLocalStorageKey string (isEnabledOption serverData.locationOptions) localData serverData.locationId
+
+        else
+            validServerId (isEnabledOption serverData.locationOptions) serverData.locationId
+    , rampRoleId =
+        if showAdvancedOptions then
+            validatedId roleIdLocalStorageKey string (isEnabledOption serverData.roleOptions) localData serverData.roleId
+
+        else
+            validServerId (isEnabledOption serverData.roleOptions) serverData.roleId
     , studentDefaultDepartmentId = serverData.studentDefaultDepartmentId
     , nonStudentDefaultDepartmentId = serverData.nonStudentDefaultDepartmentId
     , studentDefaultLocationId = serverData.studentDefaultLocationId
@@ -2637,6 +2684,19 @@ validatedId fieldName decoder isValidId localData serverValue =
         |> List.filterMap identity
         |> List.filter isValidId
         |> List.head
+
+
+validServerId : (a -> Bool) -> Maybe a -> Maybe a
+validServerId isValidId serverValue =
+    Maybe.andThen
+        (\value ->
+            if isValidId value then
+                Just value
+
+            else
+                Nothing
+        )
+        serverValue
 
 
 isEnabledOption : Dict String { a | enabled : Bool } -> String -> Bool
