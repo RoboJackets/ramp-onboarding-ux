@@ -2684,7 +2684,8 @@ addDays days time =
 
 
 
--- USPS delivers First Class mail Monday through Saturday but not Sunday, so estimates that land on a Sunday are pushed to the following Monday.
+-- USPS delivers First Class mail Monday through Saturday, but not Sunday, so estimates that land on a Sunday are pushed to the following Monday
+-- USPS delivers First Class mail on Saturday, but the Georgia Tech Post Office is closed on Saturday, so estimates that land on a Saturday are pushed to the following Monday
 
 
 estimatePhysicalCardDeliveryDate : Zone -> Posix -> Posix
@@ -2695,6 +2696,9 @@ estimatePhysicalCardDeliveryDate zone now =
             addDays estimatedShippingDays now
     in
     case toWeekday zone estimate of
+        Sat ->
+            addDays 2 estimate
+
         Sun ->
             addDays 1 estimate
 

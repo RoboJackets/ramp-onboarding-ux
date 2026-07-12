@@ -39,9 +39,9 @@ suite =
                     in
                     toWeekday Time.utc estimate
                         |> Expect.equal Wed
-            , test "leaves a Saturday estimate unchanged" <|
+            , test "pushes a Saturday estimate to Monday" <|
                 \_ ->
-                    -- Thursday 1970-01-01 + 9.5 days => Saturday
+                    -- Thursday 1970-01-01 + 9.5 days => Saturday, then +2 => Monday
                     let
                         thursday =
                             millisToPosix 0
@@ -50,7 +50,7 @@ suite =
                             estimatePhysicalCardDeliveryDate Time.utc thursday
                     in
                     toWeekday Time.utc estimate
-                        |> Expect.equal Sat
+                        |> Expect.equal Mon
             , test "pushes a Sunday estimate to Monday" <|
                 \_ ->
                     -- Friday 1970-01-02 + 9.5 days => Sunday, then +1 => Monday
