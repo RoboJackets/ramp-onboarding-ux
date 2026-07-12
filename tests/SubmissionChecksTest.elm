@@ -8,6 +8,7 @@ import Main
         , FormState(..)
         , ManagerValidation(..)
         , Msg(..)
+        , ProvisioningFailure(..)
         , abortValidation
         , addressValidationRequestFromModel
         , markAddressCheckDone
@@ -90,8 +91,8 @@ suite =
                         |> Expect.equal Editing
             , test "abortValidation leaves non-Validating states alone" <|
                 \_ ->
-                    abortValidation Error
-                        |> Expect.equal Error
+                    abortValidation (Error (CreateAccountRequestFailed "network error"))
+                        |> Expect.equal (Error (CreateAccountRequestFailed "network error"))
             , test "markManagerCheckDone flips manager to Done" <|
                 \_ ->
                     let

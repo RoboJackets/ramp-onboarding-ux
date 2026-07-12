@@ -351,10 +351,17 @@ type alias SubmissionChecks =
 type FormState
     = Editing
     | Validating SubmissionChecks
-    | Error
+    | Error ProvisioningFailure
     | CreatingRampAccount (Maybe String)
     | RampAccountCreated
     | PhysicalCardOrdered
+
+
+type ProvisioningFailure
+    = CreateAccountRequestFailed String
+    | CreateAccountTaskFailed
+    | CreateAccountStatusCheckFailed String
+    | OrderPhysicalCardFailed String
 
 
 type alias AddressComponent =
@@ -882,8 +889,8 @@ updateReady msg model =
                     , getRampAccountTaskStatus createRampAccountTaskId.taskId
                     )
 
-                Err _ ->
-                    ( { model | formState = Error }, Cmd.none )
+                Err error ->
+                    showProvisioningFailure model (CreateAccountRequestFailed (httpErrorToString error))
 
         CreateRampAccountTaskStatusReceived result ->
             let
@@ -905,27 +912,10 @@ updateReady msg model =
                         _ ->
                             CreatingRampAccount Nothing
             in
-            ( { model
-                | formState =
-                    case result of
-                        Ok TaskSucceeded ->
-                            RampAccountCreated
-
-                        Ok TaskStarted ->
-                            preserveCreatingRampAccount
-
-                        Ok TaskInProgress ->
-                            preserveCreatingRampAccount
-
-                        Ok TaskFailed ->
-                            Error
-
-                        Err _ ->
-                            Error
-              }
-            , case result of
+            case result of
                 Ok TaskSucceeded ->
-                    if model.orderPhysicalCard then
+                    ( { model | formState = RampAccountCreated }
+                    , if model.orderPhysicalCard then
                         Http.request
                             { method = "POST"
                             , headers = []
@@ -955,39 +945,35 @@ updateReady msg model =
                             , tracker = Nothing
                             }
 
-                    else
+                      else
                         Nav.load model.rampSignInUri
+                    )
 
                 Ok TaskStarted ->
-                    getRampAccountTaskStatus taskId
+                    ( { model | formState = preserveCreatingRampAccount }
+                    , getRampAccountTaskStatus taskId
+                    )
 
                 Ok TaskInProgress ->
-                    getRampAccountTaskStatus taskId
+                    ( { model | formState = preserveCreatingRampAccount }
+                    , getRampAccountTaskStatus taskId
+                    )
 
                 Ok TaskFailed ->
-                    Cmd.none
+                    showProvisioningFailure model CreateAccountTaskFailed
 
-                Err _ ->
-                    Cmd.none
-            )
+                Err error ->
+                    showProvisioningFailure model (CreateAccountStatusCheckFailed (httpErrorToString error))
 
         OrderPhysicalCardResponseReceived result ->
-            ( { model
-                | formState =
-                    case result of
-                        Ok _ ->
-                            PhysicalCardOrdered
-
-                        Err _ ->
-                            Error
-              }
-            , case result of
+            case result of
                 Ok _ ->
-                    Nav.load model.rampSignInUri
+                    ( { model | formState = PhysicalCardOrdered }
+                    , Nav.load model.rampSignInUri
+                    )
 
-                Err _ ->
-                    Cmd.none
-            )
+                Err error ->
+                    showProvisioningFailure model (OrderPhysicalCardFailed (httpErrorToString error))
 
         ShowAdvancedOptionsButtonClicked ->
             let
@@ -1088,7 +1074,7 @@ view appModel =
             , body =
                 pageChrome
                     [ p [ class "mt-4", class "mb-4" ]
-                        [ text "Something went wrong while loading this page. Please refresh to try again."
+                        [ text "Something went wrong while loading page data. Please refresh to try again."
                         ]
                     , pre [ class "text-secondary" ]
                         [ text (Json.Decode.errorToString decodeError)
@@ -1117,14 +1103,21 @@ viewReady model =
             PhysicalCardOrdered ->
                 renderLoadingIndicators model
 
-            Error ->
+            Error failure ->
                 pageChrome
                     [ p [ class "mt-4", class "mb-4" ]
-                        [ text "There was an error creating your Ramp account. Please post in "
+                        [ text
+                            ("There was an error "
+                                ++ provisioningFailureStepLabel failure
+                                ++ ". Please post in "
+                            )
                         , a [ href model.slackSupportChannelDeepLink ]
                             [ text ("#" ++ model.slackSupportChannelName)
                             ]
                         , text " for further assistance."
+                        ]
+                    , pre [ class "text-secondary" ]
+                        [ text (provisioningFailureDetail failure)
                         ]
                     ]
     }
@@ -2056,6 +2049,53 @@ httpErrorToString error =
 
         Http.BadBody body ->
             "Unexpected response body: " ++ body
+
+
+provisioningFailureStepLabel : ProvisioningFailure -> String
+provisioningFailureStepLabel failure =
+    case failure of
+        CreateAccountRequestFailed _ ->
+            "creating your Ramp account"
+
+        CreateAccountTaskFailed ->
+            "creating your Ramp account"
+
+        CreateAccountStatusCheckFailed _ ->
+            "checking account creation status"
+
+        OrderPhysicalCardFailed _ ->
+            "ordering your physical card"
+
+
+provisioningFailureDetail : ProvisioningFailure -> String
+provisioningFailureDetail failure =
+    case failure of
+        CreateAccountRequestFailed detail ->
+            detail
+
+        CreateAccountTaskFailed ->
+            "Ramp reported that account creation failed."
+
+        CreateAccountStatusCheckFailed detail ->
+            detail
+
+        OrderPhysicalCardFailed detail ->
+            detail
+
+
+provisioningFailureAlertText : ProvisioningFailure -> String
+provisioningFailureAlertText failure =
+    "There was an error "
+        ++ provisioningFailureStepLabel failure
+        ++ ": "
+        ++ provisioningFailureDetail failure
+
+
+showProvisioningFailure : Model -> ProvisioningFailure -> ( Model, Cmd Msg )
+showProvisioningFailure model failure =
+    ( { model | formState = Error failure }
+    , showAlert (provisioningFailureAlertText failure)
+    )
 
 
 emailAddressDomain : String -> Maybe String
