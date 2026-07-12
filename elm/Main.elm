@@ -350,10 +350,9 @@ type alias AddressComponent =
     }
 
 
-type alias ManagerValidation =
-    { managerRampId : Maybe String
-    , managerFeedbackText : Maybe String
-    }
+type ManagerValidation
+    = ManagerResolved { managerApiaryId : Int, managerRampId : String }
+    | ManagerRejected { managerApiaryId : Int, managerFeedbackText : String }
 
 
 type alias GoogleAddressValidation =
@@ -714,67 +713,72 @@ updateReady msg model =
                     )
 
         GoogleAddressValidationResultReceived result ->
-            let
-                missingAddressLineTwo : Bool
-                missingAddressLineTwo =
-                    case result of
-                        Ok verdict ->
-                            List.member "subpremise" (withDefault [] verdict.missingComponentTypes)
-
-                        Err _ ->
-                            False
-
-                updatedModel : Model
-                updatedModel =
-                    { model
-                        | addressLineTwoRequired =
+            case model.formState of
+                Validating _ ->
+                    let
+                        missingAddressLineTwo : Bool
+                        missingAddressLineTwo =
                             case result of
-                                Ok _ ->
-                                    missingAddressLineTwo
+                                Ok verdict ->
+                                    List.member "subpremise" (withDefault [] verdict.missingComponentTypes)
 
                                 Err _ ->
                                     False
-                        , addressIsValid =
-                            case result of
-                                Ok verdict ->
-                                    case verdict.addressComplete of
-                                        Just addressComplete ->
-                                            Just addressComplete
 
-                                        Nothing ->
-                                            if missingAddressLineTwo then
-                                                Just True
+                        updatedModel : Model
+                        updatedModel =
+                            { model
+                                | addressLineTwoRequired =
+                                    case result of
+                                        Ok _ ->
+                                            missingAddressLineTwo
 
-                                            else
-                                                Just False
+                                        Err _ ->
+                                            False
+                                , addressIsValid =
+                                    case result of
+                                        Ok verdict ->
+                                            case verdict.addressComplete of
+                                                Just addressComplete ->
+                                                    Just addressComplete
 
-                                Err _ ->
-                                    model.addressIsValid
-                    }
-            in
-            case result of
-                Ok verdict ->
-                    case verdict.addressComplete of
-                        Just True ->
-                            proceedIfReady (markAddressCheckDone updatedModel)
+                                                Nothing ->
+                                                    if missingAddressLineTwo then
+                                                        Just True
 
-                        _ ->
+                                                    else
+                                                        Just False
+
+                                        Err _ ->
+                                            model.addressIsValid
+                            }
+                    in
+                    case result of
+                        Ok verdict ->
+                            case verdict.addressComplete of
+                                Just True ->
+                                    proceedIfReady (markAddressCheckDone updatedModel)
+
+                                _ ->
+                                    ( { updatedModel | formState = abortValidation model.formState }
+                                    , if missingAddressLineTwo then
+                                        Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+
+                                      else
+                                        Cmd.none
+                                    )
+
+                        Err error ->
                             ( { updatedModel | formState = abortValidation model.formState }
-                            , if missingAddressLineTwo then
-                                Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
-
-                              else
-                                Cmd.none
+                            , showAlert
+                                ("There was an error verifying your mailing address: "
+                                    ++ httpErrorToString error
+                                    ++ "\n\nPlease check your internet connection."
+                                )
                             )
 
-                Err error ->
-                    ( { updatedModel | formState = abortValidation model.formState }
-                    , showAlert
-                        ("There was an error verifying your mailing address: "
-                            ++ httpErrorToString error
-                            ++ "\n\nPlease check your internet connection."
-                        )
-                    )
+                _ ->
+                    ( model, Cmd.none )
 
         SetTime time ->
             ( { model | time = time }, Cmd.none )
@@ -783,56 +787,57 @@ updateReady msg model =
             ( { model | zone = zone }, Cmd.none )
 
         ManagerValidationResultReceived result ->
-            let
-                updatedModel : Model
-                updatedModel =
-                    { model
-                        | managerRampId =
-                            case result of
-                                Ok managerRampInfo ->
-                                    managerRampInfo.managerRampId
+            case model.formState of
+                Validating _ ->
+                    case result of
+                        Ok managerValidation ->
+                            if Just (managerApiaryIdFromValidation managerValidation) /= model.managerApiaryId then
+                                ( model, Cmd.none )
 
-                                Err _ ->
-                                    Nothing
-                        , managerFeedbackText =
-                            case result of
-                                Ok managerRampInfo ->
-                                    withDefault "There was an error verifying your manager" managerRampInfo.managerFeedbackText
+                            else
+                                case managerValidation of
+                                    ManagerResolved { managerRampId } ->
+                                        proceedIfReady
+                                            (markManagerCheckDone
+                                                { model
+                                                    | managerRampId = Just managerRampId
+                                                    , managerFeedbackText = ""
+                                                    , managerIsValid = Just True
+                                                }
+                                            )
 
-                                Err error ->
-                                    "There was an error verifying your manager: "
-                                        ++ httpErrorToString error
-                        , managerIsValid =
-                            case result of
-                                Ok managerRampInfo ->
-                                    if managerRampInfo.managerRampId == Nothing then
-                                        Just False
+                                    ManagerRejected rejected ->
+                                        ( { model
+                                            | managerRampId = Nothing
+                                            , managerFeedbackText = rejected.managerFeedbackText
+                                            , managerIsValid = Just False
+                                            , formState = abortValidation model.formState
+                                          }
+                                        , Cmd.none
+                                        )
 
-                                    else
-                                        Just True
+                        Err error ->
+                            let
+                                updatedModel : Model
+                                updatedModel =
+                                    { model
+                                        | managerRampId = Nothing
+                                        , managerFeedbackText =
+                                            "There was an error verifying your manager: "
+                                                ++ httpErrorToString error
+                                        , managerIsValid = Just False
+                                    }
+                            in
+                            ( { updatedModel | formState = abortValidation model.formState }
+                            , showAlert
+                                ("There was an error verifying your manager: "
+                                    ++ httpErrorToString error
+                                    ++ "\n\nPlease check your internet connection."
+                                )
+                            )
 
-                                Err _ ->
-                                    Just False
-                    }
-            in
-            case result of
-                Ok managerRampInfo ->
-                    if managerRampInfo.managerRampId == Nothing then
-                        ( { updatedModel | formState = abortValidation model.formState }
-                        , Cmd.none
-                        )
-
-                    else
-                        proceedIfReady (markManagerCheckDone updatedModel)
-
-                Err error ->
-                    ( { updatedModel | formState = abortValidation model.formState }
-                    , showAlert
-                        ("There was an error verifying your manager: "
-                            ++ httpErrorToString error
-                            ++ "\n\nPlease check your internet connection."
-                        )
-                    )
+                _ ->
+                    ( model, Cmd.none )
 
         CreateRampAccountTaskIdReceived result ->
             case result of
@@ -985,17 +990,15 @@ updateReady msg model =
 
         AdvancedModeManagerPrefillReceived result ->
             case result of
-                Ok managerRampInfo ->
-                    case ( model.managerRampId, managerRampInfo.managerRampId ) of
-                        ( Nothing, Just rampId ) ->
-                            if isEnabledOption model.managerRampOptions rampId then
-                                updateAndSaveToLocalStorage { model | managerRampId = Just rampId }
+                Ok (ManagerResolved { managerRampId }) ->
+                    if model.managerRampId == Nothing && isEnabledOption model.managerRampOptions managerRampId then
+                        updateAndSaveToLocalStorage { model | managerRampId = Just managerRampId }
 
-                            else
-                                ( model, Cmd.none )
+                    else
+                        ( model, Cmd.none )
 
-                        _ ->
-                            ( model, Cmd.none )
+                Ok (ManagerRejected _) ->
+                    ( model, Cmd.none )
 
                 Err _ ->
                     ( model, Cmd.none )
@@ -2187,11 +2190,52 @@ googleAddressValidationResponseDecoder =
         (maybe (at [ "result", "address", "missingComponentTypes" ] (Json.Decode.list string)))
 
 
+managerApiaryIdFromValidation : ManagerValidation -> Int
+managerApiaryIdFromValidation validation =
+    case validation of
+        ManagerResolved { managerApiaryId } ->
+            managerApiaryId
+
+        ManagerRejected { managerApiaryId } ->
+            managerApiaryId
+
+
+managerValidationApiaryIdDecoder : Decoder Int
+managerValidationApiaryIdDecoder =
+    field "apiaryUserId" string
+        |> andThen
+            (\apiaryUserId ->
+                case String.toInt apiaryUserId of
+                    Just managerApiaryId ->
+                        succeed managerApiaryId
+
+                    Nothing ->
+                        fail ("apiaryUserId is not an integer: " ++ apiaryUserId)
+            )
+
+
 managerValidationResponseDecoder : Decoder ManagerValidation
 managerValidationResponseDecoder =
-    Json.Decode.map2 ManagerValidation
-        (maybe (at [ "rampUserId" ] string))
-        (maybe (at [ "error" ] string))
+    Json.Decode.oneOf
+        [ Json.Decode.map2
+            (\managerApiaryId managerRampId ->
+                ManagerResolved
+                    { managerApiaryId = managerApiaryId
+                    , managerRampId = managerRampId
+                    }
+            )
+            managerValidationApiaryIdDecoder
+            (field "rampUserId" string)
+        , Json.Decode.map2
+            (\managerApiaryId feedback ->
+                ManagerRejected
+                    { managerApiaryId = managerApiaryId
+                    , managerFeedbackText = feedback
+                    }
+            )
+            managerValidationApiaryIdDecoder
+            (field "error" string)
+        ]
 
 
 rampObjectDecoder : Decoder RampObject

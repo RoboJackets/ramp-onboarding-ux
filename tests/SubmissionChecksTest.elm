@@ -6,6 +6,8 @@ import Main
     exposing
         ( Check(..)
         , FormState(..)
+        , ManagerValidation(..)
+        , Msg(..)
         , abortValidation
         , markAddressCheckDone
         , markManagerCheckDone
@@ -13,6 +15,7 @@ import Main
         , needsManagerValidation
         , proceedIfReady
         , submissionChecksFromModel
+        , updateReady
         )
 import Test exposing (Test, describe, test)
 import TestFixtures
@@ -155,5 +158,132 @@ suite =
                         |> Tuple.first
                         |> .formState
                         |> Expect.equal (CreatingRampAccount Nothing)
+            ]
+        , describe "stale validation responses"
+            [ test "ignores ManagerValidationResultReceived when not Validating" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withManagerRampId Nothing
+
+                        editing =
+                            { model
+                                | formState = Editing
+                                , managerApiaryId = Just 3
+                                , managerIsValid = Nothing
+                            }
+                    in
+                    updateReady
+                        (ManagerValidationResultReceived
+                            (Ok
+                                (ManagerResolved
+                                    { managerRampId = "ramp-a"
+                                    , managerApiaryId = 3
+                                    }
+                                )
+                            )
+                        )
+                        editing
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .managerRampId >> Expect.equal Nothing
+                            , .managerApiaryId >> Expect.equal (Just 3)
+                            , .managerIsValid >> Expect.equal Nothing
+                            , .formState >> Expect.equal Editing
+                            ]
+            , test "ignores GoogleAddressValidationResultReceived when not Validating" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+
+                        editing =
+                            { model
+                                | formState = Editing
+                                , addressIsValid = Nothing
+                                , addressLineTwoRequired = False
+                            }
+                    in
+                    updateReady
+                        (GoogleAddressValidationResultReceived
+                            (Ok
+                                { addressComplete = Just True
+                                , missingComponentTypes = Nothing
+                                }
+                            )
+                        )
+                        editing
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .addressIsValid >> Expect.equal Nothing
+                            , .addressLineTwoRequired >> Expect.equal False
+                            , .formState >> Expect.equal Editing
+                            ]
+            , test "ignores ManagerValidationResultReceived for a different Apiary id" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withManagerRampId Nothing
+                                |> withOrderPhysicalCard False
+
+                        validating =
+                            { model
+                                | formState = Validating { manager = InFlight, address = Done }
+                                , managerApiaryId = Just 3
+                                , managerIsValid = Nothing
+                            }
+                    in
+                    updateReady
+                        (ManagerValidationResultReceived
+                            (Ok
+                                (ManagerResolved
+                                    { managerRampId = "ramp-a"
+                                    , managerApiaryId = 2
+                                    }
+                                )
+                            )
+                        )
+                        validating
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .managerRampId >> Expect.equal Nothing
+                            , .managerApiaryId >> Expect.equal (Just 3)
+                            , .managerIsValid >> Expect.equal Nothing
+                            , .formState >> Expect.equal (Validating { manager = InFlight, address = Done })
+                            ]
+            , test "applies ManagerValidationResultReceived while Validating" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withManagerRampId Nothing
+                                |> withOrderPhysicalCard False
+
+                        validating =
+                            { model
+                                | formState = Validating { manager = InFlight, address = Done }
+                                , managerApiaryId = Just 2
+                                , managerIsValid = Nothing
+                            }
+                    in
+                    updateReady
+                        (ManagerValidationResultReceived
+                            (Ok
+                                (ManagerResolved
+                                    { managerRampId = "ramp-manager"
+                                    , managerApiaryId = 2
+                                    }
+                                )
+                            )
+                        )
+                        validating
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .managerRampId >> Expect.equal (Just "ramp-manager")
+                            , .managerIsValid >> Expect.equal (Just True)
+                            , .formState >> Expect.equal (CreatingRampAccount Nothing)
+                            ]
             ]
         ]
