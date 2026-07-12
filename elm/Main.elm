@@ -1442,7 +1442,7 @@ renderForm model =
                     , onInput AddressLineOneInput
                     , on "change" (succeed FormChanged)
                     , Html.Attributes.value model.addressLineOne
-                    , preventDefaultOn "keypress" keyDecoder
+                    , preventDefaultOn "keydown" keyDecoder
                     ]
                     []
                 , invalidFeedback
