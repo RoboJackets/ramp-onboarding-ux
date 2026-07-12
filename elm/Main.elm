@@ -1825,7 +1825,12 @@ validateRampObject objectName selectedObject objectOptions =
 
 validateZipCode : String -> ValidationResult
 validateZipCode zipCode =
-    if String.length zipCode == 5 && String.all isDigit zipCode then
+    let
+        trimmedZipCode : String
+        trimmedZipCode =
+            String.trim zipCode
+    in
+    if String.length trimmedZipCode == 5 && String.all isDigit trimmedZipCode then
         Valid
 
     else

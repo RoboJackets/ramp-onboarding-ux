@@ -90,6 +90,10 @@ suite =
                 \_ ->
                     validateZipCode "30332"
                         |> Expect.equal Valid
+            , test "zip accepts five digits with surrounding whitespace" <|
+                \_ ->
+                    validateZipCode " 30332 "
+                        |> Expect.equal Valid
             , test "zip rejects non-digits" <|
                 \_ ->
                     validateZipCode "3033a"
