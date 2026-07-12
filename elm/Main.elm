@@ -564,10 +564,7 @@ updateReady msg model =
             else
                 case firstInvalidFieldId model of
                     Just fieldId ->
-                        ( { model
-                            | showValidation = True
-                            , formState = Editing
-                          }
+                        ( { model | showValidation = True }
                         , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
                         )
 
@@ -1574,7 +1571,7 @@ renderForm model =
                 , attribute "data-cancel_on_tap_outside" "false"
                 , attribute "data-context" "signin"
                 , attribute "data-itp_support" "true"
-                , attribute "data-login_hint" model.emailAddress
+                , attribute "data-login_hint" (String.trim model.emailAddress)
                 , attribute "data-hd" "robojackets.org"
                 , attribute "data-use_fedcm_for_prompt" "true"
                 ]
