@@ -354,7 +354,7 @@ type FormState
     | Error
     | CreatingRampAccount (Maybe String)
     | RampAccountCreated
-    | ProvisioningComplete
+    | PhysicalCardOrdered
 
 
 type alias AddressComponent =
@@ -976,7 +976,7 @@ updateReady msg model =
                 | formState =
                     case result of
                         Ok _ ->
-                            ProvisioningComplete
+                            PhysicalCardOrdered
 
                         Err _ ->
                             Error
@@ -1114,7 +1114,7 @@ viewReady model =
             RampAccountCreated ->
                 renderLoadingIndicators model
 
-            ProvisioningComplete ->
+            PhysicalCardOrdered ->
                 renderLoadingIndicators model
 
             Error ->
@@ -1606,7 +1606,7 @@ renderLoadingIndicators model =
     let
         accountCreated : Bool
         accountCreated =
-            model.formState == RampAccountCreated || model.formState == ProvisioningComplete
+            model.formState == RampAccountCreated || model.formState == PhysicalCardOrdered
 
         ssoConfigured : Bool
         ssoConfigured =
@@ -1621,7 +1621,7 @@ renderLoadingIndicators model =
 
         cardOrdered : Bool
         cardOrdered =
-            model.formState == ProvisioningComplete
+            model.formState == PhysicalCardOrdered
 
         allVisibleStepsComplete : Bool
         allVisibleStepsComplete =
