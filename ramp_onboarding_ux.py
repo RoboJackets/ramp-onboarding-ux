@@ -1728,7 +1728,9 @@ def login() -> Any:
 
         if session["manager_id"] is not None:
             required_department_id = (
-                app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"] if session["is_student"] else None
+                app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"]
+                if session["is_student"]
+                else app.config["RAMP_DEFAULT_DEPARTMENT_NON_STUDENTS"]
             )
 
             try:
