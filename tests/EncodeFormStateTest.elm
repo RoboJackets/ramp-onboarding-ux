@@ -1,11 +1,13 @@
 module EncodeFormStateTest exposing (suite)
 
+import Dict
 import Expect
 import Json.Decode
 import Json.Encode
 import Main
     exposing
-        ( departmentIdLocalStorageKey
+        ( buildInitialModel
+        , departmentIdLocalStorageKey
         , encodeFormState
         , locationIdLocalStorageKey
         , managerRampIdLocalStorageKey
@@ -34,6 +36,12 @@ encodedKeys encoded =
 
         Err _ ->
             []
+
+
+decodeEncodedFormState : String -> Json.Encode.Value
+decodeEncodedFormState encoded =
+    Json.Decode.decodeString Json.Decode.value encoded
+        |> Result.withDefault Json.Encode.null
 
 
 suite : Test
@@ -65,4 +73,158 @@ suite =
                 in
                 List.filter (\key -> not (List.member key keys)) advancedModeKeys
                     |> Expect.equal []
+        , describe "localStorage round-trip"
+            [ test "restores every persisted field after encodeFormState → buildInitialModel" <|
+                \_ ->
+                    let
+                        serverData =
+                            { minimalServerData
+                                | firstName = "Server"
+                                , lastName = "Default"
+                                , emailAddress = "server@robojackets.org"
+                                , emailVerified = False
+                                , managerApiaryId = Just 2
+                                , addressLineOne = "Old Street"
+                                , addressLineTwo = "Old Suite"
+                                , city = "Old City"
+                                , state = Just "FL"
+                                , zip = "00000"
+                                , showAdvancedOptions = False
+                                , departmentId = Just "dept-students"
+                                , locationId = Just "loc-campus"
+                                , roleId = Just "BUSINESS_USER"
+                                , locationOptions =
+                                    Dict.fromList
+                                        [ ( "loc-campus", { label = "Campus", enabled = True } )
+                                        , ( "loc-remote", { label = "Remote", enabled = True } )
+                                        , ( "loc-disabled", { label = "Disabled", enabled = False } )
+                                        ]
+                                , roleOptions =
+                                    Dict.fromList
+                                        [ ( "BUSINESS_USER", { label = "Employee", enabled = True } )
+                                        , ( "BUSINESS_ADMIN", { label = "Admin", enabled = True } )
+                                        , ( "role-disabled", { label = "Disabled", enabled = False } )
+                                        ]
+                                , rampManagerOptions =
+                                    Dict.fromList
+                                        [ ( "ramp-manager"
+                                          , { label = "Manager Two"
+                                            , enabled = True
+                                            , departmentId = "dept-students"
+                                            }
+                                          )
+                                        , ( "ramp-manager-3"
+                                          , { label = "Manager Three"
+                                            , enabled = True
+                                            , departmentId = "dept-staff"
+                                            }
+                                          )
+                                        ]
+                            }
+
+                        model =
+                            let
+                                baseModel =
+                                    modelFrom serverData Json.Encode.null
+                            in
+                            { baseModel
+                                | firstName = " Local "
+                                , lastName = " User "
+                                , emailAddress = " local@robojackets.org "
+                                , managerApiaryId = Just 3
+                                , orderPhysicalCard = False
+                                , addressLineOne = " 123 Main St "
+                                , addressLineTwo = " Apt 4 "
+                                , city = " Atlanta "
+                                , state = Just "GA"
+                                , zip = " 30301 "
+                                , showAdvancedOptions = True
+                                , managerRampId = Just "ramp-manager-3"
+                                , rampDepartmentId = Just "dept-staff"
+                                , rampLocationId = Just "loc-remote"
+                                , rampRoleId = Just "BUSINESS_ADMIN"
+                            }
+
+                        restored =
+                            buildInitialModel serverData (decodeEncodedFormState (encodeFormState model))
+                    in
+                    Expect.all
+                        [ .firstName >> Expect.equal "Local"
+                        , .lastName >> Expect.equal "User"
+                        , .emailAddress >> Expect.equal "local@robojackets.org"
+                        , .managerApiaryId >> Expect.equal (Just 3)
+                        , .orderPhysicalCard >> Expect.equal False
+                        , .addressLineOne >> Expect.equal "123 Main St"
+                        , .addressLineTwo >> Expect.equal "Apt 4"
+                        , .city >> Expect.equal "Atlanta"
+                        , .state >> Expect.equal (Just "GA")
+                        , .zip >> Expect.equal "30301"
+                        , .showAdvancedOptions >> Expect.equal True
+                        , .managerRampId >> Expect.equal (Just "ramp-manager-3")
+                        , .rampDepartmentId >> Expect.equal (Just "dept-staff")
+                        , .rampLocationId >> Expect.equal (Just "loc-remote")
+                        , .rampRoleId >> Expect.equal (Just "BUSINESS_ADMIN")
+                        ]
+                        restored
+            , test "simple-mode encode does not restore advanced Ramp fields" <|
+                \_ ->
+                    let
+                        serverData =
+                            { minimalServerData
+                                | emailVerified = False
+                                , emailAddress = "server@robojackets.org"
+                                , managerApiaryId = Just 2
+                                , departmentId = Just "dept-students"
+                                , locationId = Just "loc-campus"
+                                , roleId = Just "BUSINESS_USER"
+                                , showAdvancedOptions = False
+                            }
+
+                        model =
+                            let
+                                baseModel =
+                                    modelFrom serverData Json.Encode.null
+                            in
+                            { baseModel
+                                | firstName = "Round"
+                                , lastName = "Trip"
+                                , emailAddress = "roundtrip@robojackets.org"
+                                , managerApiaryId = Just 3
+                                , orderPhysicalCard = False
+                                , addressLineOne = "1 Peachtree St"
+                                , addressLineTwo = "Floor 2"
+                                , city = "Atlanta"
+                                , state = Just "GA"
+                                , zip = "30303"
+                                , showAdvancedOptions = False
+                                , managerRampId = Just "ramp-manager"
+                                , rampDepartmentId = Just "dept-staff"
+                                , rampLocationId = Just "loc-campus"
+                                , rampRoleId = Just "BUSINESS_USER"
+                            }
+
+                        restored =
+                            buildInitialModel serverData (decodeEncodedFormState (encodeFormState model))
+                    in
+                    Expect.all
+                        [ .firstName >> Expect.equal "Round"
+                        , .lastName >> Expect.equal "Trip"
+                        , .emailAddress >> Expect.equal "roundtrip@robojackets.org"
+                        , .managerApiaryId >> Expect.equal (Just 3)
+                        , .orderPhysicalCard >> Expect.equal False
+                        , .addressLineOne >> Expect.equal "1 Peachtree St"
+                        , .addressLineTwo >> Expect.equal "Floor 2"
+                        , .city >> Expect.equal "Atlanta"
+                        , .state >> Expect.equal (Just "GA")
+                        , .zip >> Expect.equal "30303"
+                        , .showAdvancedOptions >> Expect.equal False
+                        , -- Apiary manager changed, so server Ramp manager is cleared in simple mode
+                          .managerRampId >> Expect.equal Nothing
+                        , -- Advanced Ramp fields stay at server defaults when not encoded
+                          .rampDepartmentId >> Expect.equal (Just "dept-students")
+                        , .rampLocationId >> Expect.equal (Just "loc-campus")
+                        , .rampRoleId >> Expect.equal (Just "BUSINESS_USER")
+                        ]
+                        restored
+            ]
         ]
