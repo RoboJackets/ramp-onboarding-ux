@@ -1394,6 +1394,10 @@ def index() -> Any:
     return render_template(
         "form.html",
         business_legal_name=get_ramp_business()["business_name_legal"],
+        sentry_browser_config={
+            "dsn": os.environ.get("SENTRY_DSN") or None,
+            "environment": os.environ.get("SENTRY_ENVIRONMENT"),
+        },
         elm_model={
             "firstName": session["first_name"],
             "lastName": session["last_name"],

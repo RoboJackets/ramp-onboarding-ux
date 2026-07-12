@@ -550,7 +550,11 @@ init flags _ _ =
             )
 
         Err decodeError ->
-            ( ServerDataInvalid decodeError, Cmd.none )
+            ( ServerDataInvalid decodeError
+            , reportErrorCmd "fatal"
+                (Json.Decode.errorToString decodeError)
+                [ ( "step", "boot" ), ( "kind", "flags_decode" ) ]
+            )
 
 
 update : Msg -> AppModel -> ( AppModel, Cmd Msg )
@@ -741,11 +745,21 @@ updateReady msg model =
                             ( model, Cmd.none )
 
                         Err decodeError ->
+                            let
+                                decodeErrorMessage : String
+                                decodeErrorMessage =
+                                    Json.Decode.errorToString decodeError
+                            in
                             ( model
-                            , showAlert
-                                ("There was an error parsing the selected address: "
-                                    ++ Json.Decode.errorToString decodeError
-                                )
+                            , Cmd.batch
+                                [ showAlert
+                                    ("There was an error parsing the selected address: "
+                                        ++ decodeErrorMessage
+                                    )
+                                , reportErrorCmd "warning"
+                                    decodeErrorMessage
+                                    [ ( "step", "place_changed_decode" ), ( "kind", "decode" ) ]
+                                ]
                             )
 
                 _ ->
@@ -813,11 +827,14 @@ updateReady msg model =
 
                             Err error ->
                                 ( { updatedModel | formState = abortValidation model.formState }
-                                , showAlert
-                                    ("There was an error verifying your mailing address: "
-                                        ++ httpErrorToString error
-                                        ++ "\n\nPlease check your internet connection."
-                                    )
+                                , Cmd.batch
+                                    [ showAlert
+                                        ("There was an error verifying your mailing address: "
+                                            ++ httpErrorToString error
+                                            ++ "\n\nPlease check your internet connection."
+                                        )
+                                    , reportHttpError "address_validation" error
+                                    ]
                                 )
 
                 _ ->
@@ -872,11 +889,14 @@ updateReady msg model =
                                     }
                             in
                             ( { updatedModel | formState = abortValidation model.formState }
-                            , showAlert
-                                ("There was an error verifying your manager: "
-                                    ++ httpErrorToString error
-                                    ++ "\n\nPlease check your internet connection."
-                                )
+                            , Cmd.batch
+                                [ showAlert
+                                    ("There was an error verifying your manager: "
+                                        ++ httpErrorToString error
+                                        ++ "\n\nPlease check your internet connection."
+                                    )
+                                , reportHttpError "manager_validation" error
+                                ]
                             )
 
                 _ ->
@@ -1022,8 +1042,8 @@ updateReady msg model =
                 Ok (ManagerRejected _) ->
                     ( model, Cmd.none )
 
-                Err _ ->
-                    ( model, Cmd.none )
+                Err error ->
+                    ( model, reportHttpError "manager_prefill" error )
 
         DepartmentInput selectedDepartment ->
             updateAndSaveToLocalStorage { model | rampDepartmentId = Just selectedDepartment }
@@ -2094,8 +2114,52 @@ provisioningFailureAlertText failure =
 showProvisioningFailure : Model -> ProvisioningFailure -> ( Model, Cmd Msg )
 showProvisioningFailure model failure =
     ( { model | formState = Error failure }
-    , showAlert (provisioningFailureAlertText failure)
+    , Cmd.batch
+        [ showAlert (provisioningFailureAlertText failure)
+        , reportErrorCmd "error"
+            (provisioningFailureAlertText failure)
+            [ ( "step", provisioningFailureStepTag failure )
+            , ( "kind", "provisioning" )
+            ]
+        ]
     )
+
+
+reportErrorCmd : String -> String -> List ( String, String ) -> Cmd msg
+reportErrorCmd level message tags =
+    reportError
+        (Json.Encode.object
+            [ ( "message", Json.Encode.string message )
+            , ( "level", Json.Encode.string level )
+            , ( "tags"
+              , Json.Encode.object
+                    (List.map (\( key, value ) -> ( key, Json.Encode.string value )) tags)
+              )
+            ]
+        )
+
+
+reportHttpError : String -> Http.Error -> Cmd msg
+reportHttpError step error =
+    reportErrorCmd "warning"
+        (httpErrorToString error)
+        [ ( "step", step ), ( "kind", "http" ) ]
+
+
+provisioningFailureStepTag : ProvisioningFailure -> String
+provisioningFailureStepTag failure =
+    case failure of
+        CreateAccountRequestFailed _ ->
+            "create_account"
+
+        CreateAccountTaskFailed ->
+            "create_account_task"
+
+        CreateAccountStatusCheckFailed _ ->
+            "create_account_status"
+
+        OrderPhysicalCardFailed _ ->
+            "order_physical_card"
 
 
 emailAddressDomain : String -> Maybe String
@@ -3103,6 +3167,9 @@ port saveToLocalStorage : String -> Cmd msg
 
 
 port showAlert : String -> Cmd msg
+
+
+port reportError : Value -> Cmd msg
 
 
 port localStorageSaved : (() -> msg) -> Sub msg
