@@ -276,12 +276,25 @@ exclamationCircleIcon =
 
 checkCircleIcon : Svg msg
 checkCircleIcon =
-    svg [ Svg.Attributes.width "16", Svg.Attributes.height "16", Svg.Attributes.viewBox "2 2 20 20", Svg.Attributes.fill "currentColor" ] [ path [ d "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" ] [] ]
+    svg
+        [ Svg.Attributes.width "16"
+        , Svg.Attributes.height "16"
+        , Svg.Attributes.viewBox "2 2 20 20"
+        , Svg.Attributes.fill "currentColor"
+        , attribute "aria-hidden" "true"
+        ]
+        [ path [ d "M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" ] [] ]
 
 
 spinner : Html msg
 spinner =
-    div [ class "spinner-border", class "spinner-border-sm", style "display" "inline-block" ] []
+    div
+        [ class "spinner-border"
+        , class "spinner-border-sm"
+        , style "display" "inline-block"
+        , attribute "aria-hidden" "true"
+        ]
+        []
 
 
 
@@ -1202,17 +1215,18 @@ renderForm model =
                 [ label [ for firstNameFieldId, class "form-label" ]
                     [ text "First Name" ]
                 , input
-                    [ id firstNameFieldId
-                    , type_ "text"
-                    , class "form-control"
-                    , validationClasses model.showValidation firstNameValidationResult
-                    , maxlength 40
-                    , readonly (model.formState /= Editing)
-                    , placeholder "First Name"
-                    , on "change" (succeed FormChanged)
-                    , onInput FirstNameInput
-                    , Html.Attributes.value model.firstName
-                    ]
+                    ([ id firstNameFieldId
+                     , type_ "text"
+                     , class "form-control"
+                     , maxlength 40
+                     , readonly (model.formState /= Editing)
+                     , placeholder "First Name"
+                     , on "change" (succeed FormChanged)
+                     , onInput FirstNameInput
+                     , Html.Attributes.value model.firstName
+                     ]
+                        ++ validationClasses model.showValidation firstNameValidationResult
+                    )
                     []
                 , invalidFeedback firstNameValidationResult
                 ]
@@ -1220,17 +1234,18 @@ renderForm model =
                 [ label [ for lastNameFieldId, class "form-label" ]
                     [ text "Last Name" ]
                 , input
-                    [ id lastNameFieldId
-                    , type_ "text"
-                    , class "form-control"
-                    , validationClasses model.showValidation lastNameValidationResult
-                    , maxlength 40
-                    , readonly (model.formState /= Editing)
-                    , placeholder "Last Name"
-                    , on "change" (succeed FormChanged)
-                    , onInput LastNameInput
-                    , Html.Attributes.value model.lastName
-                    ]
+                    ([ id lastNameFieldId
+                     , type_ "text"
+                     , class "form-control"
+                     , maxlength 40
+                     , readonly (model.formState /= Editing)
+                     , placeholder "Last Name"
+                     , on "change" (succeed FormChanged)
+                     , onInput LastNameInput
+                     , Html.Attributes.value model.lastName
+                     ]
+                        ++ validationClasses model.showValidation lastNameValidationResult
+                    )
                     []
                 , invalidFeedback lastNameValidationResult
                 ]
@@ -1241,16 +1256,17 @@ renderForm model =
                     [ text "Email Address" ]
                 , div [ class "input-group" ]
                     [ input
-                        [ id emailAddressFieldId
-                        , type_ "email"
-                        , class "form-control"
-                        , validationClasses model.showValidation emailAddressValidationResult
-                        , readonly (model.formState /= Editing)
-                        , placeholder "Email Address"
-                        , on "change" (succeed FormChanged)
-                        , onInput EmailAddressInput
-                        , Html.Attributes.value model.emailAddress
-                        ]
+                        ([ id emailAddressFieldId
+                         , type_ "email"
+                         , class "form-control"
+                         , readonly (model.formState /= Editing)
+                         , placeholder "Email Address"
+                         , on "change" (succeed FormChanged)
+                         , onInput EmailAddressInput
+                         , Html.Attributes.value model.emailAddress
+                         ]
+                            ++ validationClasses model.showValidation emailAddressValidationResult
+                        )
                         []
                     , button
                         [ class "btn"
@@ -1320,7 +1336,7 @@ renderForm model =
 
                         else
                             Json.Decode.map ApiaryManagerInput targetValueIntParse
-                    , validationAttribute = validationClasses model.showValidation managerValidationResult
+                    , validationAttributes = validationClasses model.showValidation managerValidationResult
                     , options =
                         if model.showAdvancedOptions then
                             List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
@@ -1341,7 +1357,7 @@ renderForm model =
                     , placeholderLabel = "Select your department..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map DepartmentInput targetValue
-                    , validationAttribute = validationClasses model.showValidation departmentValidationResult
+                    , validationAttributes = validationClasses model.showValidation departmentValidationResult
                     , options =
                         List.map (rampObjectToHtmlOption model.rampDepartmentId) (sortWith sortByRampObjectLabel (toList model.rampDepartmentOptions))
                     , validationResult = departmentValidationResult
@@ -1363,7 +1379,7 @@ renderForm model =
                     , placeholderLabel = "Select your location..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map LocationInput targetValue
-                    , validationAttribute = validationClasses model.showValidation locationValidationResult
+                    , validationAttributes = validationClasses model.showValidation locationValidationResult
                     , options =
                         List.map (rampObjectToHtmlOption model.rampLocationId) (sortWith sortByRampObjectLabel (toList model.rampLocationOptions))
                     , validationResult = locationValidationResult
@@ -1385,7 +1401,7 @@ renderForm model =
                     , placeholderLabel = "Select your role..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map RoleInput targetValue
-                    , validationAttribute = validationClasses model.showValidation roleValidationResult
+                    , validationAttributes = validationClasses model.showValidation roleValidationResult
                     , options =
                         List.map (rampObjectToHtmlOption model.rampRoleId) (sortWith sortByRampRoleRankOrder (toList model.rampRoleOptions))
                     , validationResult = roleValidationResult
@@ -1432,18 +1448,19 @@ renderForm model =
             , div [ class "col-12", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for addressLineOneFieldId, class "form-label" ] [ text "Mailing Address" ]
                 , input
-                    [ type_ "text"
-                    , class "form-control"
-                    , addressValidationClasses model.showValidation model.addressIsValid addressLineOneValidationResult
-                    , id addressLineOneFieldId
-                    , maxlength 100
-                    , readonly (model.formState /= Editing)
-                    , placeholder "Street Address"
-                    , onInput AddressLineOneInput
-                    , on "change" (succeed FormChanged)
-                    , Html.Attributes.value model.addressLineOne
-                    , preventDefaultOn "keydown" keyDecoder
-                    ]
+                    ([ type_ "text"
+                     , class "form-control"
+                     , id addressLineOneFieldId
+                     , maxlength 100
+                     , readonly (model.formState /= Editing)
+                     , placeholder "Street Address"
+                     , onInput AddressLineOneInput
+                     , on "change" (succeed FormChanged)
+                     , Html.Attributes.value model.addressLineOne
+                     , preventDefaultOn "keydown" keyDecoder
+                     ]
+                        ++ addressValidationClasses model.showValidation model.addressIsValid addressLineOneValidationResult
+                    )
                     []
                 , invalidFeedback
                     (if isValid addressLineOneValidationResult then
@@ -1454,35 +1471,39 @@ renderForm model =
                     )
                 ]
             , div [ class "col-12", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
-                [ input
-                    [ type_ "text"
-                    , class "form-control"
-                    , addressValidationClasses model.showValidation model.addressIsValid addressLineTwoValidationResult
-                    , id addressLineTwoFieldId
-                    , maxlength 100
-                    , placeholder "Apt, Suite, Unit, etc. (optional)"
-                    , readonly (model.formState /= Editing)
-                    , onInput AddressLineTwoInput
-                    , on "change" (succeed FormChanged)
-                    , Html.Attributes.value model.addressLineTwo
-                    ]
+                [ label [ for addressLineTwoFieldId, class "visually-hidden" ]
+                    [ text "Apartment, suite, unit, etc." ]
+                , input
+                    ([ type_ "text"
+                     , class "form-control"
+                     , id addressLineTwoFieldId
+                     , maxlength 100
+                     , placeholder "Apt, Suite, Unit, etc."
+                     , readonly (model.formState /= Editing)
+                     , onInput AddressLineTwoInput
+                     , on "change" (succeed FormChanged)
+                     , Html.Attributes.value model.addressLineTwo
+                     ]
+                        ++ addressValidationClasses model.showValidation model.addressIsValid addressLineTwoValidationResult
+                    )
                     []
                 , invalidFeedback addressLineTwoValidationResult
                 ]
             , div [ class "col-md-6", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for cityFieldId, class "form-label" ] [ text "City" ]
                 , input
-                    [ type_ "text"
-                    , class "form-control"
-                    , addressValidationClasses model.showValidation model.addressIsValid cityValidationResult
-                    , id cityFieldId
-                    , maxlength 40
-                    , placeholder "City"
-                    , readonly (model.formState /= Editing)
-                    , onInput CityInput
-                    , on "change" (succeed FormChanged)
-                    , Html.Attributes.value model.city
-                    ]
+                    ([ type_ "text"
+                     , class "form-control"
+                     , id cityFieldId
+                     , maxlength 40
+                     , placeholder "City"
+                     , readonly (model.formState /= Editing)
+                     , onInput CityInput
+                     , on "change" (succeed FormChanged)
+                     , Html.Attributes.value model.city
+                     ]
+                        ++ addressValidationClasses model.showValidation model.addressIsValid cityValidationResult
+                    )
                     []
                 , invalidFeedback cityValidationResult
                 ]
@@ -1494,7 +1515,7 @@ renderForm model =
                     , placeholderLabel = "Select..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map StateInput targetValue
-                    , validationAttribute = addressValidationClasses model.showValidation model.addressIsValid stateValidationResult
+                    , validationAttributes = addressValidationClasses model.showValidation model.addressIsValid stateValidationResult
                     , options = List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
                     , validationResult = stateValidationResult
                     }
@@ -1502,18 +1523,19 @@ renderForm model =
             , div [ class "col-md-3", class "col-4", class "mb-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ]
                 [ label [ for zipCodeFieldId, class "form-label" ] [ text "ZIP Code" ]
                 , input
-                    [ type_ "text"
-                    , attribute "inputmode" "numeric"
-                    , class "form-control"
-                    , id zipCodeFieldId
-                    , placeholder "ZIP Code"
-                    , maxlength 5
-                    , readonly (model.formState /= Editing)
-                    , onInput ZipInput
-                    , on "change" (succeed FormChanged)
-                    , Html.Attributes.value model.zip
-                    , addressValidationClasses model.showValidation model.addressIsValid zipValidationResult
-                    ]
+                    ([ type_ "text"
+                     , attribute "inputmode" "numeric"
+                     , class "form-control"
+                     , id zipCodeFieldId
+                     , placeholder "ZIP Code"
+                     , maxlength 5
+                     , readonly (model.formState /= Editing)
+                     , onInput ZipInput
+                     , on "change" (succeed FormChanged)
+                     , Html.Attributes.value model.zip
+                     ]
+                        ++ addressValidationClasses model.showValidation model.addressIsValid zipValidationResult
+                    )
                     []
                 , invalidFeedback zipValidationResult
                 ]
@@ -1600,14 +1622,34 @@ renderLoadingIndicators model =
         cardOrdered : Bool
         cardOrdered =
             model.formState == ProvisioningComplete
+
+        allVisibleStepsComplete : Bool
+        allVisibleStepsComplete =
+            if model.orderPhysicalCard then
+                cardOrdered
+
+            else
+                accountCreated
     in
     pageChrome
-        [ p [ class "mt-4", class "mb-3" ]
-            [ text "Please wait a moment..."
+        [ div
+            [ attribute "aria-live" "polite"
+            , attribute "aria-atomic" "true"
+            , attribute "aria-busy"
+                (if allVisibleStepsComplete then
+                    "false"
+
+                 else
+                    "true"
+                )
             ]
-        , loadingIndicatorRow [ class "mt-3" ] ssoConfigured "Configuring single sign-on"
-        , loadingIndicatorRow [ class "mt-2" ] accountCreated "Creating your Ramp account"
-        , loadingIndicatorRow [ class "mt-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ] cardOrdered "Ordering your physical card"
+            [ p [ class "mt-4", class "mb-3" ]
+                [ text "Please wait a moment..."
+                ]
+            , loadingIndicatorRow [ class "mt-3" ] ssoConfigured "Configuring single sign-on"
+            , loadingIndicatorRow [ class "mt-2" ] accountCreated "Creating your Ramp account"
+            , loadingIndicatorRow [ class "mt-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ] cardOrdered "Ordering your physical card"
+            ]
         ]
 
 
@@ -1888,20 +1930,46 @@ feedbackText validation =
             feedback
 
 
-validationClasses : Bool -> ValidationResult -> Attribute msg
+validationClasses : Bool -> ValidationResult -> List (Attribute msg)
 validationClasses showValidation validationResult =
-    classList
+    let
+        isInvalid : Bool
+        isInvalid =
+            showValidation && not (isValid validationResult)
+    in
+    [ classList
         [ ( "is-valid", showValidation && isValid validationResult )
-        , ( "is-invalid", showValidation && not (isValid validationResult) )
+        , ( "is-invalid", isInvalid )
         ]
+    , attribute "aria-invalid"
+        (if isInvalid then
+            "true"
+
+         else
+            "false"
+        )
+    ]
 
 
-addressValidationClasses : Bool -> Maybe Bool -> ValidationResult -> Attribute msg
+addressValidationClasses : Bool -> Maybe Bool -> ValidationResult -> List (Attribute msg)
 addressValidationClasses showValidation addressIsValid validationResult =
-    classList
+    let
+        isInvalid : Bool
+        isInvalid =
+            showValidation && (not (isValid validationResult) || not (withDefault True addressIsValid))
+    in
+    [ classList
         [ ( "is-valid", showValidation && isValid validationResult && withDefault True addressIsValid )
-        , ( "is-invalid", showValidation && (not (isValid validationResult) || not (withDefault True addressIsValid)) )
+        , ( "is-invalid", isInvalid )
         ]
+    , attribute "aria-invalid"
+        (if isInvalid then
+            "true"
+
+         else
+            "false"
+        )
+    ]
 
 
 invalidFeedback : ValidationResult -> Html msg
@@ -1927,7 +1995,7 @@ type alias SelectFieldConfig =
     , placeholderLabel : String
     , isDisabled : Bool
     , onChange : Decoder Msg
-    , validationAttribute : Attribute Msg
+    , validationAttributes : List (Attribute Msg)
     , options : List (Html Msg)
     , validationResult : ValidationResult
     }
@@ -1938,12 +2006,13 @@ renderSelect config =
     [ label [ for config.fieldId, class "form-label" ]
         [ text config.labelText ]
     , select
-        [ class "form-select"
-        , id config.fieldId
-        , disabled config.isDisabled
-        , on "change" config.onChange
-        , config.validationAttribute
-        ]
+        ([ class "form-select"
+         , id config.fieldId
+         , disabled config.isDisabled
+         , on "change" config.onChange
+         ]
+            ++ config.validationAttributes
+        )
         (placeholderOption config.placeholderSelected config.placeholderLabel
             :: config.options
         )
