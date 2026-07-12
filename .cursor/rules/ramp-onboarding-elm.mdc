@@ -4,8 +4,10 @@ alwaysApply: true
 
 This repository uses Elm for its frontend.
 
-All Elm code should pass linters:
+All Elm code should pass linters and tests:
 
 elm-review
 
 elm-format
+
+elm-test
