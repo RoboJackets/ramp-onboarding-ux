@@ -353,7 +353,7 @@ type FormState
     | Validating SubmissionChecks
     | Error
     | CreatingRampAccount (Maybe String)
-    | OrderingPhysicalCard
+    | RampAccountCreated
     | ProvisioningComplete
 
 
@@ -909,7 +909,7 @@ updateReady msg model =
                 | formState =
                     case result of
                         Ok TaskSucceeded ->
-                            OrderingPhysicalCard
+                            RampAccountCreated
 
                         Ok TaskStarted ->
                             preserveCreatingRampAccount
@@ -1111,7 +1111,7 @@ viewReady model =
             CreatingRampAccount _ ->
                 renderLoadingIndicators model
 
-            OrderingPhysicalCard ->
+            RampAccountCreated ->
                 renderLoadingIndicators model
 
             ProvisioningComplete ->
@@ -1606,7 +1606,7 @@ renderLoadingIndicators model =
     let
         accountCreated : Bool
         accountCreated =
-            model.formState == OrderingPhysicalCard || model.formState == ProvisioningComplete
+            model.formState == RampAccountCreated || model.formState == ProvisioningComplete
 
         ssoConfigured : Bool
         ssoConfigured =
