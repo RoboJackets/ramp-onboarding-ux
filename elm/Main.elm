@@ -545,47 +545,51 @@ updateReady msg model =
             ( model, Cmd.none )
 
         FormSubmitted ->
-            case firstInvalidFieldId model of
-                Just fieldId ->
-                    ( { model
-                        | showValidation = True
-                        , formState = Editing
-                      }
-                    , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
-                    )
+            if model.formState /= Editing then
+                ( model, Cmd.none )
 
-                Nothing ->
-                    let
-                        checks : SubmissionChecks
-                        checks =
-                            submissionChecksFromModel model
+            else
+                case firstInvalidFieldId model of
+                    Just fieldId ->
+                        ( { model
+                            | showValidation = True
+                            , formState = Editing
+                          }
+                        , Task.attempt (\_ -> NoOpMsg) (focus fieldId)
+                        )
 
-                        updatedModel : Model
-                        updatedModel =
-                            { model
-                                | showValidation = True
-                                , formState = Validating checks
-                            }
+                    Nothing ->
+                        let
+                            checks : SubmissionChecks
+                            checks =
+                                submissionChecksFromModel model
 
-                        ( proceededModel, proceedCmd ) =
-                            proceedIfReady updatedModel
-                    in
-                    ( proceededModel
-                    , Cmd.batch
-                        [ saveFormStateToLocalStorage model
-                        , if needsManagerValidation model then
-                            requestManagerValidation model
+                            updatedModel : Model
+                            updatedModel =
+                                { model
+                                    | showValidation = True
+                                    , formState = Validating checks
+                                }
 
-                          else
-                            Cmd.none
-                        , if needsAddressValidation model then
-                            requestGoogleAddressValidation model
+                            ( proceededModel, proceedCmd ) =
+                                proceedIfReady updatedModel
+                        in
+                        ( proceededModel
+                        , Cmd.batch
+                            [ saveFormStateToLocalStorage model
+                            , if needsManagerValidation model then
+                                requestManagerValidation model
 
-                          else
-                            Cmd.none
-                        , proceedCmd
-                        ]
-                    )
+                              else
+                                Cmd.none
+                            , if needsAddressValidation model then
+                                requestGoogleAddressValidation model
+
+                              else
+                                Cmd.none
+                            , proceedCmd
+                            ]
+                        )
 
         FormChanged ->
             updateAndSaveToLocalStorage model
