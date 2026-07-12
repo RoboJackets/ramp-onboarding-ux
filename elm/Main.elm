@@ -1023,6 +1023,21 @@ subscriptions appModel =
             Sub.none
 
 
+
+-- Page shell shared by every form state. Keep in sync with layout.html.
+
+
+pageChrome : List (Html Msg) -> List (Html Msg)
+pageChrome children =
+    [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
+        (h1 []
+            [ text "Ramp Onboarding"
+            ]
+            :: children
+        )
+    ]
+
+
 view : AppModel -> Browser.Document Msg
 view appModel =
     case appModel of
@@ -1032,18 +1047,14 @@ view appModel =
         ServerDataInvalid decodeError ->
             { title = "Ramp Onboarding"
             , body =
-                [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
-                    [ h1 []
-                        [ text "Ramp Onboarding"
-                        ]
-                    , p [ class "mt-4", class "mb-4" ]
+                pageChrome
+                    [ p [ class "mt-4", class "mb-4" ]
                         [ text "Something went wrong while loading this page. Please refresh to try again."
                         ]
                     , pre [ class "text-secondary" ]
                         [ text (Json.Decode.errorToString decodeError)
                         ]
                     ]
-                ]
             }
 
 
@@ -1068,11 +1079,8 @@ viewReady model =
                 renderLoadingIndicators model
 
             Error ->
-                [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
-                    [ h1 []
-                        [ text "Ramp Onboarding"
-                        ]
-                    , p [ class "mt-4", class "mb-4" ]
+                pageChrome
+                    [ p [ class "mt-4", class "mb-4" ]
                         [ text "There was an error creating your Ramp account. Please post in "
                         , a [ href model.slackSupportChannelDeepLink ]
                             [ text ("#" ++ model.slackSupportChannelName)
@@ -1080,7 +1088,6 @@ viewReady model =
                         , text " for further assistance."
                         ]
                     ]
-                ]
     }
 
 
@@ -1150,11 +1157,8 @@ renderForm model =
             formatDate model.zone (estimatePhysicalCardDeliveryDate model.zone model.time)
     in
     -- The markup above the <form> tag should match the server-side rendered markup in form.html, so the first contentful paint is consistent with the largest contentful paint.
-    [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
-        [ h1 []
-            [ text "Ramp Onboarding"
-            ]
-        , p [ class "mt-4", class "mb-4" ]
+    pageChrome
+        [ p [ class "mt-4", class "mb-4" ]
             [ text (model.businessLegalName ++ " uses ")
             , a [ href "https://ramp.com", target "_blank" ]
                 [ text "Ramp"
@@ -1532,21 +1536,21 @@ renderForm model =
                 ++ [ text ", and ", termsOfServiceItemToLink (withDefault ( "", "" ) (List.head (List.reverse termsOfService))), text "." ]
             )
         ]
-    , div
-        [ id "g_id_onload"
-        , attribute "data-client_id" model.googleClientId
-        , attribute "data-auto_prompt" "true"
-        , attribute "data-auto_select" "true"
-        , attribute "data-login_uri" model.googleOneTapLoginUri
-        , attribute "data-cancel_on_tap_outside" "false"
-        , attribute "data-context" "signin"
-        , attribute "data-itp_support" "true"
-        , attribute "data-login_hint" model.emailAddress
-        , attribute "data-hd" "robojackets.org"
-        , attribute "data-use_fedcm_for_prompt" "true"
-        ]
-        []
-    ]
+        ++ [ div
+                [ id "g_id_onload"
+                , attribute "data-client_id" model.googleClientId
+                , attribute "data-auto_prompt" "true"
+                , attribute "data-auto_select" "true"
+                , attribute "data-login_uri" model.googleOneTapLoginUri
+                , attribute "data-cancel_on_tap_outside" "false"
+                , attribute "data-context" "signin"
+                , attribute "data-itp_support" "true"
+                , attribute "data-login_hint" model.emailAddress
+                , attribute "data-hd" "robojackets.org"
+                , attribute "data-use_fedcm_for_prompt" "true"
+                ]
+                []
+           ]
 
 
 renderLoadingIndicators : Model -> List (Html Msg)
@@ -1571,18 +1575,14 @@ renderLoadingIndicators model =
         cardOrdered =
             model.formState == ProvisioningComplete
     in
-    [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
-        [ h1 []
-            [ text "Ramp Onboarding"
-            ]
-        , p [ class "mt-4", class "mb-3" ]
+    pageChrome
+        [ p [ class "mt-4", class "mb-3" ]
             [ text "Please wait a moment..."
             ]
         , loadingIndicatorRow [ class "mt-3" ] ssoConfigured "Configuring single sign-on"
         , loadingIndicatorRow [ class "mt-2" ] accountCreated "Creating your Ramp account"
         , loadingIndicatorRow [ class "mt-2", classList [ ( "d-none", not model.orderPhysicalCard ) ] ] cardOrdered "Ordering your physical card"
         ]
-    ]
 
 
 
