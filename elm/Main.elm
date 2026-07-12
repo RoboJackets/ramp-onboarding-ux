@@ -1147,7 +1147,7 @@ renderForm model =
 
         physicalCardEstimatedDeliveryDate : String
         physicalCardEstimatedDeliveryDate =
-            formatTime model.zone (estimatePhysicalCardDeliveryDate model.zone model.time)
+            formatDate model.zone (estimatePhysicalCardDeliveryDate model.zone model.time)
     in
     -- The markup above the <form> tag should match the server-side rendered markup in form.html, so the first contentful paint is consistent with the largest contentful paint.
     [ div [ class "container", class "mt-md-4", class "mt-3", style "max-width" "48rem" ]
@@ -2790,8 +2790,8 @@ estimatePhysicalCardDeliveryDate zone now =
             estimate
 
 
-formatTime : Zone -> Posix -> String
-formatTime zone time =
+formatDate : Zone -> Posix -> String
+formatDate zone time =
     (case toWeekday zone time of
         Mon ->
             "Monday"
