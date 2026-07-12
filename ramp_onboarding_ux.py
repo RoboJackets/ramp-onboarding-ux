@@ -1742,6 +1742,7 @@ def login() -> Any:
                 if "rampUserId" in manager_resolution:
                     session["manager_ramp_id"] = manager_resolution["rampUserId"]
             except RequestException:
+                # frontend will retry this validation prior to submission if it doesn't succeed here
                 pass
 
     if session["ramp_user_id"] is None:
