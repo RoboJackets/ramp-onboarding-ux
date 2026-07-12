@@ -39,9 +39,13 @@ config =
     , NoDebug.TodoOrToString.rule
         |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoExposingEverything.rule
+        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
+        |> Rule.ignoreErrorsForFiles [ "elm/Main.elm" ]
     , NoImportingEverything.rule []
+        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
+        |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []

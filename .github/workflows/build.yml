@@ -58,6 +58,18 @@ jobs:
             -var priority=10 \
             ramp-onboarding-ux.nomad
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Run elm-test
+        run: npm test
+
   docker:
     name: Docker
     runs-on: ubuntu-latest
