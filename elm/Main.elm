@@ -1281,7 +1281,7 @@ renderForm model =
                                 Nothing ->
                                     True
                     , placeholderLabel = "Select your manager..."
-                    , isReadonly = model.formState /= Editing
+                    , isDisabled = model.formState /= Editing
                     , onChange =
                         if model.showAdvancedOptions then
                             Json.Decode.map RampManagerInput targetValue
@@ -1307,7 +1307,7 @@ renderForm model =
                     , labelText = "Department"
                     , placeholderSelected = model.rampDepartmentId == Nothing
                     , placeholderLabel = "Select your department..."
-                    , isReadonly = model.formState /= Editing
+                    , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map DepartmentInput targetValue
                     , validationAttribute = validationClasses model.showValidation departmentValidationResult
                     , options =
@@ -1329,7 +1329,7 @@ renderForm model =
                     , labelText = "Location"
                     , placeholderSelected = model.rampLocationId == Nothing
                     , placeholderLabel = "Select your location..."
-                    , isReadonly = model.formState /= Editing
+                    , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map LocationInput targetValue
                     , validationAttribute = validationClasses model.showValidation locationValidationResult
                     , options =
@@ -1351,7 +1351,7 @@ renderForm model =
                     , labelText = "Role"
                     , placeholderSelected = model.rampRoleId == Nothing
                     , placeholderLabel = "Select your role..."
-                    , isReadonly = model.formState /= Editing
+                    , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map RoleInput targetValue
                     , validationAttribute = validationClasses model.showValidation roleValidationResult
                     , options =
@@ -1386,7 +1386,7 @@ renderForm model =
                         [ id orderPhysicalCardFieldId
                         , type_ "checkbox"
                         , class "form-check-input"
-                        , readonly (model.formState /= Editing)
+                        , disabled (model.formState /= Editing)
                         , onCheck OrderPhysicalCardChecked
                         , checked model.orderPhysicalCard
                         ]
@@ -1464,7 +1464,7 @@ renderForm model =
                     , labelText = "State"
                     , placeholderSelected = model.state == Nothing
                     , placeholderLabel = "Select..."
-                    , isReadonly = model.formState /= Editing
+                    , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map StateInput targetValue
                     , validationAttribute = addressValidationClasses model.showValidation model.addressIsValid stateValidationResult
                     , options = List.map (stateTupleToHtmlOption model.state) (sortBy second (toList statesMap))
@@ -1520,6 +1520,7 @@ renderForm model =
                     , class "btn"
                     , class "btn-link"
                     , classList [ ( "d-none", model.showAdvancedOptions ) ]
+                    , disabled (model.formState /= Editing)
                     , onClick ShowAdvancedOptionsButtonClicked
                     ]
                     [ text "Show advanced options"
@@ -1897,7 +1898,7 @@ type alias SelectFieldConfig =
     , labelText : String
     , placeholderSelected : Bool
     , placeholderLabel : String
-    , isReadonly : Bool
+    , isDisabled : Bool
     , onChange : Decoder Msg
     , validationAttribute : Attribute Msg
     , options : List (Html Msg)
@@ -1913,7 +1914,7 @@ renderSelect config =
         [ class "form-select"
         , id config.fieldId
         , required True
-        , readonly config.isReadonly
+        , disabled config.isDisabled
         , on "change" config.onChange
         , config.validationAttribute
         ]
