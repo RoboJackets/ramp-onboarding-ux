@@ -7,7 +7,7 @@ import Char exposing (isDigit)
 import Dict exposing (Dict, toList)
 import Email
 import Html exposing (Attribute, Html, a, button, div, h1, input, label, option, p, pre, select, strong, text)
-import Html.Attributes exposing (attribute, autocomplete, checked, class, classList, disabled, for, href, id, maxlength, novalidate, placeholder, readonly, selected, style, target, type_)
+import Html.Attributes exposing (attribute, autocomplete, checked, class, classList, disabled, for, href, id, maxlength, novalidate, placeholder, readonly, rel, selected, style, target, type_)
 import Html.Events exposing (on, onCheck, onClick, onInput, onSubmit, preventDefaultOn, targetValue)
 import Html.Events.Extra exposing (targetValueIntParse)
 import Http exposing (expectJson, expectWhatever, jsonBody)
@@ -1154,7 +1154,7 @@ renderForm model =
 
         userRolesRampHelpCenterLink : List (Html Msg)
         userRolesRampHelpCenterLink =
-            [ a [ href "https://support.ramp.com/user-roles-overview/", target "_blank", class "text-secondary" ] [ text "Ramp help center" ]
+            [ a [ href "https://support.ramp.com/user-roles-overview/", target "_blank", rel "noopener noreferrer", class "text-secondary" ] [ text "Ramp help center" ]
             , text "."
             ]
 
@@ -1186,7 +1186,7 @@ renderForm model =
     pageChrome
         [ p [ class "mt-4", class "mb-4" ]
             [ text (model.businessLegalName ++ " uses ")
-            , a [ href "https://ramp.com", target "_blank" ]
+            , a [ href "https://ramp.com", target "_blank", rel "noopener noreferrer" ]
                 [ text "Ramp"
                 ]
             , text " to issue corporate credit cards and manage reimbursements. We need some information from you to create your Ramp account."
@@ -1555,7 +1555,7 @@ renderForm model =
             ]
         , div [ class "mb-4", class "mb-md-5", class "col-12", class "form-text" ]
             ([ text "By creating an account, you confirm that you have read and agree to the "
-             , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank" ] [ text (model.businessLegalName ++ " Expense Policy") ]
+             , a [ href "https://docs.google.com/document/d/e/2PACX-1vRtmt5h8lq3Z1dgxC8eGh04-EPEc7twiYF8t4BQGr9XxCamkjlPavBcPWuMAMGLFNJeRft3Z89ITCkY/pub", class "text-secondary", target "_blank", rel "noopener noreferrer" ] [ text (model.businessLegalName ++ " Expense Policy") ]
              , text ", "
              ]
                 ++ List.intersperse (text ", ") (List.map termsOfServiceItemToLink (List.take (List.length termsOfService - 1) termsOfService))
@@ -2970,6 +2970,7 @@ termsOfServiceItemToLink ( label, url ) =
         [ href url
         , class "text-secondary"
         , target "_blank"
+        , rel "noopener noreferrer"
         ]
         [ text label ]
 
