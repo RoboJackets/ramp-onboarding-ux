@@ -361,6 +361,15 @@ type alias GoogleAddressValidation =
     }
 
 
+type alias AddressValidationRequest =
+    { addressLineOne : String
+    , addressLineTwo : String
+    , city : String
+    , state : Maybe String
+    , zip : String
+    }
+
+
 type alias TaskId =
     { taskId : String }
 
@@ -457,7 +466,7 @@ type Msg
     | EmailVerificationButtonClicked
     | PlaceChanged Value
     | ManagerValidationResultReceived (Result Http.Error ManagerValidation)
-    | GoogleAddressValidationResultReceived (Result Http.Error GoogleAddressValidation)
+    | GoogleAddressValidationResultReceived AddressValidationRequest (Result Http.Error GoogleAddressValidation)
     | CreateRampAccountTaskIdReceived (Result Http.Error TaskId)
     | CreateRampAccountTaskStatusReceived (Result Http.Error TaskStatus)
     | OrderPhysicalCardResponseReceived (Result Http.Error ())
@@ -712,70 +721,74 @@ updateReady msg model =
                         )
                     )
 
-        GoogleAddressValidationResultReceived result ->
+        GoogleAddressValidationResultReceived requested result ->
             case model.formState of
                 Validating _ ->
-                    let
-                        missingAddressLineTwo : Bool
-                        missingAddressLineTwo =
-                            case result of
-                                Ok verdict ->
-                                    List.member "subpremise" (withDefault [] verdict.missingComponentTypes)
+                    if not (addressValidationRequestMatchesModel requested model) then
+                        ( model, Cmd.none )
 
-                                Err _ ->
-                                    False
+                    else
+                        let
+                            missingAddressLineTwo : Bool
+                            missingAddressLineTwo =
+                                case result of
+                                    Ok verdict ->
+                                        List.member "subpremise" (withDefault [] verdict.missingComponentTypes)
 
-                        updatedModel : Model
-                        updatedModel =
-                            { model
-                                | addressLineTwoRequired =
-                                    case result of
-                                        Ok _ ->
-                                            missingAddressLineTwo
+                                    Err _ ->
+                                        False
 
-                                        Err _ ->
-                                            False
-                                , addressIsValid =
-                                    case result of
-                                        Ok verdict ->
-                                            case verdict.addressComplete of
-                                                Just addressComplete ->
-                                                    Just addressComplete
+                            updatedModel : Model
+                            updatedModel =
+                                { model
+                                    | addressLineTwoRequired =
+                                        case result of
+                                            Ok _ ->
+                                                missingAddressLineTwo
 
-                                                Nothing ->
-                                                    if missingAddressLineTwo then
-                                                        Just True
+                                            Err _ ->
+                                                False
+                                    , addressIsValid =
+                                        case result of
+                                            Ok verdict ->
+                                                case verdict.addressComplete of
+                                                    Just addressComplete ->
+                                                        Just addressComplete
 
-                                                    else
-                                                        Just False
+                                                    Nothing ->
+                                                        if missingAddressLineTwo then
+                                                            Just True
 
-                                        Err _ ->
-                                            model.addressIsValid
-                            }
-                    in
-                    case result of
-                        Ok verdict ->
-                            case verdict.addressComplete of
-                                Just True ->
-                                    proceedIfReady (markAddressCheckDone updatedModel)
+                                                        else
+                                                            Just False
 
-                                _ ->
-                                    ( { updatedModel | formState = abortValidation model.formState }
-                                    , if missingAddressLineTwo then
-                                        Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+                                            Err _ ->
+                                                model.addressIsValid
+                                }
+                        in
+                        case result of
+                            Ok verdict ->
+                                case verdict.addressComplete of
+                                    Just True ->
+                                        proceedIfReady (markAddressCheckDone updatedModel)
 
-                                      else
-                                        Cmd.none
+                                    _ ->
+                                        ( { updatedModel | formState = abortValidation model.formState }
+                                        , if missingAddressLineTwo then
+                                            Task.attempt (\_ -> NoOpMsg) (focus addressLineTwoFieldId)
+
+                                          else
+                                            Cmd.none
+                                        )
+
+                            Err error ->
+                                ( { updatedModel | formState = abortValidation model.formState }
+                                , showAlert
+                                    ("There was an error verifying your mailing address: "
+                                        ++ httpErrorToString error
+                                        ++ "\n\nPlease check your internet connection."
                                     )
-
-                        Err error ->
-                            ( { updatedModel | formState = abortValidation model.formState }
-                            , showAlert
-                                ("There was an error verifying your mailing address: "
-                                    ++ httpErrorToString error
-                                    ++ "\n\nPlease check your internet connection."
                                 )
-                            )
 
                 _ ->
                     ( model, Cmd.none )
@@ -2547,10 +2560,34 @@ requestGoogleAddressValidation model =
                       )
                     ]
                 )
-        , expect = expectJson GoogleAddressValidationResultReceived googleAddressValidationResponseDecoder
+        , expect = expectJson (GoogleAddressValidationResultReceived (addressValidationRequestFromModel model)) googleAddressValidationResponseDecoder
         , timeout = Just httpRequestTimeoutMs
         , tracker = Nothing
         }
+
+
+addressValidationRequestFromModel : Model -> AddressValidationRequest
+addressValidationRequestFromModel model =
+    { addressLineOne = model.addressLineOne
+    , addressLineTwo = model.addressLineTwo
+    , city = model.city
+    , state = model.state
+    , zip = model.zip
+    }
+
+
+addressValidationRequestMatchesModel : AddressValidationRequest -> Model -> Bool
+addressValidationRequestMatchesModel requested model =
+    requested.addressLineOne
+        == model.addressLineOne
+        && requested.addressLineTwo
+        == model.addressLineTwo
+        && requested.city
+        == model.city
+        && requested.state
+        == model.state
+        && requested.zip
+        == model.zip
 
 
 createRampAccountTask : Model -> Cmd Msg

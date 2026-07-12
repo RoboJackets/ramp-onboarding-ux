@@ -9,6 +9,7 @@ import Main
         , ManagerValidation(..)
         , Msg(..)
         , abortValidation
+        , addressValidationRequestFromModel
         , markAddressCheckDone
         , markManagerCheckDone
         , needsAddressValidation
@@ -197,6 +198,7 @@ suite =
                     let
                         model =
                             modelFrom minimalServerData Json.Encode.null
+                                |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
 
                         editing =
                             { model
@@ -207,6 +209,7 @@ suite =
                     in
                     updateReady
                         (GoogleAddressValidationResultReceived
+                            (addressValidationRequestFromModel editing)
                             (Ok
                                 { addressComplete = Just True
                                 , missingComponentTypes = Nothing
@@ -219,6 +222,72 @@ suite =
                             [ .addressIsValid >> Expect.equal Nothing
                             , .addressLineTwoRequired >> Expect.equal False
                             , .formState >> Expect.equal Editing
+                            ]
+            , test "ignores GoogleAddressValidationResultReceived for a different address" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withOrderPhysicalCard False
+                                |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+
+                        validating =
+                            { model
+                                | formState = Validating { manager = Done, address = InFlight }
+                                , addressIsValid = Nothing
+                            }
+
+                        staleRequest =
+                            { addressLineOne = "999 Other St"
+                            , addressLineTwo = ""
+                            , city = "Atlanta"
+                            , state = Just "GA"
+                            , zip = "30309"
+                            }
+                    in
+                    updateReady
+                        (GoogleAddressValidationResultReceived
+                            staleRequest
+                            (Ok
+                                { addressComplete = Just True
+                                , missingComponentTypes = Nothing
+                                }
+                            )
+                        )
+                        validating
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .addressIsValid >> Expect.equal Nothing
+                            , .formState >> Expect.equal (Validating { manager = Done, address = InFlight })
+                            ]
+            , test "applies GoogleAddressValidationResultReceived while Validating for matching address" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withOrderPhysicalCard False
+                                |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+
+                        validating =
+                            { model
+                                | formState = Validating { manager = Done, address = InFlight }
+                                , addressIsValid = Nothing
+                            }
+                    in
+                    updateReady
+                        (GoogleAddressValidationResultReceived
+                            (addressValidationRequestFromModel validating)
+                            (Ok
+                                { addressComplete = Just True
+                                , missingComponentTypes = Nothing
+                                }
+                            )
+                        )
+                        validating
+                        |> Tuple.first
+                        |> Expect.all
+                            [ .addressIsValid >> Expect.equal (Just True)
+                            , .formState >> Expect.equal (CreatingRampAccount Nothing)
                             ]
             , test "ignores ManagerValidationResultReceived for a different Apiary id" <|
                 \_ ->
