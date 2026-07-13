@@ -68,6 +68,22 @@ suite =
                         |> withAddress "351 Ferst Drive" "123456 Georgia Tech Station" "Atlanta" (Just "GA") "30332"
                         |> needsAddressValidation
                         |> Expect.equal False
+            , test "not needed when address already validated as complete" <|
+                \_ ->
+                    modelFrom minimalServerData Json.Encode.null
+                        |> withOrderPhysicalCard True
+                        |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+                        |> (\model -> { model | addressIsValid = Just True })
+                        |> needsAddressValidation
+                        |> Expect.equal False
+            , test "not needed when address already validated as invalid" <|
+                \_ ->
+                    modelFrom minimalServerData Json.Encode.null
+                        |> withOrderPhysicalCard True
+                        |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+                        |> (\model -> { model | addressIsValid = Just False })
+                        |> needsAddressValidation
+                        |> Expect.equal False
             ]
         , describe "submissionChecksFromModel"
             [ test "marks both checks Done when neither is needed" <|
@@ -83,6 +99,29 @@ suite =
                         |> withOrderPhysicalCard False
                         |> submissionChecksFromModel
                         |> Expect.equal { manager = InFlight, address = Done }
+            , test "marks address Done when a Google verdict already exists" <|
+                \_ ->
+                    modelFrom minimalServerData Json.Encode.null
+                        |> withOrderPhysicalCard True
+                        |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+                        |> (\model -> { model | addressIsValid = Just False })
+                        |> submissionChecksFromModel
+                        |> Expect.equal { manager = Done, address = Done }
+            ]
+        , describe "address field edits clear Google verdict"
+            [ test "AddressLineOneInput resets addressIsValid" <|
+                \_ ->
+                    let
+                        model =
+                            modelFrom minimalServerData Json.Encode.null
+                                |> withOrderPhysicalCard True
+                                |> withAddress "123 Main St" "" "Atlanta" (Just "GA") "30309"
+                                |> (\m -> { m | addressIsValid = Just False })
+                    in
+                    updateReady (AddressLineOneInput "456 Oak Ave") model
+                        |> Tuple.first
+                        |> .addressIsValid
+                        |> Expect.equal Nothing
             ]
         , describe "abortValidation / mark*CheckDone"
             [ test "abortValidation returns Editing from Validating" <|

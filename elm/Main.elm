@@ -669,17 +669,24 @@ updateReady msg model =
             ( { model
                 | addressLineOne = addressLineOne
                 , addressLineTwoRequired = False
+                , addressIsValid = Nothing
               }
             , Cmd.none
             )
 
         AddressLineTwoInput addressLineTwo ->
-            ( { model | addressLineTwo = addressLineTwo }, Cmd.none )
+            ( { model
+                | addressLineTwo = addressLineTwo
+                , addressIsValid = Nothing
+              }
+            , Cmd.none
+            )
 
         CityInput city ->
             ( { model
                 | city = city
                 , addressLineTwoRequired = False
+                , addressIsValid = Nothing
               }
             , Cmd.none
             )
@@ -689,12 +696,14 @@ updateReady msg model =
                 { model
                     | state = Just state
                     , addressLineTwoRequired = False
+                    , addressIsValid = Nothing
                 }
 
         ZipInput zip ->
             ( { model
                 | zip = zip
                 , addressLineTwoRequired = False
+                , addressIsValid = Nothing
               }
             , Cmd.none
             )
@@ -732,6 +741,8 @@ updateReady msg model =
                                         , city = String.trim (getAddressComponent addressComponents "locality")
                                         , state = Just (String.trim (getAddressComponent addressComponents "administrative_area_level_1"))
                                         , zip = String.trim (getAddressComponent addressComponents "postal_code")
+                                        , addressIsValid = Nothing
+                                        , addressLineTwoRequired = False
                                     }
                             in
                             ( newModel
@@ -1902,7 +1913,12 @@ firstInvalidFieldId model =
     , ( departmentFieldId, isValid (validateRampObject "department" model.rampDepartmentId model.rampDepartmentOptions) )
     , ( locationFieldId, isValid (validateRampObject "location" model.rampLocationId model.rampLocationOptions) )
     , ( roleFieldId, isValid (validateRampObject "role" model.rampRoleId model.rampRoleOptions) )
-    , ( addressLineOneFieldId, not model.orderPhysicalCard || isValid (validateAddressLineOne model.addressLineOne) )
+    , ( addressLineOneFieldId
+      , not model.orderPhysicalCard
+            || (isValid (validateAddressLineOne model.addressLineOne)
+                    && isValid (validateAddressLineOneGoogleResult model.addressIsValid)
+               )
+      )
     , ( addressLineTwoFieldId, not model.orderPhysicalCard || isValid (validateAddressLineTwo model.addressLineTwo model.addressLineTwoRequired (classifyCampusAddress model)) )
     , ( cityFieldId, not model.orderPhysicalCard || isValid (validateCity model.city) )
     , ( stateFieldId, not model.orderPhysicalCard || isValid (validateState model.state) )
@@ -2613,7 +2629,11 @@ needsManagerValidation model =
 
 needsAddressValidation : Model -> Bool
 needsAddressValidation model =
-    model.orderPhysicalCard && classifyCampusAddress model == NotCampusAddress
+    model.orderPhysicalCard
+        && classifyCampusAddress model
+        == NotCampusAddress
+        && model.addressIsValid
+        == Nothing
 
 
 submissionChecksFromModel : Model -> SubmissionChecks
