@@ -216,14 +216,8 @@ suite =
                             }
                     in
                     updateReady
-                        (ManagerValidationResultReceived
-                            (Ok
-                                (ManagerResolved
-                                    { managerRampId = "ramp-a"
-                                    , managerApiaryId = 3
-                                    }
-                                )
-                            )
+                        (ManagerValidationResultReceived 3
+                            (Ok (ManagerResolved "ramp-a"))
                         )
                         editing
                         |> Tuple.first
@@ -345,14 +339,8 @@ suite =
                             }
                     in
                     updateReady
-                        (ManagerValidationResultReceived
-                            (Ok
-                                (ManagerResolved
-                                    { managerRampId = "ramp-a"
-                                    , managerApiaryId = 2
-                                    }
-                                )
-                            )
+                        (ManagerValidationResultReceived 2
+                            (Ok (ManagerResolved "ramp-a"))
                         )
                         validating
                         |> Tuple.first
@@ -378,14 +366,8 @@ suite =
                             }
                     in
                     updateReady
-                        (ManagerValidationResultReceived
-                            (Ok
-                                (ManagerResolved
-                                    { managerRampId = "ramp-manager"
-                                    , managerApiaryId = 2
-                                    }
-                                )
-                            )
+                        (ManagerValidationResultReceived 2
+                            (Ok (ManagerResolved "ramp-manager"))
                         )
                         validating
                         |> Tuple.first

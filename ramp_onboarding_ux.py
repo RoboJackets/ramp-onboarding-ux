@@ -2004,10 +2004,6 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     """
     Resolves an Apiary user ID to a Ramp user ID via Keycloak, with optional department gating
     """
-
-    def with_apiary_id(payload: Dict[str, str]) -> Dict[str, str]:
-        return {**payload, "apiaryUserId": apiary_id}
-
     apiary_user_response = apiary.get(  # type: ignore
         url=app.config["APIARY_URL"] + "/api/v1/users/" + apiary_id,
         headers={
@@ -2050,16 +2046,16 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     )
 
     if len(keycloak_user_response.json()) == 0:
-        return with_apiary_id({"error": manager_needs_ramp_account})
+        return {"error": manager_needs_ramp_account}
 
     if len(keycloak_user_response.json()) == 1:
         keycloak_user = keycloak_user_response.json()[0]
         if "attributes" in keycloak_user and "rampUserId" in keycloak_user["attributes"]:
             ramp_user_id = keycloak_user["attributes"]["rampUserId"][0]
         else:
-            return with_apiary_id({"error": manager_needs_ramp_account})
+            return {"error": manager_needs_ramp_account}
     else:
-        return with_apiary_id({"error": "More than one result for manager search in Keycloak"})
+        return {"error": "More than one result for manager search in Keycloak"}
 
     ramp_user_response = ramp.get(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
@@ -2071,24 +2067,20 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
         required_department_id is not None
         and ramp_user_response.json()["department_id"] != required_department_id
     ):
-        return with_apiary_id({"error": "Please select a manager within your department"})
+        return {"error": "Please select a manager within your department"}
 
     if ramp_user_response.json()["status"] == "USER_ACTIVE":
-        return with_apiary_id(
-            {
-                "rampUserId": ramp_user_id,
-            }
-        )
+        return {
+            "rampUserId": ramp_user_id,
+        }
 
     if ramp_user_response.json()["status"] in ("INVITE_PENDING", "USER_ONBOARDING"):
-        return with_apiary_id(
-            {
-                "error": apiary_user_response.json()["user"]["first_name"]
-                + f" hasn't finished setting up {possessive_pronoun} Ramp account yet. Ask {object_pronoun} to finish setting up {possessive_pronoun} own account first."  # noqa: E501
-            }
-        )
+        return {
+            "error": apiary_user_response.json()["user"]["first_name"]
+            + f" hasn't finished setting up {possessive_pronoun} Ramp account yet. Ask {object_pronoun} to finish setting up {possessive_pronoun} own account first."  # noqa: E501
+        }
 
-    return with_apiary_id({"error": "Unrecognized manager account status in Ramp"})
+    return {"error": "Unrecognized manager account status in Ramp"}
 
 
 @app.post("/create-ramp-account")

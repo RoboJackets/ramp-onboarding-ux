@@ -376,8 +376,8 @@ type PlaceChange
 
 
 type ManagerValidation
-    = ManagerResolved { managerApiaryId : Int, managerRampId : String }
-    | ManagerRejected { managerApiaryId : Int, managerFeedbackText : String }
+    = ManagerResolved String
+    | ManagerRejected String
 
 
 type alias GoogleAddressValidation =
@@ -490,7 +490,7 @@ type Msg
     | LocalStorageSaved
     | EmailVerificationButtonClicked
     | PlaceChanged Value
-    | ManagerValidationResultReceived (Result Http.Error ManagerValidation)
+    | ManagerValidationResultReceived Int (Result Http.Error ManagerValidation)
     | GoogleAddressValidationResultReceived AddressValidationRequest (Result Http.Error GoogleAddressValidation)
     | CreateRampAccountTaskIdReceived (Result Http.Error TaskId)
     | CreateRampAccountTaskStatusReceived (Result Http.Error TaskStatus)
@@ -857,58 +857,56 @@ updateReady msg model =
         SetZone zone ->
             ( { model | zone = zone }, Cmd.none )
 
-        ManagerValidationResultReceived result ->
+        ManagerValidationResultReceived requestedApiaryId result ->
             case model.formState of
                 Validating _ ->
-                    case result of
-                        Ok managerValidation ->
-                            if Just (managerApiaryIdFromValidation managerValidation) /= model.managerApiaryId then
-                                ( model, Cmd.none )
+                    if Just requestedApiaryId /= model.managerApiaryId then
+                        ( model, Cmd.none )
 
-                            else
-                                case managerValidation of
-                                    ManagerResolved { managerRampId } ->
-                                        proceedIfReady
-                                            (markManagerCheckDone
-                                                { model
-                                                    | managerRampId = Just managerRampId
-                                                    , managerFeedbackText = ""
-                                                    , managerIsValid = Just True
-                                                }
-                                            )
-
-                                    ManagerRejected rejected ->
-                                        ( { model
-                                            | managerRampId = Nothing
-                                            , managerFeedbackText = rejected.managerFeedbackText
-                                            , managerIsValid = Just False
-                                            , formState = abortValidation model.formState
-                                          }
-                                        , Cmd.none
-                                        )
-
-                        Err error ->
-                            let
-                                updatedModel : Model
-                                updatedModel =
-                                    { model
-                                        | managerRampId = Nothing
-                                        , managerFeedbackText =
-                                            "There was an error verifying your manager: "
-                                                ++ httpErrorToString error
-                                        , managerIsValid = Just False
-                                    }
-                            in
-                            ( { updatedModel | formState = abortValidation model.formState }
-                            , Cmd.batch
-                                [ showAlert
-                                    ("There was an error verifying your manager: "
-                                        ++ httpErrorToString error
-                                        ++ "\n\nPlease check your internet connection."
+                    else
+                        case result of
+                            Ok (ManagerResolved managerRampId) ->
+                                proceedIfReady
+                                    (markManagerCheckDone
+                                        { model
+                                            | managerRampId = Just managerRampId
+                                            , managerFeedbackText = ""
+                                            , managerIsValid = Just True
+                                        }
                                     )
-                                , reportHttpError "manager_validation" error
-                                ]
-                            )
+
+                            Ok (ManagerRejected feedback) ->
+                                ( { model
+                                    | managerRampId = Nothing
+                                    , managerFeedbackText = feedback
+                                    , managerIsValid = Just False
+                                    , formState = abortValidation model.formState
+                                  }
+                                , Cmd.none
+                                )
+
+                            Err error ->
+                                let
+                                    updatedModel : Model
+                                    updatedModel =
+                                        { model
+                                            | managerRampId = Nothing
+                                            , managerFeedbackText =
+                                                "There was an error verifying your manager: "
+                                                    ++ httpErrorToString error
+                                            , managerIsValid = Just False
+                                        }
+                                in
+                                ( { updatedModel | formState = abortValidation model.formState }
+                                , Cmd.batch
+                                    [ showAlert
+                                        ("There was an error verifying your manager: "
+                                            ++ httpErrorToString error
+                                            ++ "\n\nPlease check your internet connection."
+                                        )
+                                    , reportHttpError "manager_validation" error
+                                    ]
+                                )
 
                 _ ->
                     ( model, Cmd.none )
@@ -1043,7 +1041,7 @@ updateReady msg model =
 
         AdvancedModeManagerPrefillReceived result ->
             case result of
-                Ok (ManagerResolved { managerRampId }) ->
+                Ok (ManagerResolved managerRampId) ->
                     if model.managerRampId == Nothing && isEnabledOption model.managerRampOptions managerRampId then
                         updateAndSaveToLocalStorage { model | managerRampId = Just managerRampId }
 
@@ -2414,51 +2412,11 @@ googleAddressValidationResponseDecoder =
         (maybe (at [ "result", "address", "missingComponentTypes" ] (Json.Decode.list string)))
 
 
-managerApiaryIdFromValidation : ManagerValidation -> Int
-managerApiaryIdFromValidation validation =
-    case validation of
-        ManagerResolved { managerApiaryId } ->
-            managerApiaryId
-
-        ManagerRejected { managerApiaryId } ->
-            managerApiaryId
-
-
-managerValidationApiaryIdDecoder : Decoder Int
-managerValidationApiaryIdDecoder =
-    field "apiaryUserId" string
-        |> andThen
-            (\apiaryUserId ->
-                case String.toInt apiaryUserId of
-                    Just managerApiaryId ->
-                        succeed managerApiaryId
-
-                    Nothing ->
-                        fail ("apiaryUserId is not an integer: " ++ apiaryUserId)
-            )
-
-
 managerValidationResponseDecoder : Decoder ManagerValidation
 managerValidationResponseDecoder =
     Json.Decode.oneOf
-        [ Json.Decode.map2
-            (\managerApiaryId managerRampId ->
-                ManagerResolved
-                    { managerApiaryId = managerApiaryId
-                    , managerRampId = managerRampId
-                    }
-            )
-            managerValidationApiaryIdDecoder
-            (field "rampUserId" string)
-        , Json.Decode.map2
-            (\managerApiaryId feedback ->
-                ManagerRejected
-                    { managerApiaryId = managerApiaryId
-                    , managerFeedbackText = feedback
-                    }
-            )
-            managerValidationApiaryIdDecoder
-            (field "error" string)
+        [ Json.Decode.map ManagerResolved (field "rampUserId" string)
+        , Json.Decode.map ManagerRejected (field "error" string)
         ]
 
 
@@ -2711,15 +2669,20 @@ httpRequestTimeoutMs =
 
 requestManagerValidation : Model -> Cmd Msg
 requestManagerValidation model =
+    let
+        managerApiaryId : Int
+        managerApiaryId =
+            withDefault 0 model.managerApiaryId
+    in
     Http.request
         { method = "GET"
         , headers = []
         , url =
             Url.Builder.absolute
-                [ "get-ramp-user", String.fromInt (withDefault 0 model.managerApiaryId) ]
+                [ "get-ramp-user", String.fromInt managerApiaryId ]
                 []
         , body = Http.emptyBody
-        , expect = expectJson ManagerValidationResultReceived managerValidationResponseDecoder
+        , expect = expectJson (ManagerValidationResultReceived managerApiaryId) managerValidationResponseDecoder
         , timeout = Just httpRequestTimeoutMs
         , tracker = Nothing
         }
