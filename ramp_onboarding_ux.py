@@ -976,10 +976,10 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                                 (
                                     "https",
                                     app.config["RAMP_UI_HOSTNAME"],
-                                    "/settings/personal-settings/profile/edit",
+                                    "/settings/all/profile",
                                     "",
                                     "",
-                                    "",
+                                    "#:~:text=receipt%20forwarding%20email-,Slack%20email%20address,-If%20your%20Slack",  # noqa: E501
                                 )
                             )
                             + "|your Ramp profile>, under the *Integrations* tab. "
