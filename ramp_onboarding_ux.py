@@ -64,7 +64,12 @@ from slack_sdk.signature import SignatureVerifier
 
 from werkzeug.exceptions import BadRequest, InternalServerError, Unauthorized
 
-USER_AGENT = "RampOnboarding/" + os.environ.get("NOMAD_SHORT_ALLOC_ID", "local")
+USER_AGENT = (
+    "RampOnboarding/"
+    + os.environ.get("NOMAD_TASK_NAME", "local")
+    + "/"
+    + os.environ.get("NOMAD_SHORT_ALLOC_ID", "local")
+)
 
 
 ROLE_LABELS = {
