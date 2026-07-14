@@ -21,23 +21,23 @@ suite =
             [ test "Student Center on 351 Ferst" <|
                 \_ ->
                     matchCampusAddressByStreetPrefix "351 ferst drive"
-                        |> Expect.equal StudentCenter
+                        |> Expect.equal (Just StudentCenter)
             , test "Graduate Living Center on 301 10th" <|
                 \_ ->
                     matchCampusAddressByStreetPrefix "301 10th street nw"
-                        |> Expect.equal GraduateLivingCenter
+                        |> Expect.equal (Just GraduateLivingCenter)
             , test "Graduate Living Center on 301 Ten" <|
                 \_ ->
                     matchCampusAddressByStreetPrefix "301 tenth street nw"
-                        |> Expect.equal GraduateLivingCenter
+                        |> Expect.equal (Just GraduateLivingCenter)
             , test "MRDC on 801 Ferst" <|
                 \_ ->
                     matchCampusAddressByStreetPrefix "801 ferst drive"
-                        |> Expect.equal ManufacturingRelatedDisciplinesComplex
+                        |> Expect.equal (Just ManufacturingRelatedDisciplinesComplex)
             , test "unknown street is not campus" <|
                 \_ ->
                     matchCampusAddressByStreetPrefix "123 main street"
-                        |> Expect.equal NotCampusAddress
+                        |> Expect.equal Nothing
             ]
         , describe "classifyCampusAddress"
             [ test "classifies Student Center when city/state/zip and street match" <|
@@ -45,54 +45,54 @@ suite =
                     modelFrom minimalServerData Json.Encode.null
                         |> withAddress "351 Ferst Drive" "" "Atlanta" (Just "GA") "30332"
                         |> classifyCampusAddress
-                        |> Expect.equal StudentCenter
+                        |> Expect.equal (Just StudentCenter)
             , test "requires Atlanta / GA / 303 zip prefix" <|
                 \_ ->
                     modelFrom minimalServerData Json.Encode.null
                         |> withAddress "351 Ferst Drive" "" "Atlanta" (Just "GA") "30000"
                         |> classifyCampusAddress
-                        |> Expect.equal NotCampusAddress
+                        |> Expect.equal Nothing
             ]
         , describe "validateAddressLineTwo"
             [ test "allows empty when not required and not campus" <|
                 \_ ->
-                    validateAddressLineTwo "" False NotCampusAddress
+                    validateAddressLineTwo "" False Nothing
                         |> Expect.equal Valid
             , test "requires a value when isRequired" <|
                 \_ ->
-                    validateAddressLineTwo "" True NotCampusAddress
+                    validateAddressLineTwo "" True Nothing
                         |> Expect.equal (Invalid "This address requires an apartment or unit number")
             , test "requires a mailbox for Student Center" <|
                 \_ ->
-                    validateAddressLineTwo "" False StudentCenter
+                    validateAddressLineTwo "" False (Just StudentCenter)
                         |> Expect.equal (Invalid "This address requires a mailbox number")
             , test "accepts a Student Center mailbox" <|
                 \_ ->
-                    validateAddressLineTwo "123456 Georgia Tech Station" False StudentCenter
+                    validateAddressLineTwo "123456 Georgia Tech Station" False (Just StudentCenter)
                         |> Expect.equal Valid
             , test "rejects an invalid Student Center mailbox" <|
                 \_ ->
-                    validateAddressLineTwo "box 1" False StudentCenter
+                    validateAddressLineTwo "box 1" False (Just StudentCenter)
                         |> Expect.equal (Invalid "This doesn't appear to be a valid mailbox number")
             , test "accepts a Graduate Living Center apartment" <|
                 \_ ->
-                    validateAddressLineTwo "Apt 610A" False GraduateLivingCenter
+                    validateAddressLineTwo "Apt 610A" False (Just GraduateLivingCenter)
                         |> Expect.equal Valid
             , test "rejects an invalid Graduate Living Center apartment" <|
                 \_ ->
-                    validateAddressLineTwo "Apt 999Z" False GraduateLivingCenter
+                    validateAddressLineTwo "Apt 999Z" False (Just GraduateLivingCenter)
                         |> Expect.equal (Invalid "This doesn't appear to be a valid apartment number")
             , test "accepts MRDC Room 1312" <|
                 \_ ->
-                    validateAddressLineTwo "Room 1312" False ManufacturingRelatedDisciplinesComplex
+                    validateAddressLineTwo "Room 1312" False (Just ManufacturingRelatedDisciplinesComplex)
                         |> Expect.equal Valid
             , test "rejects other MRDC rooms" <|
                 \_ ->
-                    validateAddressLineTwo "Room 1000" False ManufacturingRelatedDisciplinesComplex
+                    validateAddressLineTwo "Room 1000" False (Just ManufacturingRelatedDisciplinesComplex)
                         |> Expect.equal (Invalid "For delivery to the MRDC loading dock, use Room 1312")
             , test "rejects line two longer than 100 characters" <|
                 \_ ->
-                    validateAddressLineTwo (String.repeat 101 "a") False NotCampusAddress
+                    validateAddressLineTwo (String.repeat 101 "a") False Nothing
                         |> Expect.equal (Invalid "Your second address line may be a maximum of 100 characters")
             ]
         ]

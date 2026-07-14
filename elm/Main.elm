@@ -329,7 +329,6 @@ type CampusAddress
     = StudentCenter
     | GraduateLivingCenter
     | ManufacturingRelatedDisciplinesComplex
-    | NotCampusAddress
 
 
 type ValidationResult
@@ -1795,25 +1794,25 @@ validateAddressLineOneGoogleResult maybeIsValid =
             Valid
 
 
-validateAddressLineTwo : String -> Bool -> CampusAddress -> ValidationResult
+validateAddressLineTwo : String -> Bool -> Maybe CampusAddress -> ValidationResult
 validateAddressLineTwo addressLineTwo isRequired campusAddress =
     if String.length (String.trim addressLineTwo) > 100 then
         Invalid "Your second address line may be a maximum of 100 characters"
 
-    else if blankString addressLineTwo && (isRequired || campusAddress /= NotCampusAddress) then
+    else if blankString addressLineTwo && (isRequired || campusAddress /= Nothing) then
         Invalid
             ("This address requires "
                 ++ (case campusAddress of
-                        StudentCenter ->
+                        Just StudentCenter ->
                             "a mailbox"
 
-                        GraduateLivingCenter ->
+                        Just GraduateLivingCenter ->
                             "an apartment"
 
-                        ManufacturingRelatedDisciplinesComplex ->
+                        Just ManufacturingRelatedDisciplinesComplex ->
                             "a room"
 
-                        NotCampusAddress ->
+                        Nothing ->
                             "an apartment or unit"
                    )
                 ++ " number"
@@ -1821,21 +1820,21 @@ validateAddressLineTwo addressLineTwo isRequired campusAddress =
 
     else if
         campusAddress
-            == StudentCenter
+            == Just StudentCenter
             && not (Regex.contains studentCenterMailboxRegex (String.trim (String.toLower addressLineTwo)))
     then
         Invalid "This doesn't appear to be a valid mailbox number"
 
     else if
         campusAddress
-            == GraduateLivingCenter
+            == Just GraduateLivingCenter
             && not (Regex.contains graduateLivingCenterMailboxRegex (String.trim (String.toLower addressLineTwo)))
     then
         Invalid "This doesn't appear to be a valid apartment number"
 
     else if
         campusAddress
-            == ManufacturingRelatedDisciplinesComplex
+            == Just ManufacturingRelatedDisciplinesComplex
             && String.trim (String.toLower addressLineTwo)
             /= "rm 1312"
             && String.trim (String.toLower addressLineTwo)
@@ -2589,7 +2588,7 @@ needsAddressValidation : Model -> Bool
 needsAddressValidation model =
     model.orderPhysicalCard
         && classifyCampusAddress model
-        == NotCampusAddress
+        == Nothing
         && model.addressIsValid
         == Nothing
 
@@ -2820,7 +2819,7 @@ campusAddressStreetPrefixes =
     ]
 
 
-matchCampusAddressByStreetPrefix : String -> CampusAddress
+matchCampusAddressByStreetPrefix : String -> Maybe CampusAddress
 matchCampusAddressByStreetPrefix street =
     campusAddressStreetPrefixes
         |> List.filterMap
@@ -2832,10 +2831,9 @@ matchCampusAddressByStreetPrefix street =
                     Nothing
             )
         |> List.head
-        |> withDefault NotCampusAddress
 
 
-classifyCampusAddress : Model -> CampusAddress
+classifyCampusAddress : Model -> Maybe CampusAddress
 classifyCampusAddress model =
     let
         city : String
@@ -2859,7 +2857,7 @@ classifyCampusAddress model =
         matchCampusAddressByStreetPrefix street
 
     else
-        NotCampusAddress
+        Nothing
 
 
 buildInitialModel : ServerData -> Value -> Model
