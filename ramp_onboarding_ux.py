@@ -1435,7 +1435,11 @@ def index() -> Any:
             "googleMapsApiKey": app.config["GOOGLE_MAPS_FRONTEND_API_KEY"],
             "googleClientId": app.config["GOOGLE_CLIENT_ID"],
             "googleOneTapLoginUri": url_for("verify_google_onetap", _external=True),
-            "showAdvancedOptions": not session["is_student"] or default_role_id != "BUSINESS_USER",
+            "showAdvancedOptions": (
+                False
+                if cache.get("force_hide_advanced_options_" + session["sub"])
+                else (not session["is_student"] or default_role_id != "BUSINESS_USER")
+            ),
             "departmentOptions": get_ramp_departments(),
             "departmentId": default_department,
             "locationOptions": get_ramp_locations(),
@@ -2608,6 +2612,16 @@ def clear_cache() -> None:
     """
     cache.clear()
     print("Cache cleared.")
+
+
+@app.cli.command("force-hide-advanced-options")
+@click.argument("keycloak_user_id")
+def force_hide_advanced_options(keycloak_user_id: str) -> None:
+    """
+    Force showAdvancedOptions=false for a Keycloak user (smoke testing).
+    """
+    cache.set("force_hide_advanced_options_" + keycloak_user_id, True, timeout=0)
+    print("Forced hide advanced options for " + keycloak_user_id + ".")
 
 
 @app.cli.command("send-slack-messages")
