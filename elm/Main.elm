@@ -394,10 +394,6 @@ type alias AddressValidationRequest =
     }
 
 
-type alias TaskId =
-    { taskId : String }
-
-
 type TaskStatus
     = TaskStarted
     | TaskInProgress
@@ -491,7 +487,7 @@ type Msg
     | PlaceChanged Value
     | ManagerValidationResultReceived Int (Result Http.Error ManagerValidation)
     | GoogleAddressValidationResultReceived AddressValidationRequest (Result Http.Error GoogleAddressValidation)
-    | CreateRampAccountTaskIdReceived (Result Http.Error TaskId)
+    | CreateRampAccountTaskIdReceived (Result Http.Error String)
     | CreateRampAccountTaskStatusReceived (Result Http.Error TaskStatus)
     | OrderPhysicalCardResponseReceived (Result Http.Error ())
     | SetTime Time.Posix
@@ -913,8 +909,8 @@ updateReady msg model =
         CreateRampAccountTaskIdReceived result ->
             case result of
                 Ok createRampAccountTaskId ->
-                    ( { model | formState = CreatingRampAccount (Just createRampAccountTaskId.taskId) }
-                    , getRampAccountTaskStatus createRampAccountTaskId.taskId
+                    ( { model | formState = CreatingRampAccount (Just createRampAccountTaskId) }
+                    , getRampAccountTaskStatus createRampAccountTaskId
                     )
 
                 Err error ->
@@ -2550,15 +2546,14 @@ serverDataDecoder =
         |> andMap (field "slackSupportChannelName" trimmedString)
 
 
-createTaskResponseDecoder : Decoder TaskId
+createTaskResponseDecoder : Decoder String
 createTaskResponseDecoder =
-    Json.Decode.map TaskId
-        (at [ "taskId" ] Json.Decode.string)
+    field "taskId" string
 
 
 getTaskResponseDecoder : Decoder TaskStatus
 getTaskResponseDecoder =
-    at [ "taskStatus" ] string
+    field "taskStatus" string
         |> Json.Decode.andThen
             (\status ->
                 case status of
