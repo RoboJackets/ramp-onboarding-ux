@@ -607,7 +607,12 @@ updateReady msg model =
                         , Cmd.batch
                             [ saveFormStateToLocalStorage model
                             , if needsManagerValidation model then
-                                requestManagerValidation model
+                                let
+                                    managerApiaryId : Int
+                                    managerApiaryId =
+                                        withDefault 0 model.managerApiaryId
+                                in
+                                requestGetRampUser managerApiaryId (ManagerValidationResultReceived managerApiaryId)
 
                               else
                                 Cmd.none
@@ -1013,7 +1018,7 @@ updateReady msg model =
                 prefillCmd =
                     case ( model.managerRampId, model.managerApiaryId ) of
                         ( Nothing, Just managerApiaryId ) ->
-                            requestManagerRampIdPrefill managerApiaryId
+                            requestGetRampUser managerApiaryId AdvancedModeManagerPrefillReceived
 
                         _ ->
                             Cmd.none
@@ -2661,13 +2666,8 @@ httpRequestTimeoutMs =
     5000
 
 
-requestManagerValidation : Model -> Cmd Msg
-requestManagerValidation model =
-    let
-        managerApiaryId : Int
-        managerApiaryId =
-            withDefault 0 model.managerApiaryId
-    in
+requestGetRampUser : Int -> (Result Http.Error ManagerValidation -> Msg) -> Cmd Msg
+requestGetRampUser managerApiaryId toMsg =
     Http.request
         { method = "GET"
         , headers = []
@@ -2676,23 +2676,7 @@ requestManagerValidation model =
                 [ "get-ramp-user", String.fromInt managerApiaryId ]
                 []
         , body = Http.emptyBody
-        , expect = expectJson (ManagerValidationResultReceived managerApiaryId) managerValidationResponseDecoder
-        , timeout = Just httpRequestTimeoutMs
-        , tracker = Nothing
-        }
-
-
-requestManagerRampIdPrefill : Int -> Cmd Msg
-requestManagerRampIdPrefill managerApiaryId =
-    Http.request
-        { method = "GET"
-        , headers = []
-        , url =
-            Url.Builder.absolute
-                [ "get-ramp-user", String.fromInt managerApiaryId ]
-                []
-        , body = Http.emptyBody
-        , expect = expectJson AdvancedModeManagerPrefillReceived managerValidationResponseDecoder
+        , expect = expectJson toMsg managerValidationResponseDecoder
         , timeout = Just httpRequestTimeoutMs
         , tracker = Nothing
         }
