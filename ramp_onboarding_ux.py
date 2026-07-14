@@ -2009,6 +2009,7 @@ def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     return resolve_ramp_user(apiary_id, app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])
 
 
+@cache.memoize(timeout=0, response_filter=only_cache_if_ramp_id_present)
 def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) -> Dict[str, str]:
     """
     Resolves an Apiary user ID to a Ramp user ID via Keycloak, with optional department gating
