@@ -445,9 +445,9 @@ type alias Model =
     , rampDepartmentOptions : Dict String RampObject
     , rampLocationOptions : Dict String RampObject
     , rampRoleOptions : Dict String RampObject
-    , rampDepartmentId : Maybe String
-    , rampLocationId : Maybe String
-    , rampRoleId : Maybe String
+    , rampDepartmentId : String
+    , rampLocationId : String
+    , rampRoleId : String
     , studentDefaultDepartmentId : String
     , nonStudentDefaultDepartmentId : String
     , studentDefaultLocationId : String
@@ -1055,13 +1055,13 @@ updateReady msg model =
                     ( model, reportHttpError "manager_prefill" error )
 
         DepartmentInput selectedDepartment ->
-            updateAndSaveToLocalStorage { model | rampDepartmentId = Just selectedDepartment }
+            updateAndSaveToLocalStorage { model | rampDepartmentId = selectedDepartment }
 
         LocationInput selectedLocation ->
-            updateAndSaveToLocalStorage { model | rampLocationId = Just selectedLocation }
+            updateAndSaveToLocalStorage { model | rampLocationId = selectedLocation }
 
         RoleInput selectedRole ->
-            updateAndSaveToLocalStorage { model | rampRoleId = Just selectedRole }
+            updateAndSaveToLocalStorage { model | rampRoleId = selectedRole }
 
 
 subscriptions : AppModel -> Sub Msg
@@ -1361,7 +1361,7 @@ renderForm model =
                     , validationAttributes = validationClasses model.showValidation managerValidationResult
                     , options =
                         if model.showAdvancedOptions then
-                            List.map (rampObjectToHtmlOption model.managerRampId) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
+                            List.map (rampObjectToHtmlOption (withDefault "" model.managerRampId)) (sortWith sortByRampObjectLabel (toList model.managerRampOptions))
 
                         else
                             List.map (managerTupleToHtmlOption model.managerApiaryId model.selfApiaryId) (sortBy second (toList model.managerApiaryOptions))
@@ -1375,7 +1375,7 @@ renderForm model =
                 (renderSelect
                     { fieldId = departmentFieldId
                     , labelText = "Department"
-                    , placeholderSelected = model.rampDepartmentId == Nothing
+                    , placeholderSelected = not (isEnabledOption model.rampDepartmentOptions model.rampDepartmentId)
                     , placeholderLabel = "Select your department..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map DepartmentInput targetValue
@@ -1397,7 +1397,7 @@ renderForm model =
                 (renderSelect
                     { fieldId = locationFieldId
                     , labelText = "Location"
-                    , placeholderSelected = model.rampLocationId == Nothing
+                    , placeholderSelected = not (isEnabledOption model.rampLocationOptions model.rampLocationId)
                     , placeholderLabel = "Select your location..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map LocationInput targetValue
@@ -1419,7 +1419,7 @@ renderForm model =
                 (renderSelect
                     { fieldId = roleFieldId
                     , labelText = "Role"
-                    , placeholderSelected = model.rampRoleId == Nothing
+                    , placeholderSelected = not (isEnabledOption model.rampRoleOptions model.rampRoleId)
                     , placeholderLabel = "Select your role..."
                     , isDisabled = model.formState /= Editing
                     , onChange = Json.Decode.map RoleInput targetValue
@@ -1721,7 +1721,7 @@ validateEmailAddress emailAddress verified =
             Invalid emailFeedbackText
 
 
-validateManager : Bool -> Maybe Bool -> String -> Maybe String -> Maybe Int -> Maybe String -> Dict Int String -> Dict String RampUser -> Int -> ValidationResult
+validateManager : Bool -> Maybe Bool -> String -> Maybe String -> Maybe Int -> String -> Dict Int String -> Dict String RampUser -> Int -> ValidationResult
 validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedManagerRampFeedbackText selectedManagerRampId selectedManagerApiaryId selectedDepartmentId managerApiaryOptions managerRampOptions selfId =
     if usingRampManagerOptions then
         case selectedManagerRampId of
@@ -1731,17 +1731,11 @@ validateManager usingRampManagerOptions selectedManagerHasRampAccount selectedMa
                         if not manager.enabled then
                             Invalid managerFeedbackText
 
+                        else if manager.departmentId /= selectedDepartmentId then
+                            Invalid managerDepartmentFeedbackText
+
                         else
-                            case selectedDepartmentId of
-                                Just deptId ->
-                                    if manager.departmentId /= deptId then
-                                        Invalid managerDepartmentFeedbackText
-
-                                    else
-                                        Valid
-
-                                Nothing ->
-                                    Valid
+                            Valid
 
                     Nothing ->
                         Invalid managerFeedbackText
@@ -1873,18 +1867,13 @@ validateState selectedState =
             Invalid "Please select your state"
 
 
-validateRampObject : String -> Maybe String -> Dict String RampObject -> ValidationResult
-validateRampObject objectName selectedObject objectOptions =
-    case selectedObject of
-        Just selectedObjectId ->
-            if (withDefault { label = "", enabled = False } (Dict.get selectedObjectId objectOptions)).enabled then
-                Valid
+validateRampObject : String -> String -> Dict String RampObject -> ValidationResult
+validateRampObject objectName selectedObjectId objectOptions =
+    if isEnabledOption objectOptions selectedObjectId then
+        Valid
 
-            else
-                Invalid ("Please select your " ++ objectName)
-
-        Nothing ->
-            Invalid ("Please select your " ++ objectName)
+    else
+        Invalid ("Please select your " ++ objectName)
 
 
 validateZipCode : String -> ValidationResult
@@ -2232,11 +2221,11 @@ managerTupleToHtmlOption selectedManagerId selfId ( managerId, managerName ) =
         [ text managerName ]
 
 
-rampObjectToHtmlOption : Maybe String -> ( String, { a | label : String, enabled : Bool } ) -> Html msg
-rampObjectToHtmlOption maybeSelectedId ( rampId, rampObject ) =
+rampObjectToHtmlOption : String -> ( String, { a | label : String, enabled : Bool } ) -> Html msg
+rampObjectToHtmlOption selectedId ( rampId, rampObject ) =
     option
         [ Html.Attributes.value rampId
-        , selected (maybeSelectedId == Just rampId)
+        , selected (selectedId == rampId)
         , disabled (not rampObject.enabled)
         ]
         [ text rampObject.label ]
@@ -2300,30 +2289,9 @@ encodeFormState model =
                                 Nothing ->
                                     Json.Encode.null
                           )
-                        , ( departmentIdLocalStorageKey
-                          , case model.rampDepartmentId of
-                                Just departmentId ->
-                                    Json.Encode.string (String.trim departmentId)
-
-                                Nothing ->
-                                    Json.Encode.null
-                          )
-                        , ( locationIdLocalStorageKey
-                          , case model.rampLocationId of
-                                Just locationId ->
-                                    Json.Encode.string (String.trim locationId)
-
-                                Nothing ->
-                                    Json.Encode.null
-                          )
-                        , ( roleIdLocalStorageKey
-                          , case model.rampRoleId of
-                                Just roleId ->
-                                    Json.Encode.string (String.trim roleId)
-
-                                Nothing ->
-                                    Json.Encode.null
-                          )
+                        , ( departmentIdLocalStorageKey, Json.Encode.string (String.trim model.rampDepartmentId) )
+                        , ( locationIdLocalStorageKey, Json.Encode.string (String.trim model.rampLocationId) )
+                        , ( roleIdLocalStorageKey, Json.Encode.string (String.trim model.rampRoleId) )
                         ]
 
                     else
@@ -2455,11 +2423,11 @@ type alias ServerData =
     , googleOneTapLoginUri : String
     , showAdvancedOptions : Bool
     , departmentOptions : Dict String RampObject
-    , departmentId : Maybe String
+    , departmentId : String
     , locationOptions : Dict String RampObject
-    , locationId : Maybe String
+    , locationId : String
     , roleOptions : Dict String RampObject
-    , roleId : Maybe String
+    , roleId : String
     , studentDefaultDepartmentId : String
     , nonStudentDefaultDepartmentId : String
     , studentDefaultLocationId : String
@@ -2531,24 +2499,79 @@ serverDataDecoder =
         |> andMap (field "city" trimmedString)
         |> andMap (field "state" (nullable string))
         |> andMap (field "zip" trimmedString)
-        |> andMap (field "googleMapsApiKey" trimmedString)
-        |> andMap (field "googleClientId" trimmedString)
-        |> andMap (field "googleOneTapLoginUri" trimmedString)
+        |> andMap (field "googleMapsApiKey" nonBlankTrimmedString)
+        |> andMap (field "googleClientId" nonBlankTrimmedString)
+        |> andMap (field "googleOneTapLoginUri" httpUrl)
         |> andMap (field "showAdvancedOptions" bool)
         |> andMap (field "departmentOptions" (dict rampObjectDecoder))
-        |> andMap (field "departmentId" (nullable string))
+        |> andMap (field "departmentId" trimmedString)
         |> andMap (field "locationOptions" (dict rampObjectDecoder))
-        |> andMap (field "locationId" (nullable string))
+        |> andMap (field "locationId" trimmedString)
         |> andMap (field "roleOptions" (dict rampObjectDecoder))
-        |> andMap (field "roleId" (nullable string))
+        |> andMap (field "roleId" trimmedString)
         |> andMap (field "defaultDepartmentForStudents" trimmedString)
         |> andMap (field "defaultDepartmentForNonStudents" trimmedString)
         |> andMap (field "defaultLocationForStudents" trimmedString)
         |> andMap (field "defaultLocationForNonStudents" trimmedString)
-        |> andMap (field "rampSignInUri" trimmedString)
-        |> andMap (field "businessLegalName" trimmedString)
-        |> andMap (field "slackSupportChannelDeepLink" trimmedString)
-        |> andMap (field "slackSupportChannelName" trimmedString)
+        |> andMap (field "rampSignInUri" httpUrl)
+        |> andMap (field "businessLegalName" nonBlankTrimmedString)
+        |> andMap (field "slackSupportChannelDeepLink" nonBlankTrimmedString)
+        |> andMap (field "slackSupportChannelName" nonBlankTrimmedString)
+        |> andThen requireEnabledRampDefaults
+
+
+requireEnabledRampDefaults : ServerData -> Decoder ServerData
+requireEnabledRampDefaults data =
+    if not (isEnabledOption data.departmentOptions data.departmentId) then
+        fail ("Expected an enabled departmentId, but found \"" ++ data.departmentId ++ "\"")
+
+    else if not (isEnabledOption data.locationOptions data.locationId) then
+        fail ("Expected an enabled locationId, but found \"" ++ data.locationId ++ "\"")
+
+    else if not (isEnabledOption data.roleOptions data.roleId) then
+        fail ("Expected an enabled roleId, but found \"" ++ data.roleId ++ "\"")
+
+    else if not (isEnabledOption data.departmentOptions data.studentDefaultDepartmentId) then
+        fail ("Expected an enabled defaultDepartmentForStudents, but found \"" ++ data.studentDefaultDepartmentId ++ "\"")
+
+    else if not (isEnabledOption data.departmentOptions data.nonStudentDefaultDepartmentId) then
+        fail ("Expected an enabled defaultDepartmentForNonStudents, but found \"" ++ data.nonStudentDefaultDepartmentId ++ "\"")
+
+    else if not (isEnabledOption data.locationOptions data.studentDefaultLocationId) then
+        fail ("Expected an enabled defaultLocationForStudents, but found \"" ++ data.studentDefaultLocationId ++ "\"")
+
+    else if not (isEnabledOption data.locationOptions data.nonStudentDefaultLocationId) then
+        fail ("Expected an enabled defaultLocationForNonStudents, but found \"" ++ data.nonStudentDefaultLocationId ++ "\"")
+
+    else
+        succeed data
+
+
+nonBlankTrimmedString : Decoder String
+nonBlankTrimmedString =
+    trimmedString
+        |> andThen
+            (\value ->
+                if blankString value then
+                    fail "Expected a non-blank string"
+
+                else
+                    succeed value
+            )
+
+
+httpUrl : Decoder String
+httpUrl =
+    nonBlankTrimmedString
+        |> andThen
+            (\value ->
+                case Url.fromString value of
+                    Just _ ->
+                        succeed value
+
+                    Nothing ->
+                        fail ("Expected a valid HTTP(S) URL, but found \"" ++ value ++ "\"")
+            )
 
 
 createTaskResponseDecoder : Decoder String
@@ -2761,9 +2784,9 @@ createRampAccountTask model =
                     [ ( "firstName", Json.Encode.string (String.trim model.firstName) )
                     , ( "lastName", Json.Encode.string (String.trim model.lastName) )
                     , ( "directManagerId", Json.Encode.string (withDefault "" model.managerRampId) )
-                    , ( "departmentId", Json.Encode.string (withDefault "" model.rampDepartmentId) )
-                    , ( "locationId", Json.Encode.string (withDefault "" model.rampLocationId) )
-                    , ( "role", Json.Encode.string (withDefault "" model.rampRoleId) )
+                    , ( "departmentId", Json.Encode.string model.rampDepartmentId )
+                    , ( "locationId", Json.Encode.string model.rampLocationId )
+                    , ( "role", Json.Encode.string model.rampRoleId )
                     , ( "orderPhysicalCard", Json.Encode.bool model.orderPhysicalCard )
                     ]
                 )
@@ -2897,22 +2920,22 @@ buildInitialModel serverData localData =
     , rampRoleOptions = serverData.roleOptions
     , rampDepartmentId =
         if showAdvancedOptions then
-            validatedId departmentIdLocalStorageKey string (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
+            preferValidLocalId departmentIdLocalStorageKey (isEnabledOption serverData.departmentOptions) localData serverData.departmentId
 
         else
-            validServerId (isEnabledOption serverData.departmentOptions) serverData.departmentId
+            serverData.departmentId
     , rampLocationId =
         if showAdvancedOptions then
-            validatedId locationIdLocalStorageKey string (isEnabledOption serverData.locationOptions) localData serverData.locationId
+            preferValidLocalId locationIdLocalStorageKey (isEnabledOption serverData.locationOptions) localData serverData.locationId
 
         else
-            validServerId (isEnabledOption serverData.locationOptions) serverData.locationId
+            serverData.locationId
     , rampRoleId =
         if showAdvancedOptions then
-            validatedId roleIdLocalStorageKey string (isEnabledOption serverData.roleOptions) localData serverData.roleId
+            preferValidLocalId roleIdLocalStorageKey (isEnabledOption serverData.roleOptions) localData serverData.roleId
 
         else
-            validServerId (isEnabledOption serverData.roleOptions) serverData.roleId
+            serverData.roleId
     , studentDefaultDepartmentId = serverData.studentDefaultDepartmentId
     , nonStudentDefaultDepartmentId = serverData.nonStudentDefaultDepartmentId
     , studentDefaultLocationId = serverData.studentDefaultLocationId
@@ -2943,6 +2966,20 @@ validatedId fieldName decoder isValidId localData serverValue =
         |> List.filterMap identity
         |> List.filter isValidId
         |> List.head
+
+
+preferValidLocalId : String -> (String -> Bool) -> Value -> String -> String
+preferValidLocalId fieldName isValidId localData serverValue =
+    case Result.toMaybe (decodeValue (field fieldName string) localData) of
+        Just localId ->
+            if isValidId localId then
+                localId
+
+            else
+                serverValue
+
+        Nothing ->
+            serverValue
 
 
 validServerId : (a -> Bool) -> Maybe a -> Maybe a

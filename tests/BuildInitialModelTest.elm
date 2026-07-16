@@ -99,7 +99,7 @@ suite =
                         buildInitialModel minimalServerData localData
                 in
                 model.rampDepartmentId
-                    |> Expect.equal (Just "dept-students")
+                    |> Expect.equal "dept-students"
         , test "accepts a valid local department id over the server default" <|
             \_ ->
                 let
@@ -113,7 +113,7 @@ suite =
                         buildInitialModel minimalServerData localData
                 in
                 model.rampDepartmentId
-                    |> Expect.equal (Just "dept-staff")
+                    |> Expect.equal "dept-staff"
         , test "rejects an invalid local state code" <|
             \_ ->
                 let
@@ -179,7 +179,7 @@ suite =
                 in
                 Expect.all
                     [ .managerRampId >> Expect.equal Nothing
-                    , .rampDepartmentId >> Expect.equal (Just "dept-students")
+                    , .rampDepartmentId >> Expect.equal "dept-students"
                     ]
                     model
         , test "restores managerRampId from localStorage in advanced mode" <|

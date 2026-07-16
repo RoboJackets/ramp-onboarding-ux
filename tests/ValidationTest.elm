@@ -103,13 +103,13 @@ suite =
             [ test "accepts an enabled option" <|
                 \_ ->
                     validateRampObject "department"
-                        (Just "dept-1")
+                        "dept-1"
                         (Dict.fromList [ ( "dept-1", { label = "One", enabled = True } ) ])
                         |> Expect.equal Valid
             , test "rejects a disabled option" <|
                 \_ ->
                     validateRampObject "department"
-                        (Just "dept-1")
+                        "dept-1"
                         (Dict.fromList [ ( "dept-1", { label = "One", enabled = False } ) ])
                         |> Expect.equal (Invalid "Please select your department")
             ]
@@ -121,7 +121,7 @@ suite =
                         ""
                         (Just "mgr-1")
                         Nothing
-                        (Just "dept-a")
+                        "dept-a"
                         Dict.empty
                         (Dict.fromList
                             [ ( "mgr-1"
@@ -141,7 +141,7 @@ suite =
                         ""
                         (Just "mgr-1")
                         Nothing
-                        (Just "dept-a")
+                        "dept-a"
                         Dict.empty
                         (Dict.fromList
                             [ ( "mgr-1"

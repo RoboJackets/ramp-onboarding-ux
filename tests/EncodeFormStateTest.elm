@@ -90,9 +90,9 @@ suite =
                                 , state = Just "FL"
                                 , zip = "00000"
                                 , showAdvancedOptions = False
-                                , departmentId = Just "dept-students"
-                                , locationId = Just "loc-campus"
-                                , roleId = Just "BUSINESS_USER"
+                                , departmentId = "dept-students"
+                                , locationId = "loc-campus"
+                                , roleId = "BUSINESS_USER"
                                 , locationOptions =
                                     Dict.fromList
                                         [ ( "loc-campus", { label = "Campus", enabled = True } )
@@ -140,9 +140,9 @@ suite =
                                 , zip = " 30301 "
                                 , showAdvancedOptions = True
                                 , managerRampId = Just "ramp-manager-3"
-                                , rampDepartmentId = Just "dept-staff"
-                                , rampLocationId = Just "loc-remote"
-                                , rampRoleId = Just "BUSINESS_ADMIN"
+                                , rampDepartmentId = "dept-staff"
+                                , rampLocationId = "loc-remote"
+                                , rampRoleId = "BUSINESS_ADMIN"
                             }
 
                         restored =
@@ -161,9 +161,9 @@ suite =
                         , .zip >> Expect.equal "30301"
                         , .showAdvancedOptions >> Expect.equal True
                         , .managerRampId >> Expect.equal (Just "ramp-manager-3")
-                        , .rampDepartmentId >> Expect.equal (Just "dept-staff")
-                        , .rampLocationId >> Expect.equal (Just "loc-remote")
-                        , .rampRoleId >> Expect.equal (Just "BUSINESS_ADMIN")
+                        , .rampDepartmentId >> Expect.equal "dept-staff"
+                        , .rampLocationId >> Expect.equal "loc-remote"
+                        , .rampRoleId >> Expect.equal "BUSINESS_ADMIN"
                         ]
                         restored
             , test "simple-mode encode does not restore advanced Ramp fields" <|
@@ -174,9 +174,9 @@ suite =
                                 | emailVerified = False
                                 , emailAddress = "server@robojackets.org"
                                 , managerApiaryId = Just 2
-                                , departmentId = Just "dept-students"
-                                , locationId = Just "loc-campus"
-                                , roleId = Just "BUSINESS_USER"
+                                , departmentId = "dept-students"
+                                , locationId = "loc-campus"
+                                , roleId = "BUSINESS_USER"
                                 , showAdvancedOptions = False
                             }
 
@@ -198,9 +198,9 @@ suite =
                                 , zip = "30303"
                                 , showAdvancedOptions = False
                                 , managerRampId = Just "ramp-manager"
-                                , rampDepartmentId = Just "dept-staff"
-                                , rampLocationId = Just "loc-campus"
-                                , rampRoleId = Just "BUSINESS_USER"
+                                , rampDepartmentId = "dept-staff"
+                                , rampLocationId = "loc-campus"
+                                , rampRoleId = "BUSINESS_USER"
                             }
 
                         restored =
@@ -221,9 +221,9 @@ suite =
                         , -- Apiary manager changed, so server Ramp manager is cleared in simple mode
                           .managerRampId >> Expect.equal Nothing
                         , -- Advanced Ramp fields stay at server defaults when not encoded
-                          .rampDepartmentId >> Expect.equal (Just "dept-students")
-                        , .rampLocationId >> Expect.equal (Just "loc-campus")
-                        , .rampRoleId >> Expect.equal (Just "BUSINESS_USER")
+                          .rampDepartmentId >> Expect.equal "dept-students"
+                        , .rampLocationId >> Expect.equal "loc-campus"
+                        , .rampRoleId >> Expect.equal "BUSINESS_USER"
                         ]
                         restored
             ]

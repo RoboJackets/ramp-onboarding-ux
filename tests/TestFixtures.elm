@@ -46,26 +46,26 @@ minimalServerData =
             , ( "dept-staff", { label = "Staff", enabled = True } )
             , ( "dept-disabled", { label = "Disabled", enabled = False } )
             ]
-    , departmentId = Just "dept-students"
+    , departmentId = "dept-students"
     , locationOptions =
         Dict.fromList
             [ ( "loc-campus", { label = "Campus", enabled = True } )
             , ( "loc-disabled", { label = "Disabled", enabled = False } )
             ]
-    , locationId = Just "loc-campus"
+    , locationId = "loc-campus"
     , roleOptions =
         Dict.fromList
             [ ( "BUSINESS_USER", { label = "Employee", enabled = True } )
             , ( "role-disabled", { label = "Disabled", enabled = False } )
             ]
-    , roleId = Just "BUSINESS_USER"
+    , roleId = "BUSINESS_USER"
     , studentDefaultDepartmentId = "dept-students"
     , nonStudentDefaultDepartmentId = "dept-staff"
     , studentDefaultLocationId = "loc-campus"
     , nonStudentDefaultLocationId = "loc-campus"
     , rampSignInUri = "https://example.test/ramp"
     , businessLegalName = "RoboJackets"
-    , slackSupportChannelDeepLink = "https://example.test/slack"
+    , slackSupportChannelDeepLink = "slack://channel?team=T123&id=C123"
     , slackSupportChannelName = "#support"
     }
 
