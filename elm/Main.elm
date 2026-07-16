@@ -466,9 +466,7 @@ type AppModel
 
 
 type Msg
-    = UrlRequest Browser.UrlRequest
-    | UrlChanged Url.Url
-    | FormSubmitted
+    = FormSubmitted
     | FormChanged
     | FirstNameInput String
     | LastNameInput String
@@ -505,18 +503,16 @@ type Msg
 
 main : Program Value AppModel Msg
 main =
-    Browser.application
+    Browser.document
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
-        , onUrlChange = UrlChanged
-        , onUrlRequest = UrlRequest
         }
 
 
-init : Value -> Url.Url -> Nav.Key -> ( AppModel, Cmd Msg )
-init flags _ _ =
+init : Value -> ( AppModel, Cmd Msg )
+init flags =
     case decodeValue (field "serverData" serverDataDecoder) flags of
         Ok serverData ->
             let
@@ -565,17 +561,6 @@ update msg appModel =
 updateReady : Msg -> Model -> ( Model, Cmd Msg )
 updateReady msg model =
     case msg of
-        UrlRequest urlRequest ->
-            case urlRequest of
-                Browser.Internal url ->
-                    ( model, Nav.load (Url.toString url) )
-
-                Browser.External externalUrl ->
-                    ( model, Nav.load externalUrl )
-
-        UrlChanged _ ->
-            ( model, Cmd.none )
-
         FormSubmitted ->
             if model.formState /= Editing then
                 ( model, Cmd.none )
