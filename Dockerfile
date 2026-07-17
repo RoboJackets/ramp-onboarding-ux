@@ -45,7 +45,6 @@ COPY --chown=uwsgi:uwsgi /ramp_onboarding_ux.py /pyproject.toml /poetry.lock /ap
 RUN set -eux && \
     POETRY_VIRTUALENVS_CREATE=false poetry install --only main --no-root --no-interaction --no-ansi && \
     zopfli --gzip -v --i10 /app/static/app.js && \
-    touch /app/static/app.js.gz /app/static/app.js && \
-    sed -i 's/return self.request.get_json()/        return self.request.get_json(silent=True)/g' /usr/local/lib/python3.14/site-packages/sentry_sdk/integrations/flask.py
+    touch /app/static/app.js.gz /app/static/app.js
 
 USER uwsgi
