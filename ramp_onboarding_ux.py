@@ -64,7 +64,7 @@ from slack_sdk.models.blocks import (
 from slack_sdk.models.blocks.block_elements import RichTextElementParts
 from slack_sdk.signature import SignatureVerifier
 
-from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, Unauthorized
+from werkzeug.exceptions import BadRequest, Conflict, Forbidden, InternalServerError, Unauthorized
 
 USER_AGENT = (
     "RampOnboarding/"
@@ -267,7 +267,7 @@ def eligible_required(view: Callable[P, R]) -> Callable[P, R]:
     @wraps(view)
     def wrapped_view(*args: P.args, **kwargs: P.kwargs) -> R:
         if session["user_state"] != "eligible":
-            raise Unauthorized("Not eligible")
+            raise Forbidden("Not eligible")
 
         return view(*args, **kwargs)
 
@@ -2274,7 +2274,7 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
     Order a physical card for the logged-in user
     """
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
-        raise InternalServerError("No Ramp user ID in session")
+        raise Conflict("No Ramp user ID in session")
 
     cache.set("physical_card_ordered_" + session["sub"], True, timeout=0)
 
