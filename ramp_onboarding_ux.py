@@ -2214,10 +2214,7 @@ def get_ramp_account_status() -> Dict[str, str]:
         session["ramp_user_id"] = ramp_task_status.json()["data"]["user_id"]
         session.pop("create_ramp_account_task_id", None)
 
-        store_ramp_user_id_in_keycloak.delay(session["sub"], session["ramp_user_id"])
-        remove_eligible_role.delay(session["sub"])
-        import_user_to_org_chart.delay(session["ramp_user_id"])
-        notify_slack_account_created.delay(session["sub"], session["ramp_user_id"])
+        provision_ramp_user(session["sub"], session["ramp_user_id"])
     elif task_status == "ERROR":
         session.pop("create_ramp_account_task_id", None)
 
@@ -2389,10 +2386,7 @@ def handle_invitation_delivery(invitation_url: str) -> None:
     else:
         raise Exception("More than one Keycloak user returned for email search")
 
-    store_ramp_user_id_in_keycloak.delay(keycloak_user_id, ramp_user_id)
-    remove_eligible_role.delay(keycloak_user_id)
-    import_user_to_org_chart.delay(ramp_user_id)
-    notify_slack_account_created.delay(keycloak_user_id, ramp_user_id)
+    provision_ramp_user(keycloak_user_id, ramp_user_id)
 
 
 @app.post("/postmark")
