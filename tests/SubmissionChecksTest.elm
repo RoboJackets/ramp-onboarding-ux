@@ -198,7 +198,7 @@ suite =
                     proceedIfReady validating
                         |> Tuple.first
                         |> .formState
-                        |> Expect.equal (CreatingRampAccount Nothing)
+                        |> Expect.equal (CreatingRampAccount False)
             ]
         , describe "stale validation responses"
             [ test "ignores ManagerValidationResultReceived when not Validating" <|
@@ -321,7 +321,7 @@ suite =
                         |> Tuple.first
                         |> Expect.all
                             [ .addressIsValid >> Expect.equal (Just True)
-                            , .formState >> Expect.equal (CreatingRampAccount Nothing)
+                            , .formState >> Expect.equal (CreatingRampAccount False)
                             ]
             , test "ignores ManagerValidationResultReceived for a different Apiary id" <|
                 \_ ->
@@ -374,7 +374,7 @@ suite =
                         |> Expect.all
                             [ .managerRampId >> Expect.equal (Just "ramp-manager")
                             , .managerIsValid >> Expect.equal (Just True)
-                            , .formState >> Expect.equal (CreatingRampAccount Nothing)
+                            , .formState >> Expect.equal (CreatingRampAccount False)
                             ]
             , test "ignores PlaceChanged when not Editing" <|
                 \_ ->

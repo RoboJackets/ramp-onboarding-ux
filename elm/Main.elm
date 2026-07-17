@@ -351,7 +351,7 @@ type FormState
     = Editing
     | Validating SubmissionChecks
     | Error ProvisioningFailure
-    | CreatingRampAccount (Maybe String)
+    | CreatingRampAccount Bool
     | RampAccountCreated
     | PhysicalCardOrdered
 
@@ -485,7 +485,7 @@ type Msg
     | PlaceChanged Value
     | ManagerValidationResultReceived Int (Result Http.Error ManagerValidation)
     | GoogleAddressValidationResultReceived AddressValidationRequest (Result Http.Error GoogleAddressValidation)
-    | CreateRampAccountTaskIdReceived (Result Http.Error String)
+    | CreateRampAccountResponseReceived (Result Http.Error ())
     | CreateRampAccountTaskStatusReceived (Result Http.Error TaskStatus)
     | OrderPhysicalCardResponseReceived (Result Http.Error ())
     | SetTime Time.Posix
@@ -896,36 +896,17 @@ updateReady msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        CreateRampAccountTaskIdReceived result ->
+        CreateRampAccountResponseReceived result ->
             case result of
-                Ok createRampAccountTaskId ->
-                    ( { model | formState = CreatingRampAccount (Just createRampAccountTaskId) }
-                    , getRampAccountTaskStatus createRampAccountTaskId
+                Ok () ->
+                    ( { model | formState = CreatingRampAccount True }
+                    , getRampAccountTaskStatus
                     )
 
                 Err error ->
                     showProvisioningFailure model (CreateAccountRequestFailed (httpErrorToString error))
 
         CreateRampAccountTaskStatusReceived result ->
-            let
-                taskId : String
-                taskId =
-                    case model.formState of
-                        CreatingRampAccount maybeTaskId ->
-                            withDefault "" maybeTaskId
-
-                        _ ->
-                            ""
-
-                preserveCreatingRampAccount : FormState
-                preserveCreatingRampAccount =
-                    case model.formState of
-                        CreatingRampAccount maybeTaskId ->
-                            CreatingRampAccount maybeTaskId
-
-                        _ ->
-                            CreatingRampAccount Nothing
-            in
             case result of
                 Ok TaskSucceeded ->
                     ( { model | formState = RampAccountCreated }
@@ -964,13 +945,13 @@ updateReady msg model =
                     )
 
                 Ok TaskStarted ->
-                    ( { model | formState = preserveCreatingRampAccount }
-                    , getRampAccountTaskStatus taskId
+                    ( model
+                    , getRampAccountTaskStatus
                     )
 
                 Ok TaskInProgress ->
-                    ( { model | formState = preserveCreatingRampAccount }
-                    , getRampAccountTaskStatus taskId
+                    ( model
+                    , getRampAccountTaskStatus
                     )
 
                 Ok TaskFailed ->
@@ -1619,7 +1600,7 @@ renderLoadingIndicators model =
         ssoConfigured =
             accountCreated
                 || (case model.formState of
-                        CreatingRampAccount (Just _) ->
+                        CreatingRampAccount True ->
                             True
 
                         _ ->
@@ -2559,11 +2540,6 @@ httpUrl =
             )
 
 
-createTaskResponseDecoder : Decoder String
-createTaskResponseDecoder =
-    field "taskId" string
-
-
 getTaskResponseDecoder : Decoder TaskStatus
 getTaskResponseDecoder =
     field "taskStatus" string
@@ -2655,7 +2631,7 @@ proceedIfReady model =
             case ( checks.manager, checks.address ) of
                 ( Done, Done ) ->
                     if firstInvalidFieldId model == Nothing then
-                        ( { model | formState = CreatingRampAccount Nothing }
+                        ( { model | formState = CreatingRampAccount False }
                         , createRampAccountTask model
                         )
 
@@ -2775,20 +2751,20 @@ createRampAccountTask model =
                     , ( "orderPhysicalCard", Json.Encode.bool model.orderPhysicalCard )
                     ]
                 )
-        , expect = expectJson CreateRampAccountTaskIdReceived createTaskResponseDecoder
+        , expect = expectWhatever CreateRampAccountResponseReceived
         , timeout = Just httpRequestTimeoutMs
         , tracker = Nothing
         }
 
 
-getRampAccountTaskStatus : String -> Cmd Msg
-getRampAccountTaskStatus taskId =
+getRampAccountTaskStatus : Cmd Msg
+getRampAccountTaskStatus =
     Http.request
         { method = "GET"
         , headers = []
         , url =
             Url.Builder.absolute
-                [ "create-ramp-account", taskId ]
+                [ "create-ramp-account" ]
                 []
         , body = Http.emptyBody
         , expect = expectJson CreateRampAccountTaskStatusReceived getTaskResponseDecoder

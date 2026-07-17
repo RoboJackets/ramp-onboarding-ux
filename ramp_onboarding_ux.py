@@ -2096,7 +2096,7 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
 @app.post("/create-ramp-account")
 def create_ramp_account() -> tuple[dict[str, Any], int]:
     """
-    Creates a new Ramp account and returns the task status for the browser to poll
+    Creates a new Ramp account; the deferred-job ID is stored in session for status polling
     """
     if "user_state" not in session:
         raise Unauthorized("Not logged in")
@@ -2193,13 +2193,13 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     )
     ramp_invite_user_response.raise_for_status()
 
-    return {
-        "taskId": ramp_invite_user_response.json()["id"],
-    }, 202
+    session["create_ramp_account_task_id"] = ramp_invite_user_response.json()["id"]
+
+    return {}, 202
 
 
-@app.get("/create-ramp-account/<task_id>")
-def get_ramp_account_status(task_id: str) -> Dict[str, str]:
+@app.get("/create-ramp-account")
+def get_ramp_account_status() -> Dict[str, str]:
     """
     Get the task status for a previous request to create a Ramp account
     """
@@ -2215,22 +2215,32 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
         }
     )
 
+    if "create_ramp_account_task_id" not in session:
+        raise BadRequest("No pending create Ramp account task")
+
+    task_id = session["create_ramp_account_task_id"]
+
     ramp_task_status = ramp.get(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred/status/" + task_id,
         timeout=(5, 5),
     )
     ramp_task_status.raise_for_status()
 
-    if ramp_task_status.json()["status"] == "SUCCESS":
+    task_status = ramp_task_status.json()["status"]
+
+    if task_status == "SUCCESS":
         session["ramp_user_id"] = ramp_task_status.json()["data"]["user_id"]
+        session.pop("create_ramp_account_task_id", None)
 
         store_ramp_user_id_in_keycloak.delay(session["sub"], session["ramp_user_id"])
         remove_eligible_role.delay(session["sub"])
         import_user_to_org_chart.delay(session["ramp_user_id"])
         notify_slack_account_created.delay(session["sub"], session["ramp_user_id"])
+    elif task_status == "ERROR":
+        session.pop("create_ramp_account_task_id", None)
 
     return {
-        "taskStatus": ramp_task_status.json()["status"],
+        "taskStatus": task_status,
     }
 
 
