@@ -6,14 +6,16 @@ import hmac
 import logging
 import os
 from base64 import b64encode
+from collections.abc import Callable
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
+from functools import wraps
 from hashlib import file_digest, sha256
 from ipaddress import ip_address, ip_network
 from json import loads
 from re import fullmatch, search
-from typing import Any, Dict, Union
+from typing import Any, Dict, ParamSpec, TypeVar, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
@@ -206,6 +208,85 @@ apiary.headers["User-Agent"] = USER_AGENT  # type: ignore
 apiary.fetch_token()
 
 cache = Cache(app)
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def _set_sentry_user_from_session() -> None:
+    """
+    Attach the logged-in user from the Flask session to the current Sentry scope
+    """
+    set_user(
+        {
+            "id": session["user_id"],
+            "username": session["username"],
+            "email": session["email_address"],
+            "ip_address": request.remote_addr,
+        }
+    )
+
+
+def login_required(view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Require an established user session; raise Unauthorized if missing
+    """
+
+    @wraps(view)
+    def wrapped_view(*args: P.args, **kwargs: P.kwargs) -> R:
+        if "user_state" not in session:
+            raise Unauthorized("Not logged in")
+
+        _set_sentry_user_from_session()
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def login_required_oidc_redirect(view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Require an established user session; redirect to Keycloak OIDC if missing
+    """
+
+    @wraps(view)
+    def wrapped_view(*args: P.args, **kwargs: P.kwargs) -> R:
+        if "user_state" not in session:
+            return oauth.keycloak.authorize_redirect(url_for("login", _external=True))  # type: ignore  # noqa: E501
+
+        _set_sentry_user_from_session()
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def eligible_required(view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Require session user_state == eligible; raise Unauthorized otherwise
+    """
+
+    @wraps(view)
+    def wrapped_view(*args: P.args, **kwargs: P.kwargs) -> R:
+        if session["user_state"] != "eligible":
+            raise Unauthorized("Not eligible")
+
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
+def email_verified_required(view: Callable[P, R]) -> Callable[P, R]:
+    """
+    Require a verified email address in session; raise BadRequest otherwise
+    """
+
+    @wraps(view)
+    def wrapped_view(*args: P.args, **kwargs: P.kwargs) -> R:
+        if not session["email_verified"]:
+            raise BadRequest("Email address must be verified")
+
+        return view(*args, **kwargs)
+
+    return wrapped_view
 
 
 def only_cache_if_ramp_id_present(response: Dict[str, str]) -> bool:
@@ -1169,22 +1250,11 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
 
 
 @app.get("/")
+@login_required_oidc_redirect
 def index() -> Any:
     """
     Generates the main form or messaging if the user shouldn't fill it out
     """
-    if "user_state" not in session:
-        return oauth.keycloak.authorize_redirect(url_for("login", _external=True))
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     keycloak_user_response = None
 
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
@@ -1837,25 +1907,12 @@ def login() -> Any:
 
 
 @app.get("/verify-email")
+@login_required
+@eligible_required
 def verify_email() -> Any:
     """
     Redirects user to mailbox provider for email address verification
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
-    if session["user_state"] != "eligible":
-        raise Unauthorized("Not eligible")
-
     return generate_redirect_for_verify_email(request.args["emailAddress"].strip())
 
 
@@ -1888,22 +1945,12 @@ def generate_redirect_for_verify_email(email_address: str) -> Any:
 
 
 @app.get("/verify-email/google/complete")
+@login_required
+@eligible_required
 def verify_google_complete() -> Response:
     """
     Handles the return from Google and updates session appropriately
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     token = oauth.google.authorize_access_token()
 
     userinfo = token["userinfo"]
@@ -1915,22 +1962,12 @@ def verify_google_complete() -> Response:
 
 
 @app.post("/verify-email/google/complete")
+@login_required
+@eligible_required
 def verify_google_onetap() -> Response:
     """
     Handles a Google One Tap login and updates session appropriately
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     userinfo = id_token.verify_oauth2_token(  # type: ignore
         request.form["credential"], requests.Request(), app.config["GOOGLE_CLIENT_ID"]
     )
@@ -1945,22 +1982,12 @@ def verify_google_onetap() -> Response:
 
 
 @app.get("/verify-email/microsoft/complete")
+@login_required
+@eligible_required
 def verify_microsoft_complete() -> Any:
     """
     Handles the return from Microsoft and updates session appropriately
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     try:
         token = oauth.microsoft.authorize_access_token()
 
@@ -1986,23 +2013,13 @@ def verify_microsoft_complete() -> Any:
 
 
 @app.get("/get-ramp-user/<apiary_id>")
+@login_required
+@eligible_required
 @cache.cached(timeout=0, response_filter=only_cache_if_ramp_id_present)
 def get_ramp_user(apiary_id: str) -> Dict[str, str]:
     """
     Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     # Only simple-mode users call this endpoint, and simple mode is limited to students, whose
     # department is always the students default. If non-students ever call this, the hard-coded
     # department gate will need to match the department selected in the frontend instead.
@@ -2094,25 +2111,13 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
 
 
 @app.post("/create-ramp-account")
+@login_required
+@eligible_required
+@email_verified_required
 def create_ramp_account() -> tuple[dict[str, Any], int]:
     """
     Creates a new Ramp account; the deferred-job ID is stored in session for status polling
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
-    if not session["email_verified"]:
-        raise BadRequest("Email address must be verified")
-
     if request.json["role"] not in [
         "BUSINESS_USER",
         "BUSINESS_BOOKKEEPER",
@@ -2199,22 +2204,13 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
 
 
 @app.get("/create-ramp-account")
+@login_required
+@eligible_required
+@email_verified_required
 def get_ramp_account_status() -> Dict[str, str]:
     """
     Get the task status for a previous request to create a Ramp account
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     if "create_ramp_account_task_id" not in session:
         raise BadRequest("No pending create Ramp account task")
 
@@ -2245,22 +2241,13 @@ def get_ramp_account_status() -> Dict[str, str]:
 
 
 @app.post("/order-physical-card")
+@login_required
+@eligible_required
+@email_verified_required
 def order_physical_card() -> tuple[dict[str, Any], int]:
     """
     Order a physical card for the logged-in user
     """
-    if "user_state" not in session:
-        raise Unauthorized("Not logged in")
-
-    set_user(
-        {
-            "id": session["user_id"],
-            "username": session["username"],
-            "email": session["email_address"],
-            "ip_address": request.remote_addr,
-        }
-    )
-
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         raise InternalServerError("No Ramp user ID in session")
 
