@@ -2115,10 +2115,10 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
         request.json["role"] == "BUSINESS_ADMIN"
         and session["can_request_business_admin"] is not True
     ):
-        raise Unauthorized("Invalid role")
+        raise Forbidden("Disallowed role")
 
     if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:
-        raise Unauthorized("Invalid role")
+        raise Forbidden("Disallowed role")
 
     if "create_ramp_account_task_id" in session:
         raise Conflict("Create Ramp account already in progress")
