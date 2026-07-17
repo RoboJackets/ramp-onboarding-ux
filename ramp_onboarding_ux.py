@@ -1946,7 +1946,6 @@ def generate_redirect_for_verify_email(email_address: str) -> Any:
 
 @app.get("/verify-email/google/complete")
 @login_required
-@eligible_required
 def verify_google_complete() -> Response:
     """
     Handles the return from Google and updates session appropriately
@@ -1983,7 +1982,6 @@ def verify_google_onetap() -> Response:
 
 @app.get("/verify-email/microsoft/complete")
 @login_required
-@eligible_required
 def verify_microsoft_complete() -> Any:
     """
     Handles the return from Microsoft and updates session appropriately
