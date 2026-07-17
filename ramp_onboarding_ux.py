@@ -15,7 +15,7 @@ from hashlib import file_digest, sha256
 from ipaddress import ip_address, ip_network
 from json import loads
 from re import fullmatch, search
-from typing import Any, Dict, ParamSpec, TypeVar, Union
+from typing import Any, Dict, Optional, ParamSpec, TypeVar, Union
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from uuid import UUID, uuid4
 
@@ -712,42 +712,38 @@ def import_user_to_org_chart(ramp_user_id: str) -> None:
     org_chart_response.raise_for_status()
 
 
-@shared_task
-def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> None:
+def update_keycloak_user(
+    keycloak_user_id: str,
+    attributes: Dict[str, str],
+    *,
+    extra_fields: Optional[Dict[str, Any]] = None,
+    existing_user: Optional[Dict[str, Any]] = None,
+) -> None:
     """
-    Store the Ramp user ID in Keycloak
+    Update a Keycloak user via GET-merge-PUT (Admin API has no PATCH).
     """
-    ramp_user_response = ramp.get(  # type: ignore
-        url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
-        timeout=(5, 5),
-    )
-    ramp_user_response.raise_for_status()
-
-    get_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users/"
-        + keycloak_user_id,
-        timeout=(5, 5),
-    )
-    get_keycloak_user_response.raise_for_status()
-
-    new_user = get_keycloak_user_response.json()
-    if "id" in new_user:
-        del new_user["id"]
-
-    if "username" in new_user:
-        del new_user["username"]
+    if existing_user is None:
+        get_keycloak_user_response = keycloak.get(  # type: ignore
+            url=app.config["KEYCLOAK_SERVER"]
+            + "/admin/realms/"
+            + app.config["KEYCLOAK_REALM"]
+            + "/users/"
+            + keycloak_user_id,
+            timeout=(5, 5),
+        )
+        get_keycloak_user_response.raise_for_status()
+        new_user = get_keycloak_user_response.json()
+    else:
+        new_user = dict(existing_user)
 
     if "attributes" not in new_user:
-        new_user["attributes"] = {
-            "rampLoginEmailAddress": [ramp_user_response.json()["email"]],
-            "rampUserId": [ramp_user_id],
-        }
-    else:
-        new_user["attributes"]["rampLoginEmailAddress"] = [ramp_user_response.json()["email"]]
-        new_user["attributes"]["rampUserId"] = [ramp_user_id]
+        new_user["attributes"] = {}
+
+    for key, value in attributes.items():
+        new_user["attributes"][key] = [value]
+
+    if extra_fields is not None:
+        new_user.update(extra_fields)
 
     update_keycloak_user_response = keycloak.put(  # type: ignore
         url=app.config["KEYCLOAK_SERVER"]
@@ -759,6 +755,26 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
         timeout=(5, 5),
     )
     update_keycloak_user_response.raise_for_status()
+
+
+@shared_task
+def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> None:
+    """
+    Store the Ramp user ID in Keycloak
+    """
+    ramp_user_response = ramp.get(  # type: ignore
+        url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
+        timeout=(5, 5),
+    )
+    ramp_user_response.raise_for_status()
+
+    update_keycloak_user(
+        keycloak_user_id,
+        {
+            "rampLoginEmailAddress": ramp_user_response.json()["email"],
+            "rampUserId": ramp_user_id,
+        },
+    )
 
 
 @shared_task
@@ -1293,43 +1309,15 @@ def index() -> Any:
         # store the ramp user id and verified email in keycloak
         # only triggered if an invitation was found during login
         if session["email_verified"]:
-            if keycloak_user_response is None:
-                keycloak_user_response = keycloak.get(  # type: ignore
-                    url=app.config["KEYCLOAK_SERVER"]
-                    + "/admin/realms/"
-                    + app.config["KEYCLOAK_REALM"]
-                    + "/users/"
-                    + session["sub"],
-                    timeout=(5, 5),
-                )
-                keycloak_user_response.raise_for_status()
-
-            new_user = keycloak_user_response.json()
-            if "id" in new_user:
-                del new_user["id"]
-
-            if "username" in new_user:
-                del new_user["username"]
-
-            if "attributes" not in new_user:
-                new_user["attributes"] = {
-                    "rampLoginEmailAddress": [session["email_address"]],
-                    "rampUserId": [ramp_user_id],
-                }
-            else:
-                new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
-                new_user["attributes"]["rampUserId"] = [ramp_user_id]
-
-            keycloak_user_response = keycloak.put(  # type: ignore
-                url=app.config["KEYCLOAK_SERVER"]
-                + "/admin/realms/"
-                + app.config["KEYCLOAK_REALM"]
-                + "/users/"
-                + session["sub"],
-                json=new_user,
-                timeout=(5, 5),
+            existing = keycloak_user_response.json() if keycloak_user_response is not None else None
+            update_keycloak_user(
+                session["sub"],
+                {
+                    "rampLoginEmailAddress": session["email_address"],
+                    "rampUserId": ramp_user_id,
+                },
+                existing_user=existing,
             )
-            keycloak_user_response.raise_for_status()
 
         # check if the login email address in keycloak matches ramp
         keycloak_user_response = keycloak.get(  # type: ignore
@@ -2160,41 +2148,14 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
     if session.get("ramp_user_id") is not None:
         raise Conflict("Ramp account already created")
 
-    get_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users/"
-        + session["sub"],
-        timeout=(5, 5),
+    update_keycloak_user(
+        session["sub"],
+        {"rampLoginEmailAddress": session["email_address"]},
+        extra_fields={
+            "firstName": request.json["firstName"].strip(),
+            "lastName": request.json["lastName"].strip(),
+        },
     )
-    get_keycloak_user_response.raise_for_status()
-
-    new_user = get_keycloak_user_response.json()
-    if "id" in new_user:
-        del new_user["id"]
-
-    if "username" in new_user:
-        del new_user["username"]
-
-    if "attributes" not in new_user:
-        new_user["attributes"] = {"rampLoginEmailAddress": [session["email_address"]]}
-    else:
-        new_user["attributes"]["rampLoginEmailAddress"] = [session["email_address"]]
-
-    new_user["firstName"] = request.json["firstName"].strip()
-    new_user["lastName"] = request.json["lastName"].strip()
-
-    keycloak_user_response = keycloak.put(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users/"
-        + session["sub"],
-        json=new_user,
-        timeout=(5, 5),
-    )
-    keycloak_user_response.raise_for_status()
 
     request_body = {
         "department_id": request.json["departmentId"].strip(),
