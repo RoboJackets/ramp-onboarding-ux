@@ -1966,6 +1966,15 @@ def verify_google_onetap() -> Response:
     """
     Handles a Google One Tap login and updates session appropriately
     """
+    csrf_token_cookie = request.cookies.get("g_csrf_token")
+    csrf_token_body = request.form.get("g_csrf_token")
+    if (
+        not csrf_token_cookie
+        or not csrf_token_body
+        or not hmac.compare_digest(csrf_token_cookie, csrf_token_body)
+    ):
+        raise BadRequest("Invalid g_csrf_token")
+
     userinfo = id_token.verify_oauth2_token(  # type: ignore
         request.form["credential"], requests.Request(), app.config["GOOGLE_CLIENT_ID"]
     )
