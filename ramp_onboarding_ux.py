@@ -2001,14 +2001,14 @@ def verify_microsoft_complete() -> Any:
 @login_required
 @eligible_required
 @cache.cached(timeout=0, response_filter=only_cache_if_ramp_id_present)
-def get_ramp_user(apiary_id: str) -> Dict[str, str]:
+def get_ramp_user(apiary_id: int) -> Dict[str, str]:
     """
     Provides the Ramp user ID for a given Apiary user ID, if the user has a Ramp account
     """
     # Only simple-mode users call this endpoint, and simple mode is limited to students, whose
     # department is always the students default. If non-students ever call this, the hard-coded
     # department gate will need to match the department selected in the frontend instead.
-    return resolve_ramp_user(apiary_id, app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])  # type: ignore  # noqa: E501
+    return resolve_ramp_user(str(apiary_id), app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])  # type: ignore  # noqa: E501
 
 
 @cache.memoize(timeout=0, response_filter=only_cache_if_ramp_id_present)
