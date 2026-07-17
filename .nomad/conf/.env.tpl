@@ -8,3 +8,9 @@ FLASK_ORG_CHART_NOTIFY_URL="https://org-chart.robojackets.org/api/import-ramp-us
 FLASK_CELERY_BROKER_URL=redis+socket://:{{ env "NOMAD_ALLOC_ID" }}@/alloc/tmp/redis.sock?virtual_host=1
 FLASK_CELERY_RESULT_BACKEND=redis+socket://:{{ env "NOMAD_ALLOC_ID" }}@/alloc/tmp/redis.sock?virtual_host=2
 FLASK_APP=ramp_onboarding_ux
+FLASK_SESSION_COOKIE_NAME="__Host-ramp_session"
+FLASK_SESSION_COOKIE_DOMAIN=false
+FLASK_SESSION_COOKIE_HTTPONLY=true
+FLASK_SESSION_COOKIE_SECURE=true
+FLASK_SESSION_COOKIE_SAMESITE="Lax"
+FLASK_PREFERRED_URL_SCHEME="https"
