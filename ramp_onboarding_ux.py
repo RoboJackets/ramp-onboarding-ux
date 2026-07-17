@@ -145,6 +145,17 @@ app = Flask(__name__)
 
 app.config.from_prefixed_env()
 
+keycloak_server = urlunparse(
+    (
+        urlparse(app.config["KEYCLOAK_METADATA_URL"]).scheme,
+        urlparse(app.config["KEYCLOAK_METADATA_URL"]).netloc,
+        "",
+        "",
+        "",
+        "",
+    )
+)
+
 
 @app.after_request
 def add_document_policy_header(response: Response) -> Response:
@@ -193,7 +204,16 @@ ramp.fetch_token()
 keycloak = OAuth2Session(
     client_id=app.config["KEYCLOAK_ADMIN_CLIENT_ID"],
     client_secret=app.config["KEYCLOAK_ADMIN_CLIENT_SECRET"],
-    token_endpoint=app.config["KEYCLOAK_SERVER"] + "/realms/master/protocol/openid-connect/token",
+    token_endpoint=urlunparse(
+        (
+            urlparse(app.config["KEYCLOAK_METADATA_URL"]).scheme,
+            urlparse(app.config["KEYCLOAK_METADATA_URL"]).netloc,
+            "/realms/master/protocol/openid-connect/token",
+            "",
+            "",
+            "",
+        )
+    ),
     leeway=5,
 )
 keycloak.headers["User-Agent"] = USER_AGENT  # type: ignore
@@ -531,7 +551,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     """
     if "keycloak_user_id" in kwargs and kwargs["keycloak_user_id"] is not None:
         get_keycloak_user_response = keycloak.get(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
+            url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
@@ -560,10 +580,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             return slack_user_id
 
         search_keycloak_user_response = keycloak.get(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
-            + "/admin/realms/"
-            + app.config["KEYCLOAK_REALM"]
-            + "/users",
+            url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
             params={
                 "q": "rampUserId:" + kwargs["ramp_user_id"],
             },
@@ -576,10 +593,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
 
         if len(search_keycloak_user_response.json()) == 0:
             search_keycloak_user_response = keycloak.get(  # type: ignore
-                url=app.config["KEYCLOAK_SERVER"]
-                + "/admin/realms/"
-                + app.config["KEYCLOAK_REALM"]
-                + "/users",
+                url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
                 params={
                     "q": "rampLoginEmailAddress:" + ramp_user_response.json()["email"],
                 },
@@ -594,7 +608,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
 
             if len(search_keycloak_user_response.json()) == 0:
                 search_keycloak_user_response = keycloak.get(  # type: ignore
-                    url=app.config["KEYCLOAK_SERVER"]
+                    url=keycloak_server
                     + "/admin/realms/"
                     + app.config["KEYCLOAK_REALM"]
                     + "/users",
@@ -651,7 +665,7 @@ def remove_eligible_role(keycloak_user_id: str) -> None:
     Remove the eligible role from this user in Keycloak, after they are provisioned
     """
     remove_eligible_role_response = keycloak.delete(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
+        url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
         + "/users/"
@@ -694,7 +708,7 @@ def update_keycloak_user(
     """
     if existing_user is None:
         get_keycloak_user_response = keycloak.get(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
+            url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
@@ -716,7 +730,7 @@ def update_keycloak_user(
         new_user.update(extra_fields)
 
     update_keycloak_user_response = keycloak.put(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
+        url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
         + "/users/"
@@ -757,7 +771,7 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
         return
 
     get_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
+        url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
         + "/users/"
@@ -771,8 +785,8 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
         action_id="view_in_keycloak",
         url=urlunparse(
             (
-                urlparse(app.config["KEYCLOAK_SERVER"]).scheme,
-                urlparse(app.config["KEYCLOAK_SERVER"]).hostname,
+                urlparse(app.config["KEYCLOAK_METADATA_URL"]).scheme,
+                urlparse(app.config["KEYCLOAK_METADATA_URL"]).hostname,
                 "/admin/master/console/",
                 "",
                 "",
@@ -945,7 +959,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     possessive_pronoun = "their"
 
     get_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
+        url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
         + "/users/"
@@ -1250,7 +1264,7 @@ def index() -> Any:
 
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
         keycloak_user_response = keycloak.get(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
+            url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
@@ -1291,7 +1305,7 @@ def index() -> Any:
 
         # check if the login email address in keycloak matches ramp
         keycloak_user_response = keycloak.get(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
+            url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
@@ -2026,10 +2040,7 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     apiary_user_response.raise_for_status()
 
     keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "username": apiary_user_response.json()["user"]["uid"],
             "exact": True,
@@ -2265,7 +2276,7 @@ def handle_slack_event() -> Dict[str, str]:
 
     if payload["actions"][0]["action_id"] == "grant_eligibility_in_keycloak":
         add_eligible_role_response = keycloak.post(  # type: ignore
-            url=app.config["KEYCLOAK_SERVER"]
+            url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
             + "/users/"
@@ -2344,10 +2355,7 @@ def handle_invitation_delivery(invitation_url: str) -> None:
     ramp_user_id = ramp_user["id"]
 
     search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "googleWorkspaceAccount:" + ramp_user["email"],
         },
@@ -2413,10 +2421,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
     Find the Keycloak user ID for a Ramp user, searching by rampUserId then email attributes
     """
     search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampUserId:" + ramp_user_id,
         },
@@ -2431,10 +2436,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
         raise Exception("More than one Keycloak user returned for rampUserId search")
 
     search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampLoginEmailAddress:" + ramp_user_email,
         },
@@ -2449,10 +2451,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
         raise Exception("More than one Keycloak user returned for rampLoginEmailAddress search")
 
     search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "googleWorkspaceAccount:" + ramp_user_email,
         },
@@ -2599,10 +2598,7 @@ def send_slack_messages(ramp_user_id: str) -> None:
     Manually send Slack welcome messages for a given user
     """
     search_keycloak_user_response = keycloak.get(  # type: ignore
-        url=app.config["KEYCLOAK_SERVER"]
-        + "/admin/realms/"
-        + app.config["KEYCLOAK_REALM"]
-        + "/users",
+        url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampUserId:" + ramp_user_id,
         },
