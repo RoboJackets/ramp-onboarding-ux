@@ -902,6 +902,10 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     Send Slack notifications to the central notifications channel, manager, and new member, when
     someone joins Ramp
     """
+    if cache.get("slack_notifications_sent_" + ramp_user_id) is not None:
+        logging.warning("multiple tasks triggered, returning early")
+        return
+
     new_ramp_user_response = ramp.get(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         timeout=(5, 5),
@@ -952,62 +956,6 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     else:
         manager_mention = f"<@{manager_slack_user_id}>"
 
-    # atomically increment a cache key to avoid sending messages more than once
-    cache_result = cache.cache.inc("slack_notifications_sent_" + ramp_user_id)
-    if cache_result is not None and cache_result > 1:
-        logging.warning("multiple tasks triggered, returning early")
-        return
-
-    slack.chat_postMessage(
-        channel=app.config["SLACK_NOTIFY_CHANNEL"],
-        thread_ts=cache.get("slack_ineligible_message_" + keycloak_user_id),
-        reply_broadcast=True,
-        text=new_user_name + " joined Ramp!",
-        blocks=[
-            SectionBlock(
-                text=new_user_mention + " joined Ramp!",
-                fields=[
-                    MarkdownTextObject(text="*Role*"),
-                    MarkdownTextObject(text="*Department*"),
-                    PlainTextObject(text=ROLE_LABELS[new_ramp_user_response.json()["role"]]),
-                    PlainTextObject(
-                        text=get_ramp_object_label(
-                            get_ramp_departments(),
-                            new_ramp_user_response.json()["department_id"],
-                        )
-                    ),
-                    MarkdownTextObject(text="*Location*"),
-                    MarkdownTextObject(text="*Manager*"),
-                    PlainTextObject(
-                        text=get_ramp_object_label(
-                            get_ramp_locations(),
-                            new_ramp_user_response.json()["location_id"],
-                        )
-                    ),
-                    MarkdownTextObject(text=manager_mention),
-                ],
-            ),
-            ActionsBlock(
-                elements=[
-                    ButtonElement(
-                        text="View in Ramp",
-                        action_id="view_in_ramp",
-                        url=urlunparse(
-                            (
-                                "https",
-                                app.config["RAMP_UI_HOSTNAME"],
-                                "/people/all",
-                                "",
-                                "",
-                                "/d/user/" + new_ramp_user_response.json()["id"],
-                            )
-                        ),
-                    )
-                ]
-            ),
-        ],
-    )
-
     possessive_pronoun = "their"
 
     get_keycloak_user_response = keycloak.get(  # type: ignore
@@ -1029,27 +977,28 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         },
         timeout=(5, 5),
     )
-    apiary_user_response.raise_for_status()
 
-    if (
-        "gender" in apiary_user_response.json()["user"]
-        and apiary_user_response.json()["user"]["gender"] is not None
-    ):
-        if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
-            possessive_pronoun = "his"
-        elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
-            possessive_pronoun = "her"
+    if apiary_user_response.status_code == 200:
+        if (
+            "gender" in apiary_user_response.json()["user"]
+            and apiary_user_response.json()["user"]["gender"] is not None
+        ):
+            if str.lower(apiary_user_response.json()["user"]["gender"]) == "male":
+                possessive_pronoun = "his"
+            elif str.lower(apiary_user_response.json()["user"]["gender"]) == "female":
+                possessive_pronoun = "her"
+    elif apiary_user_response.status_code != 404:
+        apiary_user_response.raise_for_status()
 
+    manager_link_email_hint = []
     if manager_slack_user_id is not None:
         manager_slack_profile = slack.users_profile_get(user=manager_slack_user_id)
-
-        link_email_hint = []
 
         if (
             manager_slack_profile.data["profile"]["email"]  # type: ignore
             != ramp_manager_user_response.json()["email"]  # type: ignore
         ):
-            link_email_hint = [
+            manager_link_email_hint = [
                 ContextBlock(
                     elements=[
                         MarkdownTextObject(
@@ -1074,65 +1023,16 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                 )
             ]
 
-        slack.chat_postMessage(
-            channel=manager_slack_user_id,
-            text=new_user_name
-            + " joined Ramp! As "
-            + possessive_pronoun
-            + " manager, you'll be able to view "
-            + possessive_pronoun
-            + " activity, and request funds on "
-            + possessive_pronoun
-            + " behalf.",
-            blocks=[
-                SectionBlock(
-                    text=new_user_mention
-                    + " joined Ramp! As "
-                    + possessive_pronoun
-                    + " manager, you'll be able to view "
-                    + possessive_pronoun
-                    + " activity, and request funds on "
-                    + possessive_pronoun
-                    + " behalf."
-                ),
-                ActionsBlock(
-                    elements=[
-                        ButtonElement(
-                            text="View in Ramp",
-                            action_id="view_in_ramp",
-                            url=urlunparse(
-                                (
-                                    "https",
-                                    app.config["RAMP_UI_HOSTNAME"],
-                                    "/people/all",
-                                    "",
-                                    "",
-                                    "/d/user/" + new_ramp_user_response.json()["id"],
-                                )
-                            ),
-                        )
-                    ]
-                ),
-                SectionBlock(
-                    text="If you believe this is an error, please post in <#"
-                    + app.config["SLACK_SUPPORT_CHANNEL"]
-                    + ">."
-                ),
-                *link_email_hint,
-            ],
-        )
-
+    new_user_link_email_tip = []
+    new_user_activate_physical_card_tip = []
     if new_user_slack_user_id is not None:
         new_user_slack_profile = slack.users_profile_get(user=new_user_slack_user_id)
-
-        link_email_tip = []
-        activate_physical_card_tip = []
 
         if (
             new_user_slack_profile.data["profile"]["email"]  # type: ignore
             != new_ramp_user_response.json()["email"]
         ):
-            link_email_tip = [
+            new_user_link_email_tip = [
                 RichTextSectionElement(
                     elements=[
                         RichTextElementParts.Text(text="Add your Slack email ("),
@@ -1167,7 +1067,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
             ]
 
         if cache.get("physical_card_ordered_" + keycloak_user_id):
-            activate_physical_card_tip = [
+            new_user_activate_physical_card_tip = [
                 RichTextSectionElement(
                     elements=[
                         RichTextElementParts.Link(
@@ -1179,73 +1079,178 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
                 )
             ]
 
+    notify_channel_blocks = [
+        SectionBlock(
+            text=new_user_mention + " joined Ramp!",
+            fields=[
+                MarkdownTextObject(text="*Role*"),
+                MarkdownTextObject(text="*Department*"),
+                PlainTextObject(text=ROLE_LABELS[new_ramp_user_response.json()["role"]]),
+                PlainTextObject(
+                    text=get_ramp_object_label(
+                        get_ramp_departments(),
+                        new_ramp_user_response.json()["department_id"],
+                    )
+                ),
+                MarkdownTextObject(text="*Location*"),
+                MarkdownTextObject(text="*Manager*"),
+                PlainTextObject(
+                    text=get_ramp_object_label(
+                        get_ramp_locations(),
+                        new_ramp_user_response.json()["location_id"],
+                    )
+                ),
+                MarkdownTextObject(text=manager_mention),
+            ],
+        ),
+        ActionsBlock(
+            elements=[
+                ButtonElement(
+                    text="View in Ramp",
+                    action_id="view_in_ramp",
+                    url=urlunparse(
+                        (
+                            "https",
+                            app.config["RAMP_UI_HOSTNAME"],
+                            "/people/all",
+                            "",
+                            "",
+                            "/d/user/" + new_ramp_user_response.json()["id"],
+                        )
+                    ),
+                )
+            ]
+        ),
+    ]
+
+    manager_dm_text = (
+        new_user_name
+        + " joined Ramp! As "
+        + possessive_pronoun
+        + " manager, you'll be able to view "
+        + possessive_pronoun
+        + " activity, and request funds on "
+        + possessive_pronoun
+        + " behalf."
+    )
+    manager_dm_blocks = [
+        SectionBlock(
+            text=new_user_mention
+            + " joined Ramp! As "
+            + possessive_pronoun
+            + " manager, you'll be able to view "
+            + possessive_pronoun
+            + " activity, and request funds on "
+            + possessive_pronoun
+            + " behalf."
+        ),
+        ActionsBlock(
+            elements=[
+                ButtonElement(
+                    text="View in Ramp",
+                    action_id="view_in_ramp",
+                    url=urlunparse(
+                        (
+                            "https",
+                            app.config["RAMP_UI_HOSTNAME"],
+                            "/people/all",
+                            "",
+                            "",
+                            "/d/user/" + new_ramp_user_response.json()["id"],
+                        )
+                    ),
+                )
+            ]
+        ),
+        SectionBlock(
+            text="If you believe this is an error, please post in <#"
+            + app.config["SLACK_SUPPORT_CHANNEL"]
+            + ">."
+        ),
+        *manager_link_email_hint,
+    ]
+
+    new_user_dm_blocks = [
+        SectionBlock(text="Welcome to Ramp! Here are some tips to help you get started."),
+        RichTextBlock(
+            elements=[
+                RichTextListElement(
+                    style="ordered",
+                    elements=[
+                        RichTextSectionElement(
+                            elements=[
+                                RichTextElementParts.Text(
+                                    text="Finish setting up your account at "
+                                ),
+                                RichTextElementParts.Link(
+                                    url=urlunparse(
+                                        (
+                                            "https",
+                                            app.config["RAMP_UI_HOSTNAME"],
+                                            "/sign-in",
+                                            "",
+                                            urlencode(
+                                                {"email": new_ramp_user_response.json()["email"]}
+                                            ),
+                                            "",
+                                        )
+                                    ),
+                                    text=app.config["RAMP_UI_HOSTNAME"],
+                                ),
+                            ]
+                        ),
+                        *new_user_link_email_tip,
+                        RichTextSectionElement(
+                            elements=[
+                                RichTextElementParts.Text(text="Download the Ramp app for "),
+                                RichTextElementParts.Link(
+                                    url="https://apps.apple.com/us/app/ramp/id1628197245",
+                                    text="iOS",
+                                ),
+                                RichTextElementParts.Text(text=" or "),
+                                RichTextElementParts.Link(
+                                    url="https://play.google.com/store/apps/details?id=com.ramp.android.app",  # noqa: E501
+                                    text="Android",
+                                ),
+                            ]
+                        ),
+                        *new_user_activate_physical_card_tip,
+                    ],
+                )
+            ]
+        ),
+        SectionBlock(
+            text="You can also review the onboarding guide in the <https://support.ramp.com/getting-started-as-a-user|Ramp help center>, <https://ramp.com/training/employee-manager|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa: E501
+        ),
+        SectionBlock(
+            text="If you have questions, or need help with anything, please post in <#"
+            + app.config["SLACK_SUPPORT_CHANNEL"]
+            + ">."
+        ),
+    ]
+
+    slack.chat_postMessage(
+        channel=app.config["SLACK_NOTIFY_CHANNEL"],
+        thread_ts=cache.get("slack_ineligible_message_" + keycloak_user_id),
+        reply_broadcast=True,
+        text=new_user_name + " joined Ramp!",
+        blocks=notify_channel_blocks,
+    )
+
+    cache.set("slack_notifications_sent_" + ramp_user_id, True, timeout=0)
+
+    if manager_slack_user_id is not None:
+        slack.chat_postMessage(
+            channel=manager_slack_user_id,
+            text=manager_dm_text,
+            blocks=manager_dm_blocks,
+        )
+
+    if new_user_slack_user_id is not None:
         slack.chat_postMessage(
             channel=new_user_slack_user_id,
             text="Welcome to Ramp! Here are some tips to help you get started.",
-            blocks=[
-                SectionBlock(text="Welcome to Ramp! Here are some tips to help you get started."),
-                RichTextBlock(
-                    elements=[
-                        RichTextListElement(
-                            style="ordered",
-                            elements=[
-                                RichTextSectionElement(
-                                    elements=[
-                                        RichTextElementParts.Text(
-                                            text="Finish setting up your account at "
-                                        ),
-                                        RichTextElementParts.Link(
-                                            url=urlunparse(
-                                                (
-                                                    "https",
-                                                    app.config["RAMP_UI_HOSTNAME"],
-                                                    "/sign-in",
-                                                    "",
-                                                    urlencode(
-                                                        {
-                                                            "email": new_ramp_user_response.json()[
-                                                                "email"
-                                                            ]
-                                                        }
-                                                    ),
-                                                    "",
-                                                )
-                                            ),
-                                            text=app.config["RAMP_UI_HOSTNAME"],
-                                        ),
-                                    ]
-                                ),
-                                *link_email_tip,
-                                RichTextSectionElement(
-                                    elements=[
-                                        RichTextElementParts.Text(
-                                            text="Download the Ramp app for "
-                                        ),
-                                        RichTextElementParts.Link(
-                                            url="https://apps.apple.com/us/app/ramp/id1628197245",
-                                            text="iOS",
-                                        ),
-                                        RichTextElementParts.Text(text=" or "),
-                                        RichTextElementParts.Link(
-                                            url="https://play.google.com/store/apps/details?id=com.ramp.android.app",  # noqa: E501
-                                            text="Android",
-                                        ),
-                                    ]
-                                ),
-                                *activate_physical_card_tip,
-                            ],
-                        )
-                    ]
-                ),
-                SectionBlock(
-                    text="You can also review the onboarding guide in the <https://support.ramp.com/getting-started-as-a-user|Ramp help center>, <https://ramp.com/training/employee-manager|join a live training session>, or <https://www.youtube.com/watch?v=l2Xr08U87vM|watch a video>."  # noqa: E501
-                ),
-                SectionBlock(
-                    text="If you have questions, or need help with anything, please post in <#"
-                    + app.config["SLACK_SUPPORT_CHANNEL"]
-                    + ">."
-                ),
-            ],
+            blocks=new_user_dm_blocks,
         )
 
 
