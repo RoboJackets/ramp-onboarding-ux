@@ -1974,8 +1974,11 @@ def verify_google_onetap() -> Response:
     if userinfo["hd"] != "robojackets.org":
         raise Unauthorized("Invalid hd value")
 
+    if not userinfo["email_verified"]:
+        raise Unauthorized("Email address is not verified")
+
     session["email_address"] = userinfo["email"]
-    session["email_verified"] = userinfo["email_verified"]
+    session["email_verified"] = True
 
     return redirect(url_for("index"))  # type: ignore
 
