@@ -6,7 +6,7 @@ import hmac
 import logging
 import os
 from base64 import b64encode
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from csv import DictReader
 from datetime import datetime, timezone
 from email.headerregistry import Address
@@ -463,6 +463,67 @@ def get_slack_user_id_by_email(email: str) -> Union[str, None]:
     return None
 
 
+def _first_slack_user_id_for_emails(emails: Iterable[str]) -> Union[str, None]:
+    for email in emails:
+        slack_user_id = get_slack_user_id_by_email(email)
+        if slack_user_id is not None:
+            return slack_user_id  # type: ignore
+    return None
+
+
+def _iter_keycloak_slack_candidate_emails(keycloak_user: Dict[str, Any]) -> Iterable[str]:
+    attributes = keycloak_user.get("attributes")
+    if attributes is not None:
+        for attribute_name in ("rampLoginEmailAddress", "googleWorkspaceAccount"):
+            values = attributes.get(attribute_name)
+            if values is not None and len(values) > 0:
+                yield values[0]
+
+    if keycloak_user.get("email") is not None:
+        yield keycloak_user["email"]
+
+    username = keycloak_user.get("username")
+    if username is None:
+        return
+
+    yield username + "@gatech.edu"
+
+    apiary_user_response = apiary.get(  # type: ignore
+        url=app.config["APIARY_URL"] + "/api/v1/users/" + username,
+        headers={
+            "Accept": "application/json",
+        },
+        timeout=(5, 5),
+    )
+
+    if apiary_user_response.status_code == 200:
+        apiary_user = apiary_user_response.json()["user"]
+
+        for field_name in ("gt_email", "gmail_address", "clickup_email"):
+            email = apiary_user.get(field_name)
+            if email is not None:
+                yield email
+
+    with sentry_sdk.start_span(op="ldap.connect"):
+        ldap = Connection(
+            Server("whitepages.gatech.edu", connect_timeout=1),
+            auto_bind=True,
+            raise_exceptions=True,
+            receive_timeout=1,
+        )
+    with sentry_sdk.start_span(op="ldap.search"):
+        result = ldap.search(
+            search_base="dc=whitepages,dc=gatech,dc=edu",
+            search_filter="(uid=" + username + ")",
+            attributes=["mail"],
+        )
+
+    if result is True:
+        for entry in ldap.entries:
+            if "mail" in entry and entry["mail"] is not None and entry["mail"].value is not None:
+                yield entry["mail"].value
+
+
 @cache.memoize(timeout=0, cache_none=True)
 def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     """
@@ -481,101 +542,11 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
 
         keycloak_user = get_keycloak_user_response.json()
 
-        if (
-            "attributes" in keycloak_user
-            and keycloak_user["attributes"] is not None
-            and "rampLoginEmailAddress" in keycloak_user["attributes"]
-            and keycloak_user["attributes"]["rampLoginEmailAddress"] is not None
-            and len(keycloak_user["attributes"]["rampLoginEmailAddress"]) > 0
-        ):
-            slack_user_id = get_slack_user_id_by_email(
-                keycloak_user["attributes"]["rampLoginEmailAddress"][0]
-            )
-
-            if slack_user_id is not None:
-                return slack_user_id  # type: ignore
-
-        if (
-            "attributes" in keycloak_user
-            and keycloak_user["attributes"] is not None
-            and "googleWorkspaceAccount" in keycloak_user["attributes"]
-            and keycloak_user["attributes"]["googleWorkspaceAccount"] is not None
-            and len(keycloak_user["attributes"]["googleWorkspaceAccount"]) > 0
-        ):
-            slack_user_id = get_slack_user_id_by_email(
-                keycloak_user["attributes"]["googleWorkspaceAccount"][0]
-            )
-
-            if slack_user_id is not None:
-                return slack_user_id  # type: ignore
-
-        if "email" in keycloak_user and keycloak_user["email"] is not None:
-            slack_user_id = get_slack_user_id_by_email(keycloak_user["email"])
-
-            if slack_user_id is not None:
-                return slack_user_id  # type: ignore
-
-        if "username" in keycloak_user and keycloak_user["username"] is not None:
-            slack_user_id = get_slack_user_id_by_email(keycloak_user["username"] + "@gatech.edu")
-
-            if slack_user_id is not None:
-                return slack_user_id  # type: ignore
-
-        if "username" in keycloak_user and keycloak_user["username"] is not None:
-            apiary_user_response = apiary.get(  # type: ignore
-                url=app.config["APIARY_URL"] + "/api/v1/users/" + keycloak_user["username"],
-                headers={
-                    "Accept": "application/json",
-                },
-                timeout=(5, 5),
-            )
-
-            if apiary_user_response.status_code == 200:
-                apiary_user = apiary_user_response.json()["user"]
-
-                if "gt_email" in apiary_user and apiary_user["gt_email"] is not None:
-                    slack_user_id = get_slack_user_id_by_email(apiary_user["gt_email"])
-
-                    if slack_user_id is not None:
-                        return slack_user_id  # type: ignore
-
-                if "gmail_address" in apiary_user and apiary_user["gmail_address"] is not None:
-                    slack_user_id = get_slack_user_id_by_email(apiary_user["gmail_address"])
-
-                    if slack_user_id is not None:
-                        return slack_user_id  # type: ignore
-
-                if "clickup_email" in apiary_user and apiary_user["clickup_email"] is not None:
-                    slack_user_id = get_slack_user_id_by_email(apiary_user["clickup_email"])
-
-                    if slack_user_id is not None:
-                        return slack_user_id  # type: ignore
-
-        with sentry_sdk.start_span(op="ldap.connect"):
-            ldap = Connection(
-                Server("whitepages.gatech.edu", connect_timeout=1),
-                auto_bind=True,
-                raise_exceptions=True,
-                receive_timeout=1,
-            )
-        with sentry_sdk.start_span(op="ldap.search"):
-            result = ldap.search(
-                search_base="dc=whitepages,dc=gatech,dc=edu",
-                search_filter="(uid=" + keycloak_user["username"] + ")",
-                attributes=["mail"],
-            )
-
-        if result is True:
-            for entry in ldap.entries:
-                if (
-                    "mail" in entry
-                    and entry["mail"] is not None
-                    and entry["mail"].value is not None
-                ):
-                    slack_user_id = get_slack_user_id_by_email(entry["mail"].value)
-
-                    if slack_user_id is not None:
-                        return slack_user_id  # type: ignore
+        slack_user_id = _first_slack_user_id_for_emails(
+            _iter_keycloak_slack_candidate_emails(keycloak_user)
+        )
+        if slack_user_id is not None:
+            return slack_user_id
 
     if "ramp_user_id" in kwargs and kwargs["ramp_user_id"] is not None:
         ramp_user_response = ramp.get(  # type: ignore
@@ -584,10 +555,9 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         )
         ramp_user_response.raise_for_status()
 
-        slack_user_id = get_slack_user_id_by_email(ramp_user_response.json()["email"])
-
+        slack_user_id = _first_slack_user_id_for_emails([ramp_user_response.json()["email"]])
         if slack_user_id is not None:
-            return slack_user_id  # type: ignore
+            return slack_user_id
 
         search_keycloak_user_response = keycloak.get(  # type: ignore
             url=app.config["KEYCLOAK_SERVER"]
