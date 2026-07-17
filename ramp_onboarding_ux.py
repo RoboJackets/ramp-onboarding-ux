@@ -64,7 +64,7 @@ from slack_sdk.models.blocks import (
 from slack_sdk.models.blocks.block_elements import RichTextElementParts
 from slack_sdk.signature import SignatureVerifier
 
-from werkzeug.exceptions import BadRequest, InternalServerError, Unauthorized
+from werkzeug.exceptions import BadRequest, Conflict, InternalServerError, Unauthorized
 
 USER_AGENT = (
     "RampOnboarding/"
@@ -2132,6 +2132,12 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
 
     if request.json["role"] == "IT_ADMIN" and session["can_request_it_admin"] is not True:
         raise Unauthorized("Invalid role")
+
+    if "create_ramp_account_task_id" in session:
+        raise Conflict("Create Ramp account already in progress")
+
+    if session.get("ramp_user_id") is not None:
+        raise Conflict("Ramp account already created")
 
     get_keycloak_user_response = keycloak.get(  # type: ignore
         url=app.config["KEYCLOAK_SERVER"]
