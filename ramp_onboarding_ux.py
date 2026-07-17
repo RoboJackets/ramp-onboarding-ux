@@ -2203,6 +2203,18 @@ def get_ramp_account_status(task_id: str) -> Dict[str, str]:
     """
     Get the task status for a previous request to create a Ramp account
     """
+    if "user_state" not in session:
+        raise Unauthorized("Not logged in")
+
+    set_user(
+        {
+            "id": session["user_id"],
+            "username": session["username"],
+            "email": session["email_address"],
+            "ip_address": request.remote_addr,
+        }
+    )
+
     ramp_task_status = ramp.get(  # type: ignore
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred/status/" + task_id,
         timeout=(5, 5),
