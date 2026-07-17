@@ -1576,6 +1576,7 @@ def login() -> Any:
     Handles the return from Keycloak and collects default values for the form
     """
     token = oauth.keycloak.authorize_access_token()
+    session.clear()
 
     userinfo = token["userinfo"]
 
