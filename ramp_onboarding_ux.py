@@ -1594,13 +1594,12 @@ def login() -> Any:
     session["can_request_business_admin"] = False
     session["can_request_it_admin"] = False
     session["is_finance_team_member"] = False
+    session["email_verified"] = False
 
     if "googleWorkspaceAccount" in userinfo and userinfo["googleWorkspaceAccount"] is not None:
         session["email_address"] = userinfo["googleWorkspaceAccount"]
-        session["email_verified"] = False
     else:
         session["email_address"] = userinfo["email"] if "email" in userinfo else None
-        session["email_verified"] = False
 
     set_user(
         {
