@@ -1954,6 +1954,12 @@ def verify_google_complete() -> Response:
 
     userinfo = token["userinfo"]
 
+    if userinfo.get("hd") != "robojackets.org":
+        raise Unauthorized("Invalid hd value")
+
+    if not userinfo.get("email_verified"):
+        raise Unauthorized("Email address is not verified")
+
     session["email_address"] = userinfo["email"]
     session["email_verified"] = True
 
@@ -1971,10 +1977,10 @@ def verify_google_onetap() -> Response:
         request.form["credential"], requests.Request(), app.config["GOOGLE_CLIENT_ID"]
     )
 
-    if userinfo["hd"] != "robojackets.org":
+    if userinfo.get("hd") != "robojackets.org":
         raise Unauthorized("Invalid hd value")
 
-    if not userinfo["email_verified"]:
+    if not userinfo.get("email_verified"):
         raise Unauthorized("Email address is not verified")
 
     session["email_address"] = userinfo["email"]
@@ -1993,6 +1999,12 @@ def verify_microsoft_complete() -> Any:
         token = oauth.microsoft.authorize_access_token()
 
         userinfo = token["userinfo"]
+
+        if Address(addr_spec=userinfo["email"]).domain.split(".")[-2:] != [
+            "gatech",
+            "edu",
+        ]:
+            raise Unauthorized("Invalid email domain")
 
         session["email_address"] = userinfo["email"]
         session["email_verified"] = True
