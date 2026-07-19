@@ -1512,7 +1512,7 @@ def index() -> Any:
             "googleOneTapLoginUri": url_for("verify_google_onetap", _external=True),
             "showAdvancedOptions": (
                 False
-                if cache.get("force_hide_advanced_options_" + session["sub"])
+                if cache.get("force_basic_mode_" + session["sub"])
                 else (not session["is_student"] or default_role_id != "BUSINESS_USER")
             ),
             "departmentOptions": get_ramp_departments(),
@@ -2589,14 +2589,14 @@ def clear_cache() -> None:
     print("Cache cleared.")
 
 
-@app.cli.command("force-hide-advanced-options")
+@app.cli.command("force-basic-mode")
 @click.argument("keycloak_user_id")
-def force_hide_advanced_options(keycloak_user_id: str) -> None:
+def force_basic_mode(keycloak_user_id: str) -> None:
     """
-    Force showAdvancedOptions=false for a Keycloak user (smoke testing).
+    Force basic mode for a Keycloak user (smoke testing).
     """
-    cache.set("force_hide_advanced_options_" + keycloak_user_id, True, timeout=0)
-    print("Forced hide advanced options for " + keycloak_user_id + ".")
+    cache.set("force_basic_mode_" + keycloak_user_id, True, timeout=0)
+    print("Forced basic mode for " + keycloak_user_id + ".")
 
 
 @app.cli.command("send-slack-messages")
