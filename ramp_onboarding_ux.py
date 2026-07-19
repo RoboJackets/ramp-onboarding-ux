@@ -2216,6 +2216,27 @@ def get_ramp_account_status() -> Dict[str, str]:
     elif task_status == "ERROR":
         session.pop("create_ramp_account_task_id", None)
 
+        task_response = ramp_task_status.json()
+        task_data = task_response.get("data")
+        if (
+            isinstance(task_data, dict)
+            and task_data.get("error") == "User with this email already exists."
+        ):
+            ramp_user = _first_ramp_user_for_emails([session["email_address"]])
+            if ramp_user is None or ramp_user.get("id") is None:
+                raise InternalServerError(
+                    "Ramp reported an existing user for this email, but none was found"
+                )
+
+            session["ramp_user_id"] = ramp_user["id"]
+            provision_ramp_user(session["sub"], session["ramp_user_id"])
+            task_status = "SUCCESS"
+        else:
+            logging.error(
+                "Create Ramp account task failed: %s",
+                task_response,
+            )
+
     return {
         "taskStatus": task_status,
     }
@@ -2253,6 +2274,13 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
         },
         timeout=(5, 5),
     )
+
+    if ramp_order_physical_card_response.status_code == 400:
+        error_details = ramp_order_physical_card_response.json().get("error_v2")
+        if "error_code" in error_details and error_details["error_code"] == "CARD_7014":
+            # user already has a card
+            return {"cardId": None}, 200
+
     ramp_order_physical_card_response.raise_for_status()
 
     return {
