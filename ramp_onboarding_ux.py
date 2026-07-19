@@ -1908,7 +1908,7 @@ def generate_redirect_for_verify_email(email_address: str) -> Any:
     email_address_domain = Address(addr_spec=email_address).domain.split(".")[-2:]
 
     if email_address_domain == ["robojackets", "org"]:
-        if app.debug and "+" in Address(addr_spec=email_address).username:
+        if get_debug_flag() and "+" in Address(addr_spec=email_address).username:
             session["email_address"] = email_address
             session["email_verified"] = True
             return redirect(url_for("index"))
