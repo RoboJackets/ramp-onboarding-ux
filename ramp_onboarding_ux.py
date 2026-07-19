@@ -1866,7 +1866,7 @@ def login() -> Any:
         )
 
         if (
-            ramp_user is not None
+            ramp_user is not None  # pylint: disable=too-many-boolean-expressions
             and "id" in ramp_user
             and ramp_user["id"] is not None
             and "email" in ramp_user
