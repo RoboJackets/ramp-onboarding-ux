@@ -491,7 +491,35 @@ def _first_slack_user_id_for_emails(emails: Iterable[str]) -> Union[str, None]:
     return None
 
 
-def _iter_keycloak_slack_candidate_emails(keycloak_user: Dict[str, Any]) -> Iterable[str]:
+def _first_ramp_user_for_emails(emails: Iterable[str]) -> Union[Dict[str, Any], None]:
+    for email in emails:
+        ramp_users_response = ramp.get(  # type: ignore
+            url=app.config["RAMP_API_URL"] + "/developer/v1/users",
+            params={
+                "email": email,
+                "page_size": 100,
+            },
+            timeout=(5, 5),
+        )
+        ramp_users_response.raise_for_status()
+
+        ramp_users = ramp_users_response.json()["data"]
+
+        if len(ramp_users) == 1:
+            return ramp_users[0]  # type: ignore
+
+        if len(ramp_users) > 1:
+            raise InternalServerError("More than one Ramp user returned for email search")
+
+    return None
+
+
+def _iter_keycloak_candidate_emails(keycloak_user: Dict[str, Any]) -> Iterable[str]:
+    """
+    Yield candidate email addresses associated with a Keycloak user.
+
+    Used for Slack and Ramp lookups when matching an existing account by email.
+    """
     attributes = keycloak_user.get("attributes")
     if attributes is not None:
         for attribute_name in ("rampLoginEmailAddress", "googleWorkspaceAccount"):
@@ -563,7 +591,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         keycloak_user = get_keycloak_user_response.json()
 
         slack_user_id = _first_slack_user_id_for_emails(
-            _iter_keycloak_slack_candidate_emails(keycloak_user)
+            _iter_keycloak_candidate_emails(keycloak_user)
         )
         if slack_user_id is not None:
             return slack_user_id
@@ -1821,41 +1849,21 @@ def login() -> Any:
 
     if session["ramp_user_id"] is None:
         # check ramp to see if they already have an invitation with one of the emails from keycloak
-        ramp_user = None
+        keycloak_attributes = {}
+        for attribute_name in ("rampLoginEmailAddress", "googleWorkspaceAccount"):
+            attribute_value = userinfo.get(attribute_name)
+            if attribute_value is not None:
+                keycloak_attributes[attribute_name] = [attribute_value]
 
-        if "googleWorkspaceAccount" in userinfo and userinfo["googleWorkspaceAccount"] is not None:
-            ramp_users_response = ramp.get(  # type: ignore
-                url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-                params={
-                    "email": userinfo["googleWorkspaceAccount"],
-                    "page_size": 100,
-                },
-                timeout=(5, 5),
+        ramp_user = _first_ramp_user_for_emails(
+            _iter_keycloak_candidate_emails(
+                {
+                    "attributes": keycloak_attributes,
+                    "email": userinfo.get("email"),
+                    "username": username,
+                }
             )
-            ramp_users_response.raise_for_status()
-
-            if len(ramp_users_response.json()["data"]) == 1:
-                ramp_user = ramp_users_response.json()["data"][0]
-
-            if len(ramp_users_response.json()["data"]) > 1:
-                raise InternalServerError("More than one Ramp user returned for email search")
-
-        if ramp_user is None and "email" in userinfo and userinfo["email"] is not None:
-            ramp_users_response = ramp.get(  # type: ignore
-                url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-                params={
-                    "email": userinfo["email"],
-                    "page_size": 100,
-                },
-                timeout=(5, 5),
-            )
-            ramp_users_response.raise_for_status()
-
-            if len(ramp_users_response.json()["data"]) == 1:
-                ramp_user = ramp_users_response.json()["data"][0]
-
-            if len(ramp_users_response.json()["data"]) > 1:
-                raise InternalServerError("More than one Ramp user returned for email search")
+        )
 
         if (
             ramp_user is not None
