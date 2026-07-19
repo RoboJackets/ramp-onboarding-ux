@@ -1871,6 +1871,7 @@ def login() -> Any:
             and ramp_user["id"] is not None
             and "email" in ramp_user
             and ramp_user["email"] is not None
+            and not get_debug_flag()
         ):
             # user has an existing ramp invite but not loaded into keycloak
             # verify email address then store in keycloak (handled in index)
