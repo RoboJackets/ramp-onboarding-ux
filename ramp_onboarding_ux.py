@@ -492,7 +492,12 @@ def _first_slack_user_id_for_emails(emails: Iterable[str]) -> Union[str, None]:
 
 
 def _first_ramp_user_for_emails(emails: Iterable[str]) -> Union[Dict[str, Any], None]:
+    seen_emails: set[str] = set()
     for email in emails:
+        if email in seen_emails:
+            continue
+        seen_emails.add(email)
+
         ramp_users_response = ramp.get(  # type: ignore
             url=app.config["RAMP_API_URL"] + "/developer/v1/users",
             params={
