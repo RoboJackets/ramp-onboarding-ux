@@ -945,6 +945,10 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     )
     new_ramp_user_response.raise_for_status()
 
+    if new_ramp_user_response.json()["role"] == "BUSINESS_OWNER":
+        # this is not an inviteable role, so this event is from a UI demo
+        return
+
     if new_ramp_user_response.json()["manager_id"] is None:
         ramp_manager_user_response = None
         manager_slack_user_id = None
