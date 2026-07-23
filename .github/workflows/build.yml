@@ -52,8 +52,6 @@ jobs:
         run: |
           nomad job validate \
             -var image=ghcr.io/robojackets/ramp-onboarding-ux@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
-            -var registry_username=test \
-            -var registry_password=test \
             -var hostname=example.test \
             -var priority=10 \
             ramp-onboarding-ux.nomad
