@@ -192,15 +192,6 @@ for row in DictReader(app.config["BILL_PHYSICAL_CARD_ORDERS_CSV"].split("\n")):
     if row["Order Status"] in ["Activated", "Shipped"]:
         BILL_PHYSICAL_CARD_ADDRESSES[row["Card Holder"]] = row["Shipping Address"]
 
-ramp = OAuth2Session(
-    client_id=app.config["RAMP_CLIENT_ID"],
-    client_secret=app.config["RAMP_CLIENT_SECRET"],
-    scope="users:read users:write cards:write departments:read locations:read business:read",  # noqa: E501
-    token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
-)
-ramp.headers["User-Agent"] = USER_AGENT  # type: ignore
-ramp.fetch_token()
-
 keycloak = OAuth2Session(
     client_id=app.config["KEYCLOAK_ADMIN_CLIENT_ID"],
     client_secret=app.config["KEYCLOAK_ADMIN_CLIENT_SECRET"],
@@ -226,6 +217,15 @@ apiary = OAuth2Session(
 )
 apiary.headers["User-Agent"] = USER_AGENT  # type: ignore
 apiary.fetch_token()
+
+ramp = OAuth2Session(
+    client_id=app.config["RAMP_CLIENT_ID"],
+    client_secret=app.config["RAMP_CLIENT_SECRET"],
+    scope="users:read users:write cards:write departments:read locations:read business:read",  # noqa: E501
+    token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
+)
+ramp.headers["User-Agent"] = USER_AGENT  # type: ignore
+ramp.fetch_token()
 
 cache = Cache(app)
 
