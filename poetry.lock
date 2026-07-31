@@ -215,10 +215,32 @@ description = "A collection of cache libraries in the same API interface."
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
+markers = "python_version == \"3.10\""
 files = [
     {file = "cachelib-0.14.0-py3-none-any.whl", hash = "sha256:4671000b032baa8fac47ad19850f4f522785cee764b4e04c5cfe8955a18d67de"},
     {file = "cachelib-0.14.0.tar.gz", hash = "sha256:73fedcadd0ba818fb2bb9f3c7cd5fcc2a71e86286f1842f55f28d500faee17f1"},
 ]
+
+[[package]]
+name = "cachelib"
+version = "0.15.0"
+description = "A collection of cache libraries in the same API interface."
+optional = false
+python-versions = ">=3.11"
+groups = ["main"]
+markers = "python_version >= \"3.11\""
+files = [
+    {file = "cachelib-0.15.0-py3-none-any.whl", hash = "sha256:14a226c9856a48f1666cdb107fc4573171c1c820cb3fd2528a57f81fde8170e5"},
+    {file = "cachelib-0.15.0.tar.gz", hash = "sha256:40a387c42d12e90c8a1a2cb87dedcc34fd9143a5b2c7f2daed3d4c56ebf7bdfc"},
+]
+
+[package.extras]
+dynamodb = ["boto3 (>=1.43.4)"]
+memcached = ["pylibmc (>=1.6.3)"]
+mongodb = ["pymongo (>=4.11)"]
+redis = ["redis (>=6.0.0)"]
+uwsgi = ["uwsgi (>=2.0.28)"]
+valkey = ["valkey (>=6.1.0)"]
 
 [[package]]
 name = "celery"
