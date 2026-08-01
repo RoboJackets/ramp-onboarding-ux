@@ -1669,7 +1669,11 @@ def login() -> Any:
                     if role["name"] != "member" and role["name"] != "non-member":
                         role_check = True
 
-                    if role["name"] == "admin":
+                    if (
+                        role["name"] == "admin"
+                        and "is_student" in apiary_user
+                        and apiary_user["is_student"] is False
+                    ):
                         session["can_request_it_admin"] = True
 
             if "teams" in apiary_user and apiary_user["teams"] is not None:
