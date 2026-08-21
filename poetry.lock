@@ -246,15 +246,15 @@ files = [
 
 [[package]]
 name = "cachelib"
-version = "0.16.0"
+version = "0.16.1"
 description = "A collection of cache libraries in the same API interface."
 optional = false
 python-versions = ">=3.11"
 groups = ["main"]
 markers = "python_version >= \"3.11\""
 files = [
-    {file = "cachelib-0.16.0-py3-none-any.whl", hash = "sha256:5f8ef287471936178ccbcaac38d729248d2b4135a5d17a1eb477027bdea1c612"},
-    {file = "cachelib-0.16.0.tar.gz", hash = "sha256:0417107f32beebaf6cb1895112f4cf3c92da32fd9477f2c77b95afa10774d16c"},
+    {file = "cachelib-0.16.1-py3-none-any.whl", hash = "sha256:365ba096b1df85fe1e6df26716026c929076b218eb359c2b02c9a0674d26fe01"},
+    {file = "cachelib-0.16.1.tar.gz", hash = "sha256:597f1cba00e83b4a32d32504873367c253999a26a9ab32546a94766ff24c7a8b"},
 ]
 
 [package.extras]
