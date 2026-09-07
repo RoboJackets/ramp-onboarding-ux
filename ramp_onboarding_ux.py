@@ -487,7 +487,7 @@ def _first_slack_user_id_for_emails(emails: Iterable[str]) -> Union[str, None]:
     for email in emails:
         slack_user_id = get_slack_user_id_by_email(email)
         if slack_user_id is not None:
-            return slack_user_id  # type: ignore
+            return slack_user_id
     return None
 
 
@@ -622,7 +622,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         search_keycloak_user_response.raise_for_status()
 
         if len(search_keycloak_user_response.json()) == 1:
-            return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])  # type: ignore  # noqa: E501
+            return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])
 
         if len(search_keycloak_user_response.json()) == 0:
             search_keycloak_user_response = keycloak.get(  # type: ignore
@@ -635,7 +635,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             search_keycloak_user_response.raise_for_status()
 
             if len(search_keycloak_user_response.json()) == 1:
-                return get_slack_user_id(  # type: ignore
+                return get_slack_user_id(
                     keycloak_user_id=search_keycloak_user_response.json()[0]["id"]
                 )
 
@@ -653,7 +653,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                 search_keycloak_user_response.raise_for_status()
 
                 if len(search_keycloak_user_response.json()) == 1:
-                    return get_slack_user_id(  # type: ignore
+                    return get_slack_user_id(
                         keycloak_user_id=search_keycloak_user_response.json()[0]["id"]
                     )
 
@@ -2044,7 +2044,7 @@ def get_ramp_user(apiary_id: int) -> Dict[str, str]:
     # Only simple-mode users call this endpoint, and simple mode is limited to students, whose
     # department is always the students default. If non-students ever call this, the hard-coded
     # department gate will need to match the department selected in the frontend instead.
-    return resolve_ramp_user(str(apiary_id), app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])  # type: ignore  # noqa: E501
+    return resolve_ramp_user(str(apiary_id), app.config["RAMP_DEFAULT_DEPARTMENT_STUDENTS"])
 
 
 @cache.memoize(timeout=0, response_filter=only_cache_if_ramp_id_present)
