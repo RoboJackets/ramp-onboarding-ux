@@ -106,6 +106,29 @@
             },
             "versioning": "loose",
             "groupName": "elm"
+        },
+        {
+            "matchDepNames": [
+                "elm/compiler"
+            ],
+            "major": {
+                "enabled": true
+            },
+            "groupName": "elm"
+        }
+    ],
+    "customManagers": [
+        {
+            "customType": "regex",
+            "managerFilePatterns": [
+                "/^elm.json$/"
+            ],
+            "matchStrings": [
+                "\"elm-version\":\\s*\"(?<currentValue>[\\d\\.]+)\""
+            ],
+            "depNameTemplate": "elm/compiler",
+            "datasourceTemplate": "github-releases",
+            "versioningTemplate": "semver"
         }
     ]
 }
