@@ -121,7 +121,7 @@
         {
             "customType": "regex",
             "managerFilePatterns": [
-                "/^elm.json$/"
+                "/(^|/)elm.json$/"
             ],
             "matchStrings": [
                 "\"elm-version\":\\s*\"(?<currentValue>[\\d\\.]+)\""
