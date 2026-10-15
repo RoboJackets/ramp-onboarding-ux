@@ -1,9 +1,9 @@
 {
   "devDependencies": {
-    "elm": "0.19.2-0",
+    "elm": "0.19.3-0",
     "elm-format": "0.8.8",
     "elm-review": "2.13.5",
-    "elm-test": "0.19.2-1",
+    "elm-test": "0.19.3-0",
     "esbuild": "0.28.2",
     "terser": "5.51.2"
   },
