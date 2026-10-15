@@ -91,7 +91,21 @@
             "major": {
                 "enabled": true
             },
-            "versioning": "loose"
+            "versioning": "loose",
+            "groupName": "elm"
+        },
+        {
+            "matchCategories": [
+                "js"
+            ],
+            "matchDepNames": [
+                "elm-test"
+            ],
+            "major": {
+                "enabled": true
+            },
+            "versioning": "loose",
+            "groupName": "elm"
         }
     ]
 }
