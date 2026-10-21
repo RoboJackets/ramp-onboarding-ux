@@ -9,4 +9,9 @@
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"
     integrity="{{ calculate_integrity(url_for('static', filename='app.js')) }}" crossorigin="anonymous"></script>
+<noscript>
+<div class="alert alert-danger" role="alert">
+  This app requires JavaScript.
+</div>
+</noscript>
 {% endblock %}
