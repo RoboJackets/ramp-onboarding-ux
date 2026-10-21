@@ -169,7 +169,7 @@ if not get_debug_flag():
 
 celery_app = init_celery(app)
 
-oauth = OAuth(app)  # type: ignore
+oauth = OAuth(app)
 oauth.register(  # type: ignore
     name="keycloak",
     server_metadata_url=app.config["KEYCLOAK_METADATA_URL"],
@@ -207,7 +207,7 @@ keycloak = OAuth2Session(
     ),
     leeway=5,
 )
-keycloak.headers["User-Agent"] = USER_AGENT  # type: ignore
+keycloak.headers["User-Agent"] = USER_AGENT
 keycloak.fetch_token()
 
 apiary = OAuth2Session(
@@ -215,7 +215,7 @@ apiary = OAuth2Session(
     client_secret=app.config["APIARY_CLIENT_SECRET"],
     token_endpoint=app.config["APIARY_URL"] + "/oauth/token",
 )
-apiary.headers["User-Agent"] = USER_AGENT  # type: ignore
+apiary.headers["User-Agent"] = USER_AGENT
 apiary.fetch_token()
 
 ramp = OAuth2Session(
@@ -224,7 +224,7 @@ ramp = OAuth2Session(
     scope="users:read users:write cards:write departments:read locations:read business:read",  # noqa: E501
     token_endpoint=app.config["RAMP_API_URL"] + "/developer/v1/token",
 )
-ramp.headers["User-Agent"] = USER_AGENT  # type: ignore
+ramp.headers["User-Agent"] = USER_AGENT
 ramp.fetch_token()
 
 cache = Cache(app)
@@ -334,7 +334,7 @@ def get_apiary_managers() -> Dict[int, str]:
     """
     Get the list of managers from Apiary
     """
-    apiary_managers_response = apiary.get(  # type: ignore
+    apiary_managers_response = apiary.get(
         url=app.config["APIARY_URL"] + "/api/v1/users/managers",
         headers={
             "Accept": "application/json",
@@ -369,7 +369,7 @@ def get_ramp_departments() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of departments from Ramp
     """
-    ramp_departments_response = ramp.get(  # type: ignore
+    ramp_departments_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/departments",
         timeout=(5, 5),
     )
@@ -397,7 +397,7 @@ def get_ramp_locations() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of locations from Ramp
     """
-    ramp_locations_response = ramp.get(  # type: ignore
+    ramp_locations_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/locations",
         timeout=(5, 5),
     )
@@ -427,7 +427,7 @@ def get_ramp_users() -> Dict[str, Dict[str, Union[str, bool]]]:
     """
     Get the list of users from Ramp
     """
-    ramp_users_response = ramp.get(  # type: ignore
+    ramp_users_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users",
         params={
             "page_size": 100,
@@ -456,7 +456,7 @@ def get_ramp_business() -> Dict[str, str]:
     """
     Get the business information from Ramp
     """
-    ramp_business_response = ramp.get(  # type: ignore
+    ramp_business_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/business",
         timeout=(5, 5),
     )
@@ -498,9 +498,9 @@ def _first_ramp_user_for_emails(emails: Iterable[str]) -> Union[Dict[str, Any], 
             continue
         seen_emails.add(email)
 
-        ramp_users_response = ramp.get(  # type: ignore
+        ramp_users_response = ramp.get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-            params={
+            params={  # type: ignore
                 "email": email,
                 "page_size": 100,
             },
@@ -541,7 +541,7 @@ def _iter_keycloak_candidate_emails(keycloak_user: Dict[str, Any]) -> Iterable[s
 
     yield username + "@gatech.edu"
 
-    apiary_user_response = apiary.get(  # type: ignore
+    apiary_user_response = apiary.get(
         url=app.config["APIARY_URL"] + "/api/v1/users/" + username,
         headers={
             "Accept": "application/json",
@@ -583,7 +583,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
     Get the Slack user ID for a given Keycloak or Ramp user
     """
     if "keycloak_user_id" in kwargs and kwargs["keycloak_user_id"] is not None:
-        get_keycloak_user_response = keycloak.get(  # type: ignore
+        get_keycloak_user_response = keycloak.get(
             url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
@@ -602,7 +602,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             return slack_user_id
 
     if "ramp_user_id" in kwargs and kwargs["ramp_user_id"] is not None:
-        ramp_user_response = ramp.get(  # type: ignore
+        ramp_user_response = ramp.get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + kwargs["ramp_user_id"],
             timeout=(5, 5),
         )
@@ -612,7 +612,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
         if slack_user_id is not None:
             return slack_user_id
 
-        search_keycloak_user_response = keycloak.get(  # type: ignore
+        search_keycloak_user_response = keycloak.get(
             url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
             params={
                 "q": "rampUserId:" + kwargs["ramp_user_id"],
@@ -625,7 +625,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
             return get_slack_user_id(keycloak_user_id=search_keycloak_user_response.json()[0]["id"])
 
         if len(search_keycloak_user_response.json()) == 0:
-            search_keycloak_user_response = keycloak.get(  # type: ignore
+            search_keycloak_user_response = keycloak.get(
                 url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
                 params={
                     "q": "rampLoginEmailAddress:" + ramp_user_response.json()["email"],
@@ -640,7 +640,7 @@ def get_slack_user_id(**kwargs: str) -> Union[str, None]:
                 )
 
             if len(search_keycloak_user_response.json()) == 0:
-                search_keycloak_user_response = keycloak.get(  # type: ignore
+                search_keycloak_user_response = keycloak.get(
                     url=keycloak_server
                     + "/admin/realms/"
                     + app.config["KEYCLOAK_REALM"]
@@ -697,7 +697,7 @@ def remove_eligible_role(keycloak_user_id: str) -> None:
     """
     Remove the eligible role from this user in Keycloak, after they are provisioned
     """
-    remove_eligible_role_response = keycloak.delete(  # type: ignore
+    remove_eligible_role_response = keycloak.delete(
         url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
@@ -740,7 +740,7 @@ def update_keycloak_user(
     Update a Keycloak user via GET-merge-PUT (Admin API has no PATCH).
     """
     if existing_user is None:
-        get_keycloak_user_response = keycloak.get(  # type: ignore
+        get_keycloak_user_response = keycloak.get(
             url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
@@ -762,7 +762,7 @@ def update_keycloak_user(
     if extra_fields is not None:
         new_user.update(extra_fields)
 
-    update_keycloak_user_response = keycloak.put(  # type: ignore
+    update_keycloak_user_response = keycloak.put(
         url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
@@ -779,7 +779,7 @@ def store_ramp_user_id_in_keycloak(keycloak_user_id: str, ramp_user_id: str) -> 
     """
     Store the Ramp user ID in Keycloak
     """
-    ramp_user_response = ramp.get(  # type: ignore
+    ramp_user_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         timeout=(5, 5),
     )
@@ -803,7 +803,7 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
     if cache.get("slack_ineligible_message_" + keycloak_user_id) is not None:
         return
 
-    get_keycloak_user_response = keycloak.get(  # type: ignore
+    get_keycloak_user_response = keycloak.get(
         url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
@@ -832,7 +832,7 @@ def notify_slack_ineligible(keycloak_user_id: str) -> None:
         ),
     )
 
-    apiary_user_response = apiary.get(  # type: ignore
+    apiary_user_response = apiary.get(
         url=app.config["APIARY_URL"]
         + "/api/v1/users/"
         + get_keycloak_user_response.json()["username"],
@@ -939,7 +939,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         logging.warning("multiple tasks triggered, returning early")
         return
 
-    new_ramp_user_response = ramp.get(  # type: ignore
+    new_ramp_user_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         timeout=(5, 5),
     )
@@ -953,7 +953,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
         ramp_manager_user_response = None
         manager_slack_user_id = None
     else:
-        ramp_manager_user_response = ramp.get(  # type: ignore
+        ramp_manager_user_response = ramp.get(
             url=app.config["RAMP_API_URL"]
             + "/developer/v1/users/"
             + new_ramp_user_response.json()["manager_id"],
@@ -995,7 +995,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
 
     possessive_pronoun = "their"
 
-    get_keycloak_user_response = keycloak.get(  # type: ignore
+    get_keycloak_user_response = keycloak.get(
         url=keycloak_server
         + "/admin/realms/"
         + app.config["KEYCLOAK_REALM"]
@@ -1005,7 +1005,7 @@ def notify_slack_account_created(keycloak_user_id: str, ramp_user_id: str) -> No
     )
     get_keycloak_user_response.raise_for_status()
 
-    apiary_user_response = apiary.get(  # type: ignore
+    apiary_user_response = apiary.get(
         url=app.config["APIARY_URL"]
         + "/api/v1/users/"
         + get_keycloak_user_response.json()["username"],
@@ -1300,7 +1300,7 @@ def index() -> Any:
     keycloak_user_response = None
 
     if "ramp_user_id" not in session or session["ramp_user_id"] is None:
-        keycloak_user_response = keycloak.get(  # type: ignore
+        keycloak_user_response = keycloak.get(
             url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
@@ -1321,7 +1321,7 @@ def index() -> Any:
         ramp_user_id = session["ramp_user_id"]
 
     if ramp_user_id is not None:
-        ramp_user_response = ramp.get(  # type: ignore
+        ramp_user_response = ramp.get(
             url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
             timeout=(5, 5),
         )
@@ -1341,7 +1341,7 @@ def index() -> Any:
             )
 
         # check if the login email address in keycloak matches ramp
-        keycloak_user_response = keycloak.get(  # type: ignore
+        keycloak_user_response = keycloak.get(
             url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
@@ -1639,7 +1639,7 @@ def login() -> Any:
         session["user_state"] = "ineligible"
 
     if session["user_state"] == "ineligible" or session["user_state"] == "eligible":
-        apiary_user_response = apiary.get(  # type: ignore
+        apiary_user_response = apiary.get(
             url=app.config["APIARY_URL"] + "/api/v1/users/" + username,
             headers={
                 "Accept": "application/json",
@@ -2052,7 +2052,7 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     """
     Resolves an Apiary user ID to a Ramp user ID via Keycloak, with optional department gating
     """
-    apiary_user_response = apiary.get(  # type: ignore
+    apiary_user_response = apiary.get(
         url=app.config["APIARY_URL"] + "/api/v1/users/" + apiary_id,
         headers={
             "Accept": "application/json",
@@ -2061,7 +2061,7 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     )
     apiary_user_response.raise_for_status()
 
-    keycloak_user_response = keycloak.get(  # type: ignore
+    keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "username": apiary_user_response.json()["user"]["uid"],
@@ -2102,7 +2102,7 @@ def resolve_ramp_user(apiary_id: str, required_department_id: Union[str, None]) 
     else:
         return {"error": "More than one result for manager search in Keycloak"}
 
-    ramp_user_response = ramp.get(  # type: ignore
+    ramp_user_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         timeout=(5, 5),
     )
@@ -2188,7 +2188,7 @@ def create_ramp_account() -> tuple[dict[str, Any], int]:
         timeout=0,
     )
 
-    ramp_invite_user_response = ramp.post(  # type: ignore
+    ramp_invite_user_response = ramp.post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred",
         json=request_body,
         timeout=(5, 5),
@@ -2213,7 +2213,7 @@ def get_ramp_account_status() -> Dict[str, str]:
 
     task_id = session["create_ramp_account_task_id"]
 
-    ramp_task_status = ramp.get(  # type: ignore
+    ramp_task_status = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/deferred/status/" + task_id,
         timeout=(5, 5),
     )
@@ -2268,7 +2268,7 @@ def order_physical_card() -> tuple[dict[str, Any], int]:
 
     cache.set("physical_card_ordered_" + session["sub"], True, timeout=0)
 
-    ramp_order_physical_card_response = ramp.post(  # type: ignore
+    ramp_order_physical_card_response = ramp.post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/cards/physical",
         json={
             "shipping_address": {
@@ -2325,7 +2325,7 @@ def handle_slack_event() -> Dict[str, str]:
         return {"status": "ok"}
 
     if payload["actions"][0]["action_id"] == "grant_eligibility_in_keycloak":
-        add_eligible_role_response = keycloak.post(  # type: ignore
+        add_eligible_role_response = keycloak.post(
             url=keycloak_server
             + "/admin/realms/"
             + app.config["KEYCLOAK_REALM"]
@@ -2383,9 +2383,9 @@ def handle_invitation_delivery(invitation_url: str) -> None:
 
         return
 
-    ramp_users_response = ramp.get(  # type: ignore
+    ramp_users_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users",
-        params={
+        params={  # type: ignore
             "email": query_string["email"][0],
             "page_size": 100,
         },
@@ -2404,7 +2404,7 @@ def handle_invitation_delivery(invitation_url: str) -> None:
 
     ramp_user_id = ramp_user["id"]
 
-    search_keycloak_user_response = keycloak.get(  # type: ignore
+    search_keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "googleWorkspaceAccount:" + ramp_user["email"],
@@ -2470,7 +2470,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
     """
     Find the Keycloak user ID for a Ramp user, searching by rampUserId then email attributes
     """
-    search_keycloak_user_response = keycloak.get(  # type: ignore
+    search_keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampUserId:" + ramp_user_id,
@@ -2485,7 +2485,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
     if len(search_keycloak_user_response.json()) > 1:
         raise Exception("More than one Keycloak user returned for rampUserId search")
 
-    search_keycloak_user_response = keycloak.get(  # type: ignore
+    search_keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampLoginEmailAddress:" + ramp_user_email,
@@ -2500,7 +2500,7 @@ def find_keycloak_user_id_for_ramp_user(ramp_user_id: str, ramp_user_email: str)
     if len(search_keycloak_user_response.json()) > 1:
         raise Exception("More than one Keycloak user returned for rampLoginEmailAddress search")
 
-    search_keycloak_user_response = keycloak.get(  # type: ignore
+    search_keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "googleWorkspaceAccount:" + ramp_user_email,
@@ -2533,7 +2533,7 @@ def verify_ramp_webhook_subscription(challenge: str) -> None:
     """
     Verify a pending Ramp webhook subscription using the challenge from webhooks.verification
     """
-    ramp_webhooks_response = ramp.get(  # type: ignore
+    ramp_webhooks_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks",
         timeout=(5, 5),
     )
@@ -2544,7 +2544,7 @@ def verify_ramp_webhook_subscription(challenge: str) -> None:
             continue
 
         try:
-            verify_response = ramp.post(  # type: ignore
+            verify_response = ramp.post(
                 url=app.config["RAMP_API_URL"]
                 + "/developer/v1/webhooks/"
                 + subscription["id"]
@@ -2565,7 +2565,7 @@ def handle_invite_accepted(ramp_user_id: str) -> None:
     """
     Process a users.invite_accepted webhook event from Ramp
     """
-    ramp_user_response = ramp.get(  # type: ignore
+    ramp_user_response = ramp.get(
         url=app.config["RAMP_API_URL"] + "/developer/v1/users/" + ramp_user_id,
         timeout=(5, 5),
     )
@@ -2647,7 +2647,7 @@ def send_slack_messages(ramp_user_id: str) -> None:
     """
     Manually send Slack welcome messages for a given user
     """
-    search_keycloak_user_response = keycloak.get(  # type: ignore
+    search_keycloak_user_response = keycloak.get(
         url=keycloak_server + "/admin/realms/" + app.config["KEYCLOAK_REALM"] + "/users",
         params={
             "q": "rampUserId:" + ramp_user_id,
@@ -2676,7 +2676,7 @@ def create_ramp_webhook_subscription() -> None:
     """
     endpoint_url = url_for("handle_ramp_webhook_event", _external=True, _scheme="https")
 
-    ramp_webhook_response = ramp.post(  # type: ignore
+    ramp_webhook_response = ramp.post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks",
         json={
             "endpoint_url": endpoint_url,
@@ -2705,7 +2705,7 @@ def send_mock_ramp_webhook_event() -> None:
     """
     Send a mock tests.test_event webhook to confirm delivery and signature verification
     """
-    ramp_mock_webhook_response = ramp.post(  # type: ignore
+    ramp_mock_webhook_response = ramp.post(
         url=app.config["RAMP_API_URL"] + "/developer/v1/webhooks/mock-webhook-event",
         json={
             "event_type": "tests.test_event",
