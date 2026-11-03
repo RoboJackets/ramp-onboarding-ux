@@ -1,4 +1,4 @@
-# syntax = docker/dockerfile:1.26
+# syntax = docker/dockerfile:1.28
 
 FROM node:24-trixie AS frontend
 
