@@ -2,7 +2,7 @@ import { renderElmApp } from './elmHarness';
 import { serverData } from './serverData';
 
 export default {
-  title: 'Onboarding/Form',
+  title: 'Onboarding Form/Minimal',
   render: (args) => renderElmApp({
     serverData: args.serverData,
     localData: JSON.stringify(args.localData),
@@ -14,36 +14,16 @@ export default {
   },
 };
 
-export const MinimalReady = {
+export const Ready = {
   args: {
     serverData: { ...serverData, showAdvancedOptions: false },
     localData: { orderPhysicalCard: false },
   },
 };
 
-export const MinimalEmailVerified = {
+export const EmailVerified = {
   args: {
     serverData: { ...serverData, showAdvancedOptions: false, emailVerified: true },
     localData: { orderPhysicalCard: false },
-  },
-};
-
-export const BasicModeReady = {};
-
-export const BasicModeEmailVerified = {
-  args: {
-    serverData: { ...serverData, emailVerified: true },
-  },
-};
-
-export const AdvancedModeReady = {
-  args: {
-    serverData: { ...serverData, showAdvancedOptions: true },
-  },
-};
-
-export const AdvancedModeEmailVerified = {
-  args: {
-    serverData: { ...serverData, showAdvancedOptions: true, emailVerified: true },
   },
 };
