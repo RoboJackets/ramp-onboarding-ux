@@ -170,7 +170,10 @@ js/entrypoint.bundle.js
 js/entrypoint.bundle.js.map
 static/app.js
 static/app.js.map
-main.js
+/main.js
 
 # JavaScript stuff
 node_modules/
+
+*storybook.log
+storybook-static
