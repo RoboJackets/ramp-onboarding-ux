@@ -1,8 +1,6 @@
-name: Build and Publish Storybook to GitHub Pages
+name: Build and Publish Storybook
 on:
-  push:
-    branches:
-      - main
+  - push
 permissions:
   contents: read
   pages: write
@@ -11,11 +9,8 @@ concurrency:
   group: 'pages'
   cancel-in-progress: false
 jobs:
-  deploy:
+  build-storybook:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -34,6 +29,27 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'storybook-static'
+
+  publish-storybook:
+    if: ${{ github.ref == 'refs/heads/main' }}
+
+    runs-on: ubuntu-26.04
+
+    needs: build-artifact
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    concurrency:
+      group: deploy-github-pages
+      cancel-in-progress: false
+
+    steps:
       - id: deploy
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
