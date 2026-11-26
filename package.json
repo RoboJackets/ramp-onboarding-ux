@@ -7,7 +7,7 @@
     "elm-test": "0.19.3-0",
     "esbuild": "0.28.2",
     "storybook": "^10.6.7",
-    "terser": "5.51.2",
+    "terser": "5.51.4",
     "vite-plugin-elm": "4.0.0-2"
   },
   "scripts": {
